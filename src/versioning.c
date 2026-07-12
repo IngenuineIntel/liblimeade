@@ -15,15 +15,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
-#include<liblimeade.h>
+#include <liblimeade.h>
 
-LIBLIMEADE_COMPATIBILITY liblimeade_check_versioning(LIBLIMEADE_VERSION local_ver,
-                                                     LIBLIMEADE_VERSION target_ver)
+LIBLIMEADE_COMPATIBILITY
+liblimeade_check_versioning(LIBLIMEADE_VERSION local_ver,
+                            LIBLIMEADE_VERSION target_ver)
 {
   int diff = local_ver.mja - target_ver.maj;
 
   // diff = abs(diff)
-  if(diff < 0)
+  if (diff < 0)
   {
     diff = -diff;
   }
@@ -32,16 +33,15 @@ LIBLIMEADE_COMPATIBILITY liblimeade_check_versioning(LIBLIMEADE_VERSION local_ve
   int is_ident_min = (local_ver.min == target_ver.min) ? 1 : 0;
 
   // same major version
-  if(is_ident_maj)
+  if (is_ident_maj)
   {
     // versions have to be identical when before v1.0, otherwise indeterminate
-    if(local_ver.maj == 0) && (!is_ident_min)
-    {
-      return INDETERMINATE_COMPATIBILITY;
-    }
+    if (local_ver.maj == 0)
+      &&(!is_ident_min) { return INDETERMINATE_COMPATIBILITY; }
 
     return COMPATIBLE;
-  } else if(diff == 1)
+  }
+  else if (diff == 1)
   {
     // versions are within 1 major version
     // insert exceptions here

@@ -19,42 +19,51 @@
 #ifndef _LIBLIMEADE_ENTRY_H
 #define _LIBLIMEADE_ENTRY_H
 
-#include<stdbool.h>
-#include<stddef.h>
-#include<stdint.h>
-#include<sys/types.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 /*** INIT ***/
 
+// context manager for library usage (the "this|self|me" of the library)
 typedef struct LIMEADE_CONTEXT_IMPL *LIMEADE_CONTEXT;
 
-// representation of a framed payload for stream transports (SSH subsystem I/O)
-
+// representation of a raw payload
 typedef struct
 {
   uint32_t sz;         // payload size in bytes
   unsigned char *data; // payload bytes
 } LIMEADE_PACKET;
 
+// initialization functions for host and client
 LIMEADE_CONTEXT limeade_host_init(unsigned int port);
-LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user, const char *passwd);
+LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
+                                    const char *passwd);
 
+// send functions for host and client
 int limeade_host_send(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt);
 int limeade_client_send(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt);
 
+// receive functions for host and client
 LIMEADE_PACKET limeade_host_recv(LIMEADE_CONTEXT ctx);
 LIMEADE_PACKET limeade_client_recv(LIMEADE_CONTEXT ctx);
 
+// sets timeout when waiting for complete packet
 int limeade_context_set_timeout(LIMEADE_CONTEXT ctx, int timeout_ms);
+
+// deinitialization functions for host and client
 void limeade_host_free(LIMEADE_CONTEXT ctx);
 void limeade_client_free(LIMEADE_CONTEXT ctx);
-
 
 /***  PACKET DESIGN  ***/
 
 // all packets have 4 components:
 /// 1. the magic, which indicates the protocol
 static const char LIMEADE_MAGIC[7] = "!LIME!\x00";
+
+// clang-format off
+// if on the graph below gets mangled
 
 /// 2. the flags
 // The flags are, in total, always 7 bytes, as follows:
@@ -70,16 +79,19 @@ static const char LIMEADE_MAGIC[7] = "!LIME!\x00";
 // ,--+,--+,--+,------------+,------------+,------+,------+
 // 0001000001010000010100110101000011101101001111111011111111
 
-// note: all `Data`s are compression with the DEFLATE algorithm @ compression_level 5
+/// clang-format on
+
+// note: all `Data`s are compression with the DEFLATE algorithm @
+// compression_level 5
 
 // version info
 typedef struct
 {
-  uint8_t maj:4; // major version number
-  uint8_t min:4; // minor version number
+  uint8_t maj : 4; // major version number
+  uint8_t min : 4; // minor version number
 } LIBLIMEADE_VERSION;
 
-LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION = {0,1};
+LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION = {0, 1};
 
 // packet types
 typedef enum
@@ -91,23 +103,23 @@ typedef enum
   LIMEADE_CLIENT_PROCS_UPDATE,  // process table info (dynamic)
   LIMEADE_CLIENT_PERF,          // resource usage info
   LIMEADE_CLIENT_ASK,           // ask to connect
-  // host packets
-  LIMEADE_HOST_ANSWER,          // confirm connection (or disband connection)
-  LIMEADE_HOST_COMMANDEER,      // execute command on the client
-  LIMEADE_HOST_GETSHELL         // demands a cryptcat instance on the client
+                      // host packets
+  LIMEADE_HOST_ANSWER,     // confirm connection (or disband connection)
+  LIMEADE_HOST_COMMANDEER, // execute command on the client
+  LIMEADE_HOST_GETSHELL    // demands a cryptcat instance on the client
 } LIMEADE_PACKET_TYPE;
 
 // field delimiter
 static char LIMEADE_FIELD_DELIM = '\xFE';
-static char LIMEADE_ROW_DELIM   = '\xFF';
+static char LIMEADE_ROW_DELIM = '\xFF';
 
 // the flags themselves
 typedef struct
 {
   uint8_t version;
-  LIMEADE_PACKET_TYPE type:4;
-  uint16_t datasz_before_compression:14;
-  uint16_t datasz_after_compression:14;
+  LIMEADE_PACKET_TYPE type : 4;
+  uint16_t datasz_before_compression : 14;
+  uint16_t datasz_after_compression : 14;
   char field_delim;
   char row_delim;
 } LIMEADE_PACKET_FLAGS;
@@ -149,12 +161,12 @@ typedef struct
 typedef struct
 {
   TS ts;
-  pid_t pid;      // PID of the calling process
-  char *type;     // type of syscall    (open, get)
-  char *subtype;  // subtype of syscall (opensysat2, geteuid)
-  char *arg1;     // RDI at call time ("/dev/null", etc.)
-  char *arg2;     // RSI at call time (b00010010, etc.)
-  int retval;     // return value from syscall
+  pid_t pid;     // PID of the calling process
+  char *type;    // type of syscall    (open, get)
+  char *subtype; // subtype of syscall (opensysat2, geteuid)
+  char *arg1;    // RDI at call time ("/dev/null", etc.)
+  char *arg2;    // RSI at call time (b00010010, etc.)
+  int retval;    // return value from syscall
 } EVENT;
 
 typedef struct
@@ -183,7 +195,8 @@ typedef struct
 } LIMEADE_PACKET_PROCS_GENERIC;
 
 // CLIENT_PROCS_UPDATE
-typedef struct LIMEADE_PACKET_PROCS_UPDATE LIMEADE_PACKET_PROCS_UPDATE; // NOT IMPLEMENTED
+typedef struct LIMEADE_PACKET_PROCS_UPDATE
+    LIMEADE_PACKET_PROCS_UPDATE; // NOT IMPLEMENTED
 
 typedef struct
 {
@@ -233,14 +246,12 @@ LIMEADE_PACKET limeade_compile_answer(LIMEADE_PACKET_ANSWER in);
 LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_PACKET_COMMANDEER in);
 LIMEADE_PACKET limeade_compile_getshell(LIMEADE_PACKET_GETSHELL in);
 
-
 /***  DECODING  ***/
 
 // parsing flags
 LIMEADE_PACKET_FLAGS limeade_parseflags(char *flags_raw);
 
 // TODO
-
 
 /***  ERRORS  ***/
 
@@ -277,7 +288,8 @@ typedef enum
 static uint8_t LIMEADE_ERRORS[5];
 
 // which index in the buffer is the latest error
-// if =1, the latest error is at [1], the previous [0], and the next previous [5], etc.
+// if =1, the latest error is at [1], the previous [0], and the next previous
+// [5], etc.
 static uint8_t LIMEADE_ERROR_INDEX;
 
 // errors are added by a handler function,
@@ -316,7 +328,8 @@ typedef enum
 // local_ver: this program's version
 // target_ver: the presumed communicating program's version of this same
 // software
-LIBLIMEADE_COMPATIBILITY liblimeade_check_versioning(LIBLIMEADE_VERSION local_ver,
-                                                     LIBLIMEADE_VERSION target_ver);
+LIBLIMEADE_COMPATIBILITY
+liblimeade_check_versioning(LIBLIMEADE_VERSION local_ver,
+                            LIBLIMEADE_VERSION target_ver);
 
 #endif /* _LIBLIMEADE_ENTRY_H */
