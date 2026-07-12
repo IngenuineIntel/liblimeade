@@ -34,6 +34,8 @@ typedef struct
 } LIMEADE_DATA;
 
 // writer call error guard
+// note that limeade_wru, limeade_wri, and limeade_wrd are wrapped in this macro
+// because they require checks that limeade_wrs doesn't need
 #define LIMEADE_WERR(expr, ret)                                                \
   do                                                                           \
   {                                                                            \
@@ -72,7 +74,7 @@ static size_t limeade_di64(long long value)
 {
   unsigned long long magnitude;
 
-  if (value >= 0)
+  if (value >= 0) // just treat as unsigned
   {
     return limeade_du64((unsigned long long)value);
   }
@@ -99,6 +101,7 @@ static size_t limeade_szu(unsigned long long value)
 // calculate bytes to render double
 static int limeade_szd(double value, size_t *size_out)
 {
+  // TODO workaround for snprintf?
   int n = snprintf(NULL, 0, "%.17g", value);
 
   if (n < 0)
@@ -119,6 +122,7 @@ static void limeade_wrs(char *dst, const char *value, char delim)
   {
     char ch = *scan++;
 
+    // IMPORTANT: escaping delimeters
     if (ch == LIMEADE_FIELD_DELIM || ch == LIMEADE_ROW_DELIM)
     {
       ch = ' ';
@@ -181,6 +185,7 @@ LIMEADE_PACKET_FLAGS limeade_genflags(LIMEADE_PACKET_TYPE type,
                                       unsigned int datasz_after_compression)
 {
   /* Generates flag datatype from given packet information */
+  // TODO write in a way that doesn't make clang-format get hysterical
   return (LIMEADE_PACKET_FLAGS){
       .version = LIMEADE_CHECKERROTOCOL_VERSION,
       .type = type,
@@ -197,11 +202,15 @@ LIMEADE_PACKET_FLAGS limeade_genflags(LIMEADE_PACKET_TYPE type,
 
 /*** BIG HELPERS ***/
 
+// small note to perusers:
+// a lot of these functions are really superfluous, and so not all of them have
+// comments, but since they all work about the same, they'll work all the same
+
 LIMEADE_DATA limeade_gendata_sysoverv(LIMEADE_PACKET_SYSOVERV in)
 {
   /* Converts LIMEADE_PACKET_SYSOVERV data to an buffer that can be
    * compressed to be used as the packet's data segment.
-   * Returns a LIMEADE_DATA object for simplicity.
+   * Returns a LIMEADE_DATA object.
    */
 
   LIMEADE_DATA ret = {0, NULL};
@@ -228,6 +237,7 @@ LIMEADE_DATA limeade_gendata_sysoverv(LIMEADE_PACKET_SYSOVERV in)
     return ret;
   }
 
+  // index
   data_index = (char *)ret.data;
 
   // write + increment
@@ -245,10 +255,10 @@ LIMEADE_DATA limeade_gendata_sysoverv(LIMEADE_PACKET_SYSOVERV in)
   data_index += processorsz;
   limeade_wrs(data_index, in.processor_vend, LIMEADE_FIELD_DELIM);
   data_index += processor_vendsz;
+
   LIMEADE_WERR(limeade_wru(data_index, ram_gbssz,
                            (unsigned long long)in.ram_gbs, LIMEADE_ROW_DELIM),
                ret);
-  data_index += ram_gbssz;
 
   return ret;
 }
@@ -271,8 +281,7 @@ LIMEADE_DATA limeade_gendata_events(LIMEADE_PACKET_EVENTS in)
   char *data_index;
   size_t ts_ssz, ts_mssz, pidsz, typesz, subtypesz, arg1sz, arg2sz, retvalsz, i;
 
-  in.nr_events;
-
+  // buffer size calculation
   for (i = 0; i < in.nr_events; i++)
   {
     EVENT *ev;
@@ -295,11 +304,6 @@ LIMEADE_DATA limeade_gendata_events(LIMEADE_PACKET_EVENTS in)
 
     ret.len += ts_ssz + ts_mssz + pidsz + typesz + subtypesz + arg1sz + arg2sz +
                retvalsz;
-  }
-
-  if (ret.len == 0)
-  {
-    return ret;
   }
 
   ret.data = malloc(ret.len);

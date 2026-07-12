@@ -52,11 +52,11 @@ struct LIMEADE_CONTEXT_IMPL
   unsigned int port;
 };
 
-static const size_t LIMEADE_MAGIC_WIRE_LEN = 7;
-static const size_t LIMEADE_FLAGS_WIRE_LEN = 7;
-static const size_t LIMEADE_SESSION_WIRE_LEN = 5;
-static const uint16_t LIMEADE_MAX_DATASZ = 16384;
-static const char *LIMEADE_SUBSYSTEM_NAME = "limeade";
+#define LIMEADE_MAGIC_WIRE_LEN 7
+#define LIMEADE_FLAGS_WIRE_LEN 7
+#define LIMEADE_SESSION_WIRE_LEN 5
+#define LIMEADE_MAX_DATASZ 16384 // 2 ** 14
+#define LIMEADE_SUBSYSTEM_NAME "limeade"
 
 static LIMEADE_PACKET limeade_empty_packet(void)
 {
@@ -67,13 +67,9 @@ static LIMEADE_PACKET limeade_empty_packet(void)
   return p;
 }
 
-static void limeade_record_error(LIMEADE_ERROR_TYPE err)
-{
-  limeade_inserror(err);
-}
-
 static void limeade_generate_session_id(uint8_t out[LIMEADE_SESSION_WIRE_LEN])
 {
+  /* Generates pseudo-random session ID */
   size_t i;
 
   srand((unsigned int)(time(NULL) ^ (unsigned int)getpid()));
@@ -86,6 +82,7 @@ static void limeade_generate_session_id(uint8_t out[LIMEADE_SESSION_WIRE_LEN])
 static int limeade_parse_wire_flags(const uint8_t raw[LIMEADE_FLAGS_WIRE_LEN],
                                     LIMEADE_WIRE_FLAGS *out)
 {
+  /* Converts raw packet data into a LIMEADE_WIRE_FLAGS object */
   uint8_t b1;
   uint8_t b2;
   uint8_t b3;
@@ -124,7 +121,7 @@ static int limeade_read_exact(LIMEADE_CONTEXT ctx, void *buf, size_t need)
 
   if (ctx == NULL || buf == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_INVALID_CONTEXT);
+    limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
     return -1;
   }
 
@@ -146,19 +143,19 @@ static int limeade_read_exact(LIMEADE_CONTEXT ctx, void *buf, size_t need)
 
     if (rc == SSH_ERROR)
     {
-      limeade_record_error(LIMEADE_ERROR_SSH_IO);
+      limeade_inserror(LIMEADE_ERROR_SSH_IO);
       return -1;
     }
 
     if (rc == SSH_AGAIN)
     {
-      limeade_record_error(LIMEADE_ERROR_TIMEOUT);
+      limeade_inserror(LIMEADE_ERROR_TIMEOUT);
       return -1;
     }
 
     if (rc == 0)
     {
-      limeade_record_error(LIMEADE_ERROR_SSH_IO);
+      limeade_inserror(LIMEADE_ERROR_SSH_IO);
       return -1;
     }
 
@@ -175,7 +172,7 @@ static int limeade_write_exact(LIMEADE_CONTEXT ctx, const void *buf,
 
   if (ctx == NULL || buf == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_INVALID_CONTEXT);
+    limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
     return -1;
   }
 
@@ -188,7 +185,7 @@ static int limeade_write_exact(LIMEADE_CONTEXT ctx, const void *buf,
                            (uint32_t)(need - off));
     if (rc == SSH_ERROR || rc <= 0)
     {
-      limeade_record_error(LIMEADE_ERROR_SSH_IO);
+      limeade_inserror(LIMEADE_ERROR_SSH_IO);
       return -1;
     }
 
@@ -223,13 +220,13 @@ static int limeade_send_common(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt,
 
   if (ctx == NULL || ctx->role != role || ctx->channel == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_INVALID_CONTEXT);
+    limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
     return -1;
   }
 
   if (pckt.data == NULL || pckt.sz == 0)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_FORMAT);
+    limeade_inserror(LIMEADE_ERROR_PACKET_FORMAT);
     return -1;
   }
 
@@ -237,19 +234,19 @@ static int limeade_send_common(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt,
   min_header = LIMEADE_MAGIC_WIRE_LEN + LIMEADE_FLAGS_WIRE_LEN;
   if ((size_t)pckt.sz < min_header)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_FORMAT);
+    limeade_inserror(LIMEADE_ERROR_PACKET_FORMAT);
     return -1;
   }
 
   if (memcmp(wire, LIMEADE_MAGIC, LIMEADE_MAGIC_WIRE_LEN) != 0)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_MAGIC);
+    limeade_inserror(LIMEADE_ERROR_PACKET_MAGIC);
     return -1;
   }
 
   if (limeade_parse_wire_flags(wire + LIMEADE_MAGIC_WIRE_LEN, &flags) < 0)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_FORMAT);
+    limeade_inserror(LIMEADE_ERROR_PACKET_FORMAT);
     return -1;
   }
 
@@ -258,7 +255,7 @@ static int limeade_send_common(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt,
                     : LIMEADE_SESSION_WIRE_LEN;
   if ((size_t)pckt.sz < min_header + session_len)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_FORMAT);
+    limeade_inserror(LIMEADE_ERROR_PACKET_FORMAT);
     return -1;
   }
 
@@ -266,7 +263,7 @@ static int limeade_send_common(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt,
   {
     if (!ctx->has_session_id)
     {
-      limeade_record_error(LIMEADE_ERROR_PACKET_SESSION);
+      limeade_inserror(LIMEADE_ERROR_PACKET_SESSION);
       return -1;
     }
 
@@ -279,7 +276,7 @@ static int limeade_send_common(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt,
     return -1;
   }
 
-  limeade_record_error(LIMEADE_SUCCESS);
+  limeade_inserror(LIMEADE_SUCCESS);
   return (int)pckt.sz;
 }
 
@@ -300,7 +297,7 @@ static LIMEADE_PACKET limeade_recv_common(LIMEADE_CONTEXT ctx,
 
   if (ctx == NULL || ctx->role != role || ctx->channel == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_INVALID_CONTEXT);
+    limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
     return ret;
   }
 
@@ -311,7 +308,7 @@ static LIMEADE_PACKET limeade_recv_common(LIMEADE_CONTEXT ctx,
 
   if (memcmp(magic, LIMEADE_MAGIC, LIMEADE_MAGIC_WIRE_LEN) != 0)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_MAGIC);
+    limeade_inserror(LIMEADE_ERROR_PACKET_MAGIC);
     return ret;
   }
 
@@ -322,14 +319,14 @@ static LIMEADE_PACKET limeade_recv_common(LIMEADE_CONTEXT ctx,
 
   if (limeade_parse_wire_flags(flags_raw, &flags) < 0)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_FORMAT);
+    limeade_inserror(LIMEADE_ERROR_PACKET_FORMAT);
     return ret;
   }
 
   if (flags.datasz_before > LIMEADE_MAX_DATASZ ||
       flags.datasz_after > LIMEADE_MAX_DATASZ)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_SIZE);
+    limeade_inserror(LIMEADE_ERROR_PACKET_SIZE);
     return ret;
   }
 
@@ -350,7 +347,7 @@ static LIMEADE_PACKET limeade_recv_common(LIMEADE_CONTEXT ctx,
   {
     if (memcmp(ctx->session_id, session_id, LIMEADE_SESSION_WIRE_LEN) != 0)
     {
-      limeade_record_error(LIMEADE_ERROR_PACKET_SESSION);
+      limeade_inserror(LIMEADE_ERROR_PACKET_SESSION);
       return ret;
     }
   }
@@ -366,7 +363,7 @@ static LIMEADE_PACKET limeade_recv_common(LIMEADE_CONTEXT ctx,
 
   if (payload_len > LIMEADE_MAX_DATASZ)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_SIZE);
+    limeade_inserror(LIMEADE_ERROR_PACKET_SIZE);
     return ret;
   }
 
@@ -374,15 +371,14 @@ static LIMEADE_PACKET limeade_recv_common(LIMEADE_CONTEXT ctx,
               payload_len;
   if (total_len > UINT32_MAX)
   {
-    limeade_record_error(LIMEADE_ERROR_PACKET_SIZE);
+    limeade_inserror(LIMEADE_ERROR_PACKET_SIZE);
     return ret;
   }
 
   ret.data = (unsigned char *)malloc(total_len);
   if (ret.data == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_OOM);
-    return limeade_empty_packet();
+  	return limeade_empty_packet();
   }
 
   dst = ret.data;
@@ -407,7 +403,7 @@ static LIMEADE_PACKET limeade_recv_common(LIMEADE_CONTEXT ctx,
   }
 
   ret.sz = (uint32_t)total_len;
-  limeade_record_error(LIMEADE_SUCCESS);
+  limeade_inserror(LIMEADE_SUCCESS);
   return ret;
 }
 
@@ -464,7 +460,6 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
   ctx = (LIMEADE_CONTEXT)calloc(1, sizeof(*ctx));
   if (ctx == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_OOM);
     return NULL;
   }
 
@@ -478,7 +473,7 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
   ctx->session = ssh_new();
   if (ctx->bind == NULL || ctx->session == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_INIT);
+    limeade_inserror(LIMEADE_ERROR_SSH_INIT);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
@@ -488,7 +483,7 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
           0 ||
       ssh_bind_options_set(ctx->bind, SSH_BIND_OPTIONS_BINDPORT, &port_int) < 0)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_BIND);
+    limeade_inserror(LIMEADE_ERROR_SSH_BIND);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
@@ -496,28 +491,28 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
   if (ssh_pki_generate(SSH_KEYTYPE_RSA, 2048, &hostkey) != SSH_OK ||
       ssh_bind_options_set(ctx->bind, SSH_BIND_OPTIONS_IMPORT_KEY, hostkey) < 0)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_BIND);
+    limeade_inserror(LIMEADE_ERROR_SSH_BIND);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
 
   if (ssh_bind_listen(ctx->bind) < 0)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_LISTEN);
+    limeade_inserror(LIMEADE_ERROR_SSH_LISTEN);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
 
   if (ssh_bind_accept(ctx->bind, ctx->session) != SSH_OK)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_ACCEPT);
+    limeade_inserror(LIMEADE_ERROR_SSH_ACCEPT);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
 
   if (ssh_handle_key_exchange(ctx->session) != SSH_OK)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_KEX);
+    limeade_inserror(LIMEADE_ERROR_SSH_KEX);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
@@ -540,7 +535,7 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
 
   if (!authed)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_AUTH);
+    limeade_inserror(LIMEADE_ERROR_SSH_AUTH);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
@@ -561,7 +556,7 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
 
   if (channel == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_CHANNEL);
+    limeade_inserror(LIMEADE_ERROR_SSH_CHANNEL);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
@@ -589,7 +584,7 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
 
   if (!subsystem_ready)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_SUBSYSTEM);
+    limeade_inserror(LIMEADE_ERROR_SSH_SUBSYSTEM);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
@@ -603,7 +598,7 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
     ssh_key_free(hostkey);
   }
 
-  limeade_record_error(LIMEADE_SUCCESS);
+  limeade_inserror(LIMEADE_SUCCESS);
   return ctx;
 }
 
@@ -618,7 +613,6 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
   ctx = (LIMEADE_CONTEXT)calloc(1, sizeof(*ctx));
   if (ctx == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_OOM);
     return NULL;
   }
 
@@ -629,7 +623,7 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
   ctx->session = ssh_new();
   if (ctx->session == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_INIT);
+    limeade_inserror(LIMEADE_ERROR_SSH_INIT);
     limeade_context_free_common(ctx);
     return NULL;
   }
@@ -640,21 +634,21 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
       (user != NULL &&
        ssh_options_set(ctx->session, SSH_OPTIONS_USER, user) < 0))
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_INIT);
+    limeade_inserror(LIMEADE_ERROR_SSH_INIT);
     limeade_context_free_common(ctx);
     return NULL;
   }
 
   if (ssh_connect(ctx->session) != SSH_OK)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_INIT);
+    limeade_inserror(LIMEADE_ERROR_SSH_INIT);
     limeade_context_free_common(ctx);
     return NULL;
   }
 
   if (ssh_userauth_publickey_auto(ctx->session, NULL, NULL) != SSH_AUTH_SUCCESS)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_AUTH);
+    limeade_inserror(LIMEADE_ERROR_SSH_AUTH);
     limeade_context_free_common(ctx);
     return NULL;
   }
@@ -662,14 +656,14 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
   ctx->channel = ssh_channel_new(ctx->session);
   if (ctx->channel == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_CHANNEL);
+    limeade_inserror(LIMEADE_ERROR_SSH_CHANNEL);
     limeade_context_free_common(ctx);
     return NULL;
   }
 
   if (ssh_channel_open_session(ctx->channel) != SSH_OK)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_CHANNEL);
+    limeade_inserror(LIMEADE_ERROR_SSH_CHANNEL);
     limeade_context_free_common(ctx);
     return NULL;
   }
@@ -677,12 +671,12 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
   if (ssh_channel_request_subsystem(ctx->channel, LIMEADE_SUBSYSTEM_NAME) !=
       SSH_OK)
   {
-    limeade_record_error(LIMEADE_ERROR_SSH_SUBSYSTEM);
+    limeade_inserror(LIMEADE_ERROR_SSH_SUBSYSTEM);
     limeade_context_free_common(ctx);
     return NULL;
   }
 
-  limeade_record_error(LIMEADE_SUCCESS);
+  limeade_inserror(LIMEADE_SUCCESS);
   return ctx;
 }
 
@@ -710,12 +704,12 @@ int limeade_context_set_timeout(LIMEADE_CONTEXT ctx, int timeout_ms)
 {
   if (ctx == NULL)
   {
-    limeade_record_error(LIMEADE_ERROR_INVALID_CONTEXT);
+    limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
     return -1;
   }
 
   ctx->timeout_ms = timeout_ms;
-  limeade_record_error(LIMEADE_SUCCESS);
+  limeade_inserror(LIMEADE_SUCCESS);
   return 0;
 }
 
@@ -723,7 +717,7 @@ void limeade_host_free(LIMEADE_CONTEXT ctx)
 {
   if (ctx != NULL && ctx->role != LIMEADE_ROLE_HOST)
   {
-    limeade_record_error(LIMEADE_ERROR_INVALID_CONTEXT);
+    limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
     return;
   }
 
@@ -734,7 +728,7 @@ void limeade_client_free(LIMEADE_CONTEXT ctx)
 {
   if (ctx != NULL && ctx->role != LIMEADE_ROLE_CLIENT)
   {
-    limeade_record_error(LIMEADE_ERROR_INVALID_CONTEXT);
+    limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
     return;
   }
 

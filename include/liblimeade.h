@@ -63,7 +63,7 @@ void limeade_client_free(LIMEADE_CONTEXT ctx);
 static const char LIMEADE_MAGIC[7] = "!LIME!\x00";
 
 // clang-format off
-// if on the graph below gets mangled
+// if left on, the graph below gets mangled
 
 /// 2. the flags
 // The flags are, in total, always 7 bytes, as follows:
@@ -114,6 +114,8 @@ static char LIMEADE_FIELD_DELIM = '\xFE';
 static char LIMEADE_ROW_DELIM = '\xFF';
 
 // the flags themselves
+// note that this datatype isn't used by the developer, but interally by the
+// library
 typedef struct
 {
   uint8_t version;
@@ -266,11 +268,11 @@ LIMEADE_PACKET_FLAGS limeade_parseflags(char *flags_raw);
 // all types of errors
 typedef enum
 {
+  // the error that wasn't
   LIMEADE_SUCCESS,
-  LIMEADE_ERROR_INVALID_CONTEXT,
-  LIMEADE_ERROR_OOM,
-  LIMEADE_ERROR_SSH_INIT,
-  LIMEADE_ERROR_SSH_BIND,
+
+  // errors invoking SSH
+  LIMEADE_ERROR_SSH_INIT,        
   LIMEADE_ERROR_SSH_LISTEN,
   LIMEADE_ERROR_SSH_ACCEPT,
   LIMEADE_ERROR_SSH_KEX,
@@ -278,11 +280,17 @@ typedef enum
   LIMEADE_ERROR_SSH_CHANNEL,
   LIMEADE_ERROR_SSH_SUBSYSTEM,
   LIMEADE_ERROR_SSH_IO,
-  LIMEADE_ERROR_TIMEOUT,
-  LIMEADE_ERROR_PACKET_MAGIC,
-  LIMEADE_ERROR_PACKET_FORMAT,
-  LIMEADE_ERROR_PACKET_SIZE,
-  LIMEADE_ERROR_PACKET_SESSION
+
+  // errors caused by malformed packet segments
+  LIMEADE_ERROR_PACKET_MAGIC,  // improper/no magic
+  LIMEADE_ERROR_PACKET_FORMAT, // improper/no flags
+  LIMEADE_ERROR_PACKET_SIZE,   // disingenuous/incorrent packet size
+  LIMEADE_ERROR_PACKET_SESSION // wrong/no session
+
+
+  // miscellaneous
+  LIMEADE_ERROR_TIMEOUT,         // timeout reached before packet end was observed
+  LIMEADE_ERROR_INVALID_CONTEXT, // LIMEADE_CONTEXT passed was malformed
 } LIMEADE_ERROR_TYPE;
 
 static uint8_t LIMEADE_ERRORS[5];
