@@ -26,25 +26,7 @@
 
 /*** INIT ***/
 
-typedef enum
-{
-  LIMEADE_CONTEXT_HOST_SUBSYSTEM,
-  LIMEADE_CONTEXT_CLIENT_SUBSYSTEM
-} LIMEADE_CONTEXT_MODE;
-
-typedef struct
-{
-  // For host subsystem mode these are stdin/stdout descriptors.
-  // For client subsystem mode they stay -1 and channel I/O is used instead.
-  int send;
-  int recv;
-
-  // Opaque libssh handles used by client-side subsystem transport.
-  void *session;
-  void *channel;
-
-  LIMEADE_CONTEXT_MODE mode;
-} LIMEADE_CONTEXT;
+typedef struct LIMEADE_CONTEXT; // TODO
 
 // representation of a framed payload for stream transports (SSH subsystem I/O)
 
@@ -62,6 +44,7 @@ int limeade_client_send(LIMEADE_CONTEXT ctx, void *pckt, size_t sz); // TODO
 
 LIMEADE_PACKET limeade_host_recv(LIMEADE_CONTEXT ctx);   // TODO
 LIMEADE_PACKET limeade_client_recv(LIMEADE_CONTEXT ctx); // TODO
+
 
 /***  PACKET DESIGN  ***/
 
@@ -82,6 +65,8 @@ static const char LIMEADE_MAGIC[7] = "!LIME!\x00";
 //    |   |   |             |             |       |       |
 // ,--+,--+,--+,------------+,------------+,------+,------+
 // 0001000001010000010100110101000011101101001111111011111111
+
+// note: all `Data`s are compression with the DEFLATE algorithm @ compression_level 5
 
 // version info
 typedef struct
@@ -105,7 +90,6 @@ typedef enum
   // host packets
   LIMEADE_HOST_ANSWER,          // confirm connection (or disband connection)
   LIMEADE_HOST_COMMANDEER       // execute command on the client
-  LIMEADE_CLIENT_COMMANDEER     // gives return info about command
   LIMEADE_HOST_GETSHELL         // demands a cryptcat instance on the client
 } LIMEADE_PACKET_TYPE;
 
@@ -231,12 +215,20 @@ typedef struct
   uint8_t require_admin; // if elevated permissions are required
 } LIMEADE_PACKET_COMMANDEER;
 
-typedef struct LIMEADE_PACKET_GETSHELL; // TODOA
-DATE in); // NOT IMPLEMENTED
+typedef struct LIMEADE_PACKET_GETSHELL; // TODO
+
+/*** ENCODING ***/
+
+LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_PACKET_SYSOVERV in);
+LIMEADE_PACKET limeade_compile_events(LIMEADE_PACKET_EVENTS in);
+LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in);
+LIMEADE_PACKET limeade_compile_procs_update(LIMEADE_PACKET_PROCS_UPDATE in); // NOT IMPLEMENTED
 LIMEADE_PACKET limeade_compile_perf(LIMEADE_PACKERF_PERF in);
 LIMEADE_PACKET limeade_compile_ask(LIMEADE_PACKET_ASK in);
 LIMEADE_PACKET limeade_compile_answer(LIMEADE_PACKET_ANSWER in);
 LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_PACKET_COMMANDEER in);
+LIMEADE_PACKET limeade_compile_getshell(LIMEADE_PACKET_GETSHELL in);
+
 
 /***  DECODING  ***/
 
@@ -278,9 +270,7 @@ LIMEADE_ERROR_TYPE limeade_poperror(void);
 /***  VERSIONS  ***/
 
 // packet versions have to be checked for compatibility, as (inevitably) not
-// every version of the protocol will be c
-  LIMEADE_CONN_FAIL,
-  LIMEADE_SSH_FAILompatible with others
+// every version of the protocol will be compatible with others
 //
 // generally, every version tries to be compatible with the previous major
 // version (a client won't send a CLIENT_PROCS_UPDATE if the previous major
