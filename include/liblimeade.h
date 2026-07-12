@@ -26,7 +26,7 @@
 
 /*** INIT ***/
 
-typedef struct LIMEADE_CONTEXT; // TODO
+typedef struct LIMEADE_CONTEXT_IMPL *LIMEADE_CONTEXT;
 
 // representation of a framed payload for stream transports (SSH subsystem I/O)
 
@@ -36,14 +36,18 @@ typedef struct
   unsigned char *data; // payload bytes
 } LIMEADE_PACKET;
 
-LIMEADE_CONTEXT limeade_host_init(unsigned int port); // TODO
-LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user, const char *passwd); // TODO
+LIMEADE_CONTEXT limeade_host_init(unsigned int port);
+LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user, const char *passwd);
 
-int limeade_host_send(LIMEADE_CONTEXT ctx, void *pckt, size_t sz);   // TODO
-int limeade_client_send(LIMEADE_CONTEXT ctx, void *pckt, size_t sz); // TODO
+int limeade_host_send(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt);
+int limeade_client_send(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt);
 
-LIMEADE_PACKET limeade_host_recv(LIMEADE_CONTEXT ctx);   // TODO
-LIMEADE_PACKET limeade_client_recv(LIMEADE_CONTEXT ctx); // TODO
+LIMEADE_PACKET limeade_host_recv(LIMEADE_CONTEXT ctx);
+LIMEADE_PACKET limeade_client_recv(LIMEADE_CONTEXT ctx);
+
+int limeade_context_set_timeout(LIMEADE_CONTEXT ctx, int timeout_ms);
+void limeade_host_free(LIMEADE_CONTEXT ctx);
+void limeade_client_free(LIMEADE_CONTEXT ctx);
 
 
 /***  PACKET DESIGN  ***/
@@ -89,18 +93,18 @@ typedef enum
   LIMEADE_CLIENT_ASK,           // ask to connect
   // host packets
   LIMEADE_HOST_ANSWER,          // confirm connection (or disband connection)
-  LIMEADE_HOST_COMMANDEER       // execute command on the client
+  LIMEADE_HOST_COMMANDEER,      // execute command on the client
   LIMEADE_HOST_GETSHELL         // demands a cryptcat instance on the client
 } LIMEADE_PACKET_TYPE;
 
 // field delimiter
-static char LIMEADE_FIELD_DELIM = "\xFE";
-static char LIMEADE_ROW_DELIM   = "\xFF";
+static char LIMEADE_FIELD_DELIM = '\xFE';
+static char LIMEADE_ROW_DELIM   = '\xFF';
 
 // the flags themselves
 typedef struct
 {
-  LIBLIMEADE_VERSION version:8;
+  uint8_t version;
   LIMEADE_PACKET_TYPE type:4;
   uint16_t datasz_before_compression:14;
   uint16_t datasz_after_compression:14;
@@ -113,7 +117,7 @@ typedef struct
 // pseudorandomly generated, always 5 bytes
 // included in both client and host packets except in CLIENT_ASK packets where
 // the client has never connected before or otherwise lacks a session id
-typedef char[5] LIMEADE_SESSION;
+typedef char LIMEADE_SESSION[5];
 
 /// 4. data
 // takes various forms, depending on packet type
@@ -175,11 +179,11 @@ typedef struct
 {
   TS ts;
   uint16_t nr_processes;
-  PROC *processes[];
+  LIMEADE_PACKET_PROC *processes[];
 } LIMEADE_PACKET_PROCS_GENERIC;
 
 // CLIENT_PROCS_UPDATE
-typedef struct LIMEADE_PACKET_PROCS_UPDATE; // NOT IMPLEMENTED
+typedef struct LIMEADE_PACKET_PROCS_UPDATE LIMEADE_PACKET_PROCS_UPDATE; // NOT IMPLEMENTED
 
 typedef struct
 {
@@ -215,7 +219,7 @@ typedef struct
   uint8_t require_admin; // if elevated permissions are required
 } LIMEADE_PACKET_COMMANDEER;
 
-typedef struct LIMEADE_PACKET_GETSHELL; // TODO
+typedef struct LIMEADE_PACKET_GETSHELL LIMEADE_PACKET_GETSHELL; // TODO
 
 /*** ENCODING ***/
 
@@ -223,7 +227,7 @@ LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_PACKET_SYSOVERV in);
 LIMEADE_PACKET limeade_compile_events(LIMEADE_PACKET_EVENTS in);
 LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in);
 LIMEADE_PACKET limeade_compile_procs_update(LIMEADE_PACKET_PROCS_UPDATE in); // NOT IMPLEMENTED
-LIMEADE_PACKET limeade_compile_perf(LIMEADE_PACKERF_PERF in);
+LIMEADE_PACKET limeade_compile_perf(LIMEADE_PACKET_PERF in);
 LIMEADE_PACKET limeade_compile_ask(LIMEADE_PACKET_ASK in);
 LIMEADE_PACKET limeade_compile_answer(LIMEADE_PACKET_ANSWER in);
 LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_PACKET_COMMANDEER in);
@@ -252,7 +256,22 @@ LIMEADE_PACKET_FLAGS limeade_parseflags(char *flags_raw);
 typedef enum
 {
   LIMEADE_SUCCESS,
-  //LIMEADE_ERROR_*
+  LIMEADE_ERROR_INVALID_CONTEXT,
+  LIMEADE_ERROR_OOM,
+  LIMEADE_ERROR_SSH_INIT,
+  LIMEADE_ERROR_SSH_BIND,
+  LIMEADE_ERROR_SSH_LISTEN,
+  LIMEADE_ERROR_SSH_ACCEPT,
+  LIMEADE_ERROR_SSH_KEX,
+  LIMEADE_ERROR_SSH_AUTH,
+  LIMEADE_ERROR_SSH_CHANNEL,
+  LIMEADE_ERROR_SSH_SUBSYSTEM,
+  LIMEADE_ERROR_SSH_IO,
+  LIMEADE_ERROR_TIMEOUT,
+  LIMEADE_ERROR_PACKET_MAGIC,
+  LIMEADE_ERROR_PACKET_FORMAT,
+  LIMEADE_ERROR_PACKET_SIZE,
+  LIMEADE_ERROR_PACKET_SESSION
 } LIMEADE_ERROR_TYPE;
 
 static uint8_t LIMEADE_ERRORS[5];

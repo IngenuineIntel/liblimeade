@@ -30,7 +30,7 @@ void limeade_inserror(LIMEADE_ERROR_TYPE error)
 
 LIMEADE_ERROR_TYPE limeade_poperror(void)
 {
-  LIMEADE_ERROR_TYPE ret = LIMEADE_ERORRS[LIMEADE_ERROR_INDEX];
+  LIMEADE_ERROR_TYPE ret = LIMEADE_ERRORS[LIMEADE_ERROR_INDEX];
   if(LIMEADE_ERROR_INDEX == 0)
   {
     // must loop around
