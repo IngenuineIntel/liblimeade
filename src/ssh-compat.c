@@ -680,6 +680,8 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
   return ctx;
 }
 
+/*** "Exported" Functions (Wrappers) ***/
+
 int limeade_host_send(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt)
 {
   return limeade_send_common(ctx, pckt, LIMEADE_ROLE_HOST);

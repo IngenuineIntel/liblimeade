@@ -26,7 +26,7 @@
 
 /*** INIT ***/
 
-// context manager for library usage (the "this|self|me" of the library)
+// context manager for library usage (the "this|self|me" of the connection)
 typedef struct LIMEADE_CONTEXT_IMPL *LIMEADE_CONTEXT;
 
 // representation of a raw payload
@@ -81,7 +81,7 @@ static const char LIMEADE_MAGIC[7] = "!LIME!\x00";
 
 /// clang-format on
 
-// note: all `Data`s are compression with the DEFLATE algorithm @
+// note: all `Data`s are compressed with the DEFLATE algorithm @
 // compression_level 5
 
 // version info
@@ -103,10 +103,10 @@ typedef enum
   LIMEADE_CLIENT_PROCS_UPDATE,  // process table info (dynamic)
   LIMEADE_CLIENT_PERF,          // resource usage info
   LIMEADE_CLIENT_ASK,           // ask to connect
-                      // host packets
+  
+  // host packets
   LIMEADE_HOST_ANSWER,     // confirm connection (or disband connection)
   LIMEADE_HOST_COMMANDEER, // execute command on the client
-  LIMEADE_HOST_GETSHELL    // demands a cryptcat instance on the client
 } LIMEADE_PACKET_TYPE;
 
 // field delimiter
@@ -118,7 +118,7 @@ static char LIMEADE_ROW_DELIM = '\xFF';
 // library
 typedef struct
 {
-  uint8_t version;
+  LIBLIMEADE_VERSION version : 8;
   LIMEADE_PACKET_TYPE type : 4;
   uint16_t datasz_before_compression : 14;
   uint16_t datasz_after_compression : 14;
@@ -234,7 +234,6 @@ typedef struct
   uint8_t require_admin; // if elevated permissions are required
 } LIMEADE_PACKET_COMMANDEER;
 
-typedef struct LIMEADE_PACKET_GETSHELL LIMEADE_PACKET_GETSHELL; // TODO
 
 /*** ENCODING ***/
 
@@ -246,12 +245,20 @@ LIMEADE_PACKET limeade_compile_perf(LIMEADE_PACKET_PERF in);
 LIMEADE_PACKET limeade_compile_ask(LIMEADE_PACKET_ASK in);
 LIMEADE_PACKET limeade_compile_answer(LIMEADE_PACKET_ANSWER in);
 LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_PACKET_COMMANDEER in);
-LIMEADE_PACKET limeade_compile_getshell(LIMEADE_PACKET_GETSHELL in);
 
 /***  DECODING  ***/
 
-// parsing flags
-LIMEADE_PACKET_FLAGS limeade_parseflags(char *flags_raw);
+// all data from parsing a packet
+typedef struct
+{
+  TS when_parsed;             // when the packet was parsed
+  LIMEADE_PACKET_FLAGS flags; // packet flags
+  LIMEADE_SESSION sessionid;  // packet session ID
+  void *data;                 // packet data
+} LIMEADE_PARSED;
+
+// parses packet (can wrap limeade_*_recv)
+LIMEADE_PARSED limeade_parse_packet(LIMEADE_PACKET pkt);
 
 // TODO
 
@@ -281,14 +288,19 @@ typedef enum
   LIMEADE_ERROR_SSH_SUBSYSTEM,
   LIMEADE_ERROR_SSH_IO,
 
-  // errors caused by malformed packet segments
-  LIMEADE_ERROR_PACKET_MAGIC,  // improper/no magic
-  LIMEADE_ERROR_PACKET_FORMAT, // improper/no flags
-  LIMEADE_ERROR_PACKET_SIZE,   // disingenuous/incorrent packet size
-  LIMEADE_ERROR_PACKET_SESSION // wrong/no session
+  // error invoking zlib
+  LIMEADE_ERROR_ZLIB,
 
+  // errors caused by malformed packet segments
+  LIMEADE_ERROR_PACKET_MAGIC,      // improper/no magic
+  LIMEADE_ERROR_PACKET_FORMAT,     // improper/no flags
+  LIMEADE_ERROR_PACKET_SIZE,       // disingenuous/incorrent packet size
+  LIMEADE_ERROR_PACKET_SESSION,    // wrong/no session
+  LIMEADE_ERROR_PACKET_DATA,       // malformed/lacking data
+  LIMEADE_ERROR_PACKET_COMPRESSED, // improper compressed data
 
   // miscellaneous
+  LIMEADE_ERROR_GARBAGE          // user gave garbage data
   LIMEADE_ERROR_TIMEOUT,         // timeout reached before packet end was observed
   LIMEADE_ERROR_INVALID_CONTEXT, // LIMEADE_CONTEXT passed was malformed
 } LIMEADE_ERROR_TYPE;
