@@ -62,9 +62,9 @@ LIMEADE_PARSED limeade_parse_packet(LIMEADE_PACKET pkt)
 
   {
     uint64_t flags = 0;
-    memcpy(&flags, wire + magic_len, 7);
+    memcpy(&flags, pkt.data + magic_len, 7);
 
-    ret.flags.version                   = (LIBLIMEADE_VERSION)(flags & 0xFF);
+    ret.flags.version                   = (LIBLIMEADE_VERSION){flags & 0x0F, (flags >> 4) & 0x0F};
     ret.flags.type                      = (LIMEADE_PACKET_TYPE)((flags >> 12) & 0x0F);
     ret.flags.datasz_before_compression = (uint16_t)(((flags >>  8) & 0x0F) << 10
                                                    | ((flags >> 16) & 0xFF) <<  2
@@ -95,14 +95,14 @@ LIMEADE_PARSED limeade_parse_packet(LIMEADE_PACKET pkt)
 
   if (session_len > 0)
   {
-    memcpy(ret.sessionid, wire + magic_len + flags_len, session_len_wire);
+    memcpy(ret.sessionid, pkt.data + magic_len + flags_len, session_len_wire);
   }
   else
   {
     memset(ret.sessionid, 0, session_len_wire);
   }
 
-  payload = wire + magic_len + flags_len + session_len;
+  payload = pkt.data + magic_len + flags_len + session_len;
 
   if (ret.flags.datasz_after_compression > 0)
   {

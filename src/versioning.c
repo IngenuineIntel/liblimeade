@@ -17,11 +17,13 @@
 
 #include <liblimeade.h>
 
+LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION = {0, 1};
+
 LIBLIMEADE_COMPATIBILITY
 liblimeade_check_versioning(LIBLIMEADE_VERSION local_ver,
                             LIBLIMEADE_VERSION target_ver)
 {
-  int diff = local_ver.mja - target_ver.maj;
+  int diff = local_ver.maj - target_ver.maj;
 
   // diff = abs(diff)
   if (diff < 0)
@@ -36,16 +38,16 @@ liblimeade_check_versioning(LIBLIMEADE_VERSION local_ver,
   if (is_ident_maj)
   {
     // versions have to be identical when before v1.0, otherwise indeterminate
-    if (local_ver.maj == 0)
-      &&(!is_ident_min) { return INDETERMINATE_COMPATIBILITY; }
+    if (local_ver.maj == 0 && !is_ident_min)
+      return INDETERMINATE_COMPATIBILITY;
 
-    return COMPATIBLE;
+    return IS_COMPATIBLE;
   }
   else if (diff == 1)
   {
     // versions are within 1 major version
     // insert exceptions here
-    return COMPATIBLE;
+    return IS_COMPATIBLE;
   }
   return IS_NOT_COMPATIBLE;
 }

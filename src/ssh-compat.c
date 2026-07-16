@@ -17,6 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -27,11 +28,7 @@
 
 #include <liblimeade.h>
 
-enum LIMEADE_ROLE
-{
-  LIMEADE_ROLE_HOST = 1,
-  LIMEADE_ROLE_CLIENT = 2
-};
+#define HOST_TRACE(msg) write(STDERR_FILENO, msg, sizeof(msg) - 1)
 
 typedef struct
 {
@@ -39,18 +36,6 @@ typedef struct
   uint16_t datasz_before;
   uint16_t datasz_after;
 } LIMEADE_WIRE_FLAGS;
-
-struct LIMEADE_CONTEXT_IMPL
-{
-  enum LIMEADE_ROLE role;
-  ssh_bind bind;
-  ssh_session session;
-  ssh_channel channel;
-  uint8_t session_id[5];
-  bool has_session_id;
-  int timeout_ms;
-  unsigned int port;
-};
 
 #define LIMEADE_MAGIC_WIRE_LEN 7
 #define LIMEADE_FLAGS_WIRE_LEN 7
@@ -469,8 +454,12 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
   hostkey = NULL;
   channel = NULL;
 
+  HOST_TRACE("host:init before bind new\n");
   ctx->bind = ssh_bind_new();
+  HOST_TRACE("host:init after bind new\n");
+  HOST_TRACE("host:init before session new\n");
   ctx->session = ssh_new();
+  HOST_TRACE("host:init after session new\n");
   if (ctx->bind == NULL || ctx->session == NULL)
   {
     limeade_inserror(LIMEADE_ERROR_SSH_INIT);
@@ -479,6 +468,7 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
   }
 
   port_int = (int)port;
+  HOST_TRACE("host:init before bind options\n");
   if (ssh_bind_options_set(ctx->bind, SSH_BIND_OPTIONS_BINDADDR, "0.0.0.0") <
           0 ||
       ssh_bind_options_set(ctx->bind, SSH_BIND_OPTIONS_BINDPORT, &port_int) < 0)
@@ -487,7 +477,9 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
+  HOST_TRACE("host:init after bind options\n");
 
+  HOST_TRACE("host:init before key generate\n");
   if (ssh_pki_generate(SSH_KEYTYPE_RSA, 2048, &hostkey) != SSH_OK ||
       ssh_bind_options_set(ctx->bind, SSH_BIND_OPTIONS_IMPORT_KEY, hostkey) < 0)
   {
@@ -495,9 +487,13 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
   }
+  HOST_TRACE("host:init after key import\n");
+
+  hostkey = NULL;
 
   if (ssh_bind_listen(ctx->bind) < 0)
   {
+    fprintf(stderr, "host listen failed: %s\n", ssh_get_error(ctx->bind));
     limeade_inserror(LIMEADE_ERROR_SSH_LISTEN);
     limeade_context_cleanup_on_error(ctx, hostkey);
     return NULL;
@@ -520,13 +516,18 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
   authed = false;
   while ((msg = ssh_message_get(ctx->session)) != NULL)
   {
-    if (ssh_message_type(msg) == SSH_REQUEST_AUTH &&
-        ssh_message_subtype(msg) == SSH_AUTH_METHOD_PUBLICKEY)
+    if (ssh_message_type(msg) == SSH_REQUEST_AUTH)
     {
-      ssh_message_auth_reply_success(msg, 0);
-      ssh_message_free(msg);
-      authed = true;
-      break;
+      if (ssh_message_subtype(msg) == SSH_AUTH_METHOD_NONE ||
+          ssh_message_subtype(msg) == SSH_AUTH_METHOD_PUBLICKEY)
+      {
+        ssh_message_auth_reply_success(msg, 0);
+        ssh_message_free(msg);
+        authed = true;
+        break;
+      }
+
+      ssh_message_auth_set_methods(msg, SSH_AUTH_METHOD_NONE);
     }
 
     ssh_message_reply_default(msg);
@@ -593,11 +594,6 @@ LIMEADE_CONTEXT limeade_host_init(unsigned int port)
   limeade_generate_session_id(ctx->session_id);
   ctx->has_session_id = true;
 
-  if (hostkey != NULL)
-  {
-    ssh_key_free(hostkey);
-  }
-
   limeade_inserror(LIMEADE_SUCCESS);
   return ctx;
 }
@@ -607,6 +603,8 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
 {
   LIMEADE_CONTEXT ctx;
   int port_int;
+  const char *strict_hostkey;
+  const char *knownhosts_path;
 
   (void)passwd;
 
@@ -629,8 +627,17 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
   }
 
   port_int = (int)port;
+  strict_hostkey = "no";
+  knownhosts_path = "/dev/null";
+  HOST_TRACE("client:init before options\n");
   if (ssh_options_set(ctx->session, SSH_OPTIONS_HOST, "127.0.0.1") < 0 ||
       ssh_options_set(ctx->session, SSH_OPTIONS_PORT, &port_int) < 0 ||
+      ssh_options_set(ctx->session, SSH_OPTIONS_STRICTHOSTKEYCHECK,
+                      strict_hostkey) < 0 ||
+      ssh_options_set(ctx->session, SSH_OPTIONS_KNOWNHOSTS,
+                      knownhosts_path) < 0 ||
+      ssh_options_set(ctx->session, SSH_OPTIONS_GLOBAL_KNOWNHOSTS,
+                      knownhosts_path) < 0 ||
       (user != NULL &&
        ssh_options_set(ctx->session, SSH_OPTIONS_USER, user) < 0))
   {
@@ -638,43 +645,59 @@ LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
     limeade_context_free_common(ctx);
     return NULL;
   }
+  HOST_TRACE("client:init after options\n");
 
+  HOST_TRACE("client:init before connect\n");
   if (ssh_connect(ctx->session) != SSH_OK)
   {
+    fprintf(stderr, "client connect failed: %s\n", ssh_get_error(ctx->session));
     limeade_inserror(LIMEADE_ERROR_SSH_INIT);
     limeade_context_free_common(ctx);
     return NULL;
   }
+  HOST_TRACE("client:init after connect\n");
 
-  if (ssh_userauth_publickey_auto(ctx->session, NULL, NULL) != SSH_AUTH_SUCCESS)
+  HOST_TRACE("client:init before none auth\n");
+  if (ssh_userauth_none(ctx->session, NULL) != SSH_AUTH_SUCCESS)
   {
+    fprintf(stderr, "client auth failed: %s\n", ssh_get_error(ctx->session));
     limeade_inserror(LIMEADE_ERROR_SSH_AUTH);
     limeade_context_free_common(ctx);
     return NULL;
   }
+  HOST_TRACE("client:init after none auth\n");
 
+  HOST_TRACE("client:init before channel new\n");
   ctx->channel = ssh_channel_new(ctx->session);
   if (ctx->channel == NULL)
   {
+    fprintf(stderr, "client channel new failed: %s\n", ssh_get_error(ctx->session));
     limeade_inserror(LIMEADE_ERROR_SSH_CHANNEL);
     limeade_context_free_common(ctx);
     return NULL;
   }
+  HOST_TRACE("client:init after channel new\n");
 
+  HOST_TRACE("client:init before open session\n");
   if (ssh_channel_open_session(ctx->channel) != SSH_OK)
   {
+    fprintf(stderr, "client open session failed: %s\n", ssh_get_error(ctx->session));
     limeade_inserror(LIMEADE_ERROR_SSH_CHANNEL);
     limeade_context_free_common(ctx);
     return NULL;
   }
+  HOST_TRACE("client:init after open session\n");
 
+  HOST_TRACE("client:init before subsystem request\n");
   if (ssh_channel_request_subsystem(ctx->channel, LIMEADE_SUBSYSTEM_NAME) !=
       SSH_OK)
   {
+    fprintf(stderr, "client subsystem failed: %s\n", ssh_get_error(ctx->session));
     limeade_inserror(LIMEADE_ERROR_SSH_SUBSYSTEM);
     limeade_context_free_common(ctx);
     return NULL;
   }
+  HOST_TRACE("client:init after subsystem request\n");
 
   limeade_inserror(LIMEADE_SUCCESS);
   return ctx;

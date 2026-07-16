@@ -167,17 +167,17 @@ LIMEADE_PACKET_FLAGS limeade_genflags(LIMEADE_PACKET_TYPE type,
   /* Generates flag datatype from given packet information */
   // TODO write in a way that doesn't make clang-format get hysterical
   return (LIMEADE_PACKET_FLAGS){
-      .version     = POTOCOL_VERSION,
+      .version     = LIMEADE_PROTOCOL_VERSION,
       .type        = type,
-      .datasz_before_compression = datasz_before_compression
-      .datasz_after_compression  = datasz_after_compression
+      .datasz_before_compression = datasz_before_compression,
+      .datasz_after_compression  = datasz_after_compression,
       .field_delim = LIMEADE_FIELD_DELIM,
       .row_delim   = LIMEADE_ROW_DELIM};
 }
 
 // this macro is used in the limeade_gendata_* functions
 #define CHECK(expr, err)                                                       \
-  if((expr) != 0)                                                               \
+  if((expr) != 0)                                                              \
   {                                                                            \
     free(ret.data);                                                            \
     ret.len = 0;                                                               \
@@ -232,7 +232,7 @@ LIMEADE_DATA limeade_gendata_sysoverv(LIMEADE_PACKET_SYSOVERV in)
   limeade_wrs(data_index, in.processor_vend, LIMEADE_FIELD_DELIM);
   data_index += processor_vendsz;
 
-  CHECK(limeade_wru(data_inedx, ram_gbssz, (unsigned long long)in.ram_gbs, LIMEADE_ROW_DELIM),
+  CHECK(limeade_wru(data_index, ram_gbssz, (unsigned long long)in.ram_gbs, LIMEADE_ROW_DELIM),
         LIMEADE_ERROR_GARBAGE);
           
   return ret;
@@ -249,7 +249,7 @@ LIMEADE_DATA limeade_gendata_events(LIMEADE_PACKET_EVENTS in)
   char *data_index;
   size_t ts_ssz, ts_mssz, pidsz, typesz, subtypesz, arg1sz, arg2sz, retvalsz, i;
 
-  CHECK(!in || !in.events, LIMEADE_ERROR_GARBAGE);
+  CHECK(&in == NULL || &in.events == NULL, LIMEADE_ERROR_GARBAGE);
 
   // buffer size calculation
   for (i = 0; i < in.nr_events; i++)
@@ -329,7 +329,7 @@ LIMEADE_DATA limeade_gendata_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in)
   size_t ts_ssz, ts_mssz, pidsz, ppidsz, uidsz, threadssz, cpu_tickssz;
   size_t vm_rss_kbsz, commsz, i;
 
-  CHECK(!in || !in.processes, LIMEADE_ERROR_GARBAGE);
+  CHECK(&in == NULL || &in.processes == NULL, LIMEADE_ERROR_GARBAGE);
 
   ts_ssz  = limeade_szu((unsigned long long)in.ts.s);
   ts_mssz = limeade_szu((unsigned long long)in.ts.ms);
@@ -356,7 +356,7 @@ LIMEADE_DATA limeade_gendata_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in)
 
   data_index = (char *)ret.data;
 
-  for (i = 0; i < nr_processes; i++)
+  for (i = 0; i < in.nr_processes; i++)
   {
     LIMEADE_PACKET_PROC *proc = (LIMEADE_PACKET_PROC *)in.processes[i];
 
@@ -383,7 +383,7 @@ LIMEADE_DATA limeade_gendata_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in)
     
     CHECK(limeade_wri(data_index, ppidsz, (long long)proc->ppid,
                       LIMEADE_FIELD_DELIM),
-                 ret);
+          LIMEADE_ERROR_GARBAGE);
     data_index += ppidsz;
     
     CHECK(limeade_wru(data_index, uidsz, (unsigned long long)proc->uid,
@@ -427,6 +427,8 @@ LIMEADE_DATA limeade_gendata_perf(LIMEADE_PACKET_PERF in)
   size_t mem_available_kbsz, mem_cached_kbsz, load_1msz, load_5msz, load_15msz,
       cores_jsonsz;
 
+  CHECK(&in == NULL, LIMEADE_ERROR_GARBAGE);
+
   ts_ssz             = limeade_szu((unsigned long long)in.ts.s);
   ts_mssz            = limeade_szu((unsigned long long)in.ts.ms);
   coressz            = limeade_szu((unsigned long long)in.cores);
@@ -437,9 +439,9 @@ LIMEADE_DATA limeade_gendata_perf(LIMEADE_PACKET_PERF in)
   mem_cached_kbsz    = limeade_szu((unsigned long long)in.mem_cached_kb);
   cores_jsonsz       = limeade_szs(in.cores_json);
 
-  ret.len =  ts_ssz + ts_mssz + coresz + avg_cpu_pctsz + mem_total_kbsz;
+  ret.len =  ts_ssz + ts_mssz + coressz + avg_cpu_pctsz + mem_total_kbsz;
   ret.len += mem_free_kbsz + mem_available_kbsz + mem_cached_kbsz + load_1msz;
-  ret.len += load_5msz + load_15msz + core_jsonsz;
+  ret.len += load_5msz + load_15msz + cores_jsonsz;
 
   ret.data   = malloc(ret.len);
   data_index = (char *)ret.data;
@@ -510,6 +512,8 @@ LIMEADE_DATA limeade_gendata_ask(LIMEADE_PACKET_ASK in)
   char *data_index;
   size_t is_new_devicesz, is_new_sessionsz, ts_ssz, ts_mssz;
 
+  CHECK(&in == NULL, LIMEADE_ERROR_GARBAGE);
+
   is_new_devicesz  = limeade_szu((unsigned long long)in.is_new_device);
   is_new_sessionsz = limeade_szu((unsigned long long)in.is_new_session);
   ts_ssz           = limeade_szu((unsigned long long)in.ts.s);
@@ -547,10 +551,11 @@ LIMEADE_DATA limeade_gendata_ask(LIMEADE_PACKET_ASK in)
 LIMEADE_DATA limeade_gendata_answer(LIMEADE_PACKET_ANSWER in)
 {
   LIMEADE_DATA ret = {0, NULL};
-  ret.len          = limeade_szu((unsigned long long)(in.accepted ? 1 : 0));
+  unsigned long long accepted;
+  ret.len          = limeade_szu((unsigned long long)in.accepted);
   ret.data         = malloc(ret.len);
   
-  CHECK(limeade_wru(ret.data, acceptedsz, (unsigned long long)(in.accepted ? 1 : 0),
+  CHECK(limeade_wru(ret.data, ret.len, (unsigned long long)in.accepted,
                     LIMEADE_ROW_DELIM),
         LIMEADE_ERROR_GARBAGE);
 
@@ -562,6 +567,8 @@ LIMEADE_DATA limeade_gendata_commandeer(LIMEADE_PACKET_COMMANDEER in)
   LIMEADE_DATA ret = {0, NULL};
   char *data_index;
   size_t commandsz, require_ttysz, require_adminsz;
+
+  CHECK(&in == NULL, LIMEADE_ERROR_GARBAGE);
 
   commandsz       = limeade_szs(in.command);
   require_ttysz   = limeade_szu((unsigned long long)in.require_tty);
@@ -589,6 +596,7 @@ LIMEADE_DATA limeade_gendata_commandeer(LIMEADE_PACKET_COMMANDEER in)
   return ret;
 }
 
+#undef CHECK
 // this macro is used in limeade_compile and limeade_compress
 #define CHECK(expr, err)                                                       \
   if(expr)                                                                     \
@@ -611,16 +619,16 @@ LIMEADE_PACKET limeade_compile(LIMEADE_PACKET_FLAGS flags,
   ret.data = (unsigned char *)malloc(ret.sz);
   dst = ret.data;
 
-  memcpy(dst, &LIMEADE_MAGIC, magic_len);
-  dst += magic_len;
+  memcpy(dst, &LIMEADE_MAGIC, sizeof(LIMEADE_MAGIC));
+  dst += sizeof(LIMEADE_MAGIC);
 
-  memcpy(dst, &flags, flags_len);
-  dst += flags_len;
+  memcpy(dst, &flags, sizeof(LIMEADE_PACKET_FLAGS));
+  dst += sizeof(LIMEADE_PACKET_FLAGS);
 
   memcpy(dst, session_id, 5);
-  dst += session_len;
+  dst += 5;
 
-  memcpy(dst, data, data_len);
+  memcpy(dst, data, flags.datasz_after_compression);
 
   return ret;
 }
@@ -658,34 +666,36 @@ LIMEADE_DATA limeade_compress(LIMEADE_DATA *in)
   CHECK(true, LIMEADE_SUCCESS);
 }
 
+#undef CHECK
 // this macro is used in all of the exported functions
-#define CHECK()                                                                \ 
-  LIMEADE_ERROR err = limeade_poperror();                                      \
+#define CHECK()                                                                \
+  err = limeade_poperror();                                                    \
   if(err != LIMEADE_SUCCESS)                                                   \
   {                                                                            \
     limeade_inserror(err);                                                     \
-    return {0, NULL};                                                          \
+    return (LIMEADE_PACKET){0, NULL};                                          \
   }
 
 // EXPORTED FUNCTIONS
 
-LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_PACKET_SYSOVERV in, LIMEADE_SESSION session)
+LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_SYSOVERV in)
 {
   LIMEADE_PACKET ret;
   LIMEADE_DATA data_pre, data_post;
   LIMEADE_PACKET_FLAGS flags;
+  LIMEADE_ERROR err;
   unsigned int datasz_pre, datasz_post;
 
   data_pre  = limeade_gendata_sysoverv(in);
   CHECK();
   
-  data_post = limeade_compress(data_pre);
+  data_post = limeade_compress(&data_pre);
   CHECK();
 
-  flags     = limeade_genflags(LIMEADE_PACKET_SYSOVERV, data_pre.len, data_post.len);
+  flags     = limeade_genflags(LIMEADE_CLIENT_SYSOVERV, data_pre.len, data_post.len);
   CHECK();
 
-  ret       = limeade_compile(flags, session, data_post);
+  ret       = limeade_compile(flags, ctx->session_id, data_post.data);
   CHECK();
 
   free(data_pre.data);
@@ -694,23 +704,24 @@ LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_PACKET_SYSOVERV in, LIMEADE_SESS
   return ret;
 }
 
-LIMEADE_PACKET limeade_compile_events(LIMEADE_PACKET_EVENTS in)
+LIMEADE_PACKET limeade_compile_events(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_EVENTS in)
 {
   LIMEADE_PACKET ret;
   LIMEADE_DATA data_pre, data_post;
   LIMEADE_PACKET_FLAGS flags;
+  LIMEADE_ERROR err;
   unsigned int datasz_pre, datasz_post;
 
   data_pre  = limeade_gendata_events(in);
   CHECK();
 
-  data_post = limeade_compress(data_pre);
+  data_post = limeade_compress(&data_pre);
   CHECK();
 
-  flags     = limeade_genflags(LIMEADE_PACKET_EVENTS, data_pre.len, data_post.len);
+  flags     = limeade_genflags(LIMEADE_CLIENT_EVENTS, data_pre.len, data_post.len);
   CHECK();
 
-  ret       = limeade_compile(flags, session, data_post);
+  ret       = limeade_compile(flags, ctx->session_id, data_post.data);
   CHECK();
 
   free(data_pre.data);
@@ -719,23 +730,24 @@ LIMEADE_PACKET limeade_compile_events(LIMEADE_PACKET_EVENTS in)
   return ret;
 }
 
-LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in)
+LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PROCS_GENERIC in)
 {
   LIMEADE_PACKET ret;
   LIMEADE_DATA data_pre, data_post;
   LIMEADE_PACKET_FLAGS flags;
+  LIMEADE_ERROR err;
   unsigned int datasz_pre, datasz_post;
 
   data_pre  = limeade_gendata_procs_generic(in);
   CHECK();
 
-  data_post = limeade_compress(data_pre);
+  data_post = limeade_compress(&data_pre);
   CHECK();
 
-  flags     = limeade_genflags(LIMEADE_PACKET_PROCS_GENERIC, data_pre.len, data_post.len);
+  flags     = limeade_genflags(LIMEADE_CLIENT_PROCS_GENERIC, data_pre.len, data_post.len);
   CHECK();
 
-  ret       = limeade_compile(flags, session, data_post);
+  ret       = limeade_compile(flags, ctx->session_id, data_post.data);
   CHECK();
 
   free(data_pre.data);
@@ -745,28 +757,29 @@ LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in)
 
 }
 
-LIMEADE_PACKET limeade_compile_procs_update(LIMEADE_PACKET_PROCS_UPDATE in)
+LIMEADE_PACKET limeade_compile_procs_update(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PROCS_UPDATE in)
 {
   // NOT IMPLEMENTED
 }
 
-LIMEADE_PACKET limeade_compile_perf(LIMEADE_PACKERF_PERF in)
+LIMEADE_PACKET limeade_compile_perf(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PERF in)
 {
   LIMEADE_PACKET ret;
   LIMEADE_DATA data_pre, data_post;
   LIMEADE_PACKET_FLAGS flags;
+  LIMEADE_ERROR err;
   unsigned int datasz_pre, datasz_post;
 
   data_pre  = limeade_gendata_perf(in);
   CHECK();
   
-  data_post = limeade_compress(data_pre);
+  data_post = limeade_compress(&data_pre);
   CHECK();
   
-  flags     = limeade_genflags(LIMEADE_PACKET_PERF, data_pre.len, data_post.len);
+  flags     = limeade_genflags(LIMEADE_CLIENT_PERF, data_pre.len, data_post.len);
   CHECK();
   
-  ret       = limeade_compile(flags, session, data_post);
+  ret       = limeade_compile(flags, ctx->session_id, data_post.data);
   CHECK();
 
   free(data_pre.data);
@@ -775,23 +788,24 @@ LIMEADE_PACKET limeade_compile_perf(LIMEADE_PACKERF_PERF in)
   return ret;
 }
 
-LIMEADE_PACKET limeade_compile_ask(LIMEADE_PACKET_ASK in)
+LIMEADE_PACKET limeade_compile_ask(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_ASK in)
 {
   LIMEADE_PACKET ret;
   LIMEADE_DATA data_pre, data_post;
   LIMEADE_PACKET_FLAGS flags;
+  LIMEADE_ERROR err;
   unsigned int datasz_pre, datasz_post;
 
   data_pre  = limeade_gendata_ask(in);
   CHECK();
 
-  data_post = limeade_compress(data_pre);
+  data_post = limeade_compress(&data_pre);
   CHECK();
 
-  flags     = limeade_genflags(LIMEADE_PACKET_ASK, data_pre.len, data_post.len);
+  flags     = limeade_genflags(LIMEADE_CLIENT_ASK, data_pre.len, data_post.len);
   CHECK();
 
-  ret       = limeade_compile(flags, session, data_post);
+  ret       = limeade_compile(flags, ctx->session_id, data_post.data);
   CHECK();
 
   free(data_pre.data);
@@ -800,23 +814,24 @@ LIMEADE_PACKET limeade_compile_ask(LIMEADE_PACKET_ASK in)
   return ret;
 }
 
-LIMEADE_PACKET limeade_compile_answer(LIMEADE_PACKET_ANSWER in)
+LIMEADE_PACKET limeade_compile_answer(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_ANSWER in)
 {
   LIMEADE_PACKET ret;
   LIMEADE_DATA data_pre, data_post;
   LIMEADE_PACKET_FLAGS flags;
+  LIMEADE_ERROR err;
   unsigned int datasz_pre, datasz_post;
 
   data_pre = limeade_gendata_answer(in);
   CHECK();
 
-  data_post = limeade_compress(data_pre);
+  data_post = limeade_compress(&data_pre);
   CHECK();
 
-  flags = limeade_genflags(LIMEADE_PACKET_ANSWER, data_pre.len, data_post.len);
+  flags = limeade_genflags(LIMEADE_HOST_ANSWER, data_pre.len, data_post.len);
   CHECK();
 
-  ret = limeade_compile(flags, session, data_post);
+  ret = limeade_compile(flags, ctx->session_id, data_post.data);
   CHECK();
 
   free(data_pre.data);
@@ -825,23 +840,24 @@ LIMEADE_PACKET limeade_compile_answer(LIMEADE_PACKET_ANSWER in)
   return ret;
 }
 
-LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_PACKET_COMMANDEER in)
+LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_COMMANDEER in)
 {
   LIMEADE_PACKET ret;
   LIMEADE_DATA data_pre, data_post;
   LIMEADE_PACKET_FLAGS flags;
+  LIMEADE_ERROR err;
   unsigned int datasz_pre, datasz_post;
 
   data_pre = limeade_gendata_commandeer(in);
   CHECK();
 
-  data_post = limeade_compress(data_pre);
+  data_post = limeade_compress(&data_pre);
   CHECK();
 
-  flags = limeade_genflags(LIMEADE_PACKET_COMMANDEER, data_pre.len, data_post.len);
+  flags = limeade_genflags(LIMEADE_HOST_COMMANDEER, data_pre.len, data_post.len);
   CHECK();
 
-  ret = limeade_compile(flags, session, data_post);
+  ret = limeade_compile(flags, ctx->session_id, data_post.data);
   CHECK();
 
   free(data_pre.data);

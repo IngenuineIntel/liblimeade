@@ -1,5 +1,5 @@
 // liblimeade.h
-// entry point header file for liblimeade
+// header file for liblimeade
 //
 // Copyright (C) 2026 Roan Rothrock
 //
@@ -24,9 +24,31 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include<libssh/libssh.h>
+#include <libssh/server.h>
+
 /*** INIT ***/
 
+// two different types of roles
+// pretty straight forward
+enum LIMEADE_ROLE
+{
+  LIMEADE_ROLE_HOST = 1,
+  LIMEADE_ROLE_CLIENT = 2
+};
+
 // context manager for library usage (the "this|self|me" of the connection)
+struct LIMEADE_CONTEXT_IMPL
+{
+  enum LIMEADE_ROLE role;
+  ssh_bind bind;
+  ssh_session session;
+  ssh_channel channel;
+  uint8_t session_id[5];
+  bool has_session_id;
+  int timeout_ms;
+  unsigned int port;
+};
 typedef struct LIMEADE_CONTEXT_IMPL *LIMEADE_CONTEXT;
 
 // representation of a raw payload
@@ -91,7 +113,7 @@ typedef struct
   uint8_t min : 4; // minor version number
 } LIBLIMEADE_VERSION;
 
-LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION = {0, 1};
+LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION;
 
 // packet types
 typedef enum
@@ -118,7 +140,7 @@ static char LIMEADE_ROW_DELIM = '\xFF';
 // library
 typedef struct
 {
-  LIBLIMEADE_VERSION version : 8;
+  LIBLIMEADE_VERSION version;
   LIMEADE_PACKET_TYPE type : 4;
   uint16_t datasz_before_compression : 14;
   uint16_t datasz_after_compression : 14;
@@ -197,8 +219,11 @@ typedef struct
 } LIMEADE_PACKET_PROCS_GENERIC;
 
 // CLIENT_PROCS_UPDATE
-typedef struct LIMEADE_PACKET_PROCS_UPDATE
-    LIMEADE_PACKET_PROCS_UPDATE; // NOT IMPLEMENTED
+typedef struct
+{
+  // NOT IMPLEMENTED
+  uint8_t filler;
+} LIMEADE_PACKET_PROCS_UPDATE;
 
 typedef struct
 {
@@ -237,14 +262,14 @@ typedef struct
 
 /*** ENCODING ***/
 
-LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_PACKET_SYSOVERV in);
-LIMEADE_PACKET limeade_compile_events(LIMEADE_PACKET_EVENTS in);
-LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_PACKET_PROCS_GENERIC in);
-LIMEADE_PACKET limeade_compile_procs_update(LIMEADE_PACKET_PROCS_UPDATE in); // NOT IMPLEMENTED
-LIMEADE_PACKET limeade_compile_perf(LIMEADE_PACKET_PERF in);
-LIMEADE_PACKET limeade_compile_ask(LIMEADE_PACKET_ASK in);
-LIMEADE_PACKET limeade_compile_answer(LIMEADE_PACKET_ANSWER in);
-LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_PACKET_COMMANDEER in);
+LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_SYSOVERV in);
+LIMEADE_PACKET limeade_compile_events(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_EVENTS in);
+LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PROCS_GENERIC in);
+LIMEADE_PACKET limeade_compile_procs_update(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PROCS_UPDATE in); // NOT IMPLEMENTED
+LIMEADE_PACKET limeade_compile_perf(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PERF in);
+LIMEADE_PACKET limeade_compile_ask(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_ASK in);
+LIMEADE_PACKET limeade_compile_answer(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_ANSWER in);
+LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_COMMANDEER in);
 
 /***  DECODING  ***/
 
@@ -287,6 +312,7 @@ typedef enum
   LIMEADE_ERROR_SSH_CHANNEL,
   LIMEADE_ERROR_SSH_SUBSYSTEM,
   LIMEADE_ERROR_SSH_IO,
+  LIMEADE_ERROR_SSH_BIND,
 
   // error invoking zlib
   LIMEADE_ERROR_ZLIB,
@@ -300,10 +326,12 @@ typedef enum
   LIMEADE_ERROR_PACKET_COMPRESSED, // improper compressed data
 
   // miscellaneous
-  LIMEADE_ERROR_GARBAGE          // user gave garbage data
+  LIMEADE_ERROR_GARBAGE,         // user gave garbage data
   LIMEADE_ERROR_TIMEOUT,         // timeout reached before packet end was observed
   LIMEADE_ERROR_INVALID_CONTEXT, // LIMEADE_CONTEXT passed was malformed
 } LIMEADE_ERROR_TYPE;
+
+typedef unsigned int LIMEADE_ERROR;
 
 static uint8_t LIMEADE_ERRORS[5];
 
