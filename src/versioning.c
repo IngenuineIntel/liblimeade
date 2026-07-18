@@ -17,6 +17,7 @@
 
 #include <liblimeade.h>
 
+// liblimeade v0.1
 LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION = {0, 1};
 
 LIBLIMEADE_COMPATIBILITY

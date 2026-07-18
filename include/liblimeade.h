@@ -113,7 +113,7 @@ typedef struct
   uint8_t min : 4; // minor version number
 } LIBLIMEADE_VERSION;
 
-LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION;
+extern LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION;
 
 // packet types
 typedef enum
