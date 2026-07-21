@@ -1,321 +1,80 @@
 // liblimeade.h
-// header file for liblimeade
 //
 // Copyright (C) 2026 Roan Rothrock
 //
 // This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published
-// by the Free Software Foundation, either version 3 of the License, or
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
 
-#ifndef _LIBLIMEADE_ENTRY_H
-#define _LIBLIMEADE_ENTRY_H
+#ifndef _LIBLIMEADE_H_
+#define _LIBLIMEADE_H_
 
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h>
 
-#include<libssh/libssh.h>
-#include <libssh/server.h>
 
-/*** INIT ***/
 
-// two different types of roles
-// pretty straight forward
+/*** *** VERSION *** ***/
+// liblimeade v0.1
+#define LIBLIMEADE_MAJOR_VERSION 0
+#define LIBLIMEADE_MINOR_VERSION 1
+static uint8_t LIBLIMEADE_VERSION[2];
+
+
+
+/*** *** CONTEXT *** ***/
+
+
+// the `self` of the library
+typedef struct
+{
+  uint8_t role;       // either host or client
+  uint64_t sessionid; // Limeade session identifier
+
+  // SSH child process to monitor (for client)
+  pid_t ssh_child_pid;
+
+  // fds for send/recv
+  int send_fd;
+  int recv_fd;
+} LIMEADE_CONTEXT;
+
+// options for LIMEADE_CONTEXT.role
 enum LIMEADE_ROLE
 {
-  LIMEADE_ROLE_HOST = 1,
-  LIMEADE_ROLE_CLIENT = 2
+  LIMEADE_ROLE_HOST,
+  LIMEADE_ROLE_CLIENT
 };
 
-// context manager for library usage (the "this|self|me" of the connection)
-struct LIMEADE_CONTEXT_IMPL
-{
-  enum LIMEADE_ROLE role;
-  ssh_bind bind;
-  ssh_session session;
-  ssh_channel channel;
-  uint8_t session_id[5];
-  bool has_session_id;
-  int timeout_ms;
-  unsigned int port;
-};
-typedef struct LIMEADE_CONTEXT_IMPL *LIMEADE_CONTEXT;
-
-// representation of a raw payload
-typedef struct
-{
-  uint32_t sz;         // payload size in bytes
-  unsigned char *data; // payload bytes
-} LIMEADE_PACKET;
-
-// initialization functions for host and client
-LIMEADE_CONTEXT limeade_host_init(unsigned int port);
-LIMEADE_CONTEXT limeade_client_init(unsigned int port, const char *user,
-                                    const char *passwd);
-
-// send functions for host and client
-int limeade_host_send(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt);
-int limeade_client_send(LIMEADE_CONTEXT ctx, LIMEADE_PACKET pckt);
-
-// receive functions for host and client
-LIMEADE_PACKET limeade_host_recv(LIMEADE_CONTEXT ctx);
-LIMEADE_PACKET limeade_client_recv(LIMEADE_CONTEXT ctx);
-
-// sets timeout when waiting for complete packet
-int limeade_context_set_timeout(LIMEADE_CONTEXT ctx, int timeout_ms);
-
-// deinitialization functions for host and client
-void limeade_host_free(LIMEADE_CONTEXT ctx);
-void limeade_client_free(LIMEADE_CONTEXT ctx);
-
-/***  PACKET DESIGN  ***/
-
-// all packets have 4 components:
-/// 1. the magic, which indicates the protocol
-static const char LIMEADE_MAGIC[7] = "!LIME!\x00";
-
-// clang-format off
-// if left on, the graph below gets mangled
-
-/// 2. the flags
-// The flags are, in total, always 7 bytes, as follows:
-//
-//    Protocol version (major number)     - 4 bits (max 15)
-//    |   Protocol version (minor number) - 4 bits (max 15)
-//    |   |   Packet type                 - 4 bits (max 15)
-//    |   |   |             Data size (before compression)              - 14 bits (max 16384)
-//    |   |   |             |             Data size (after compression) - 14 bits (max 16384)
-//    |   |   |             |             |       Field delimiter       - 1 byte
-//    |   |   |             |             |       |       Row delimiter - 1 byte
-//    |   |   |             |             |       |       |
-// ,--+,--+,--+,------------+,------------+,------+,------+
-// 0001000001010000010100110101000011101101001111111011111111
-
-/// clang-format on
-
-// note: all `Data`s are compressed with the DEFLATE algorithm @
-// compression_level 5
-
-// version info
-typedef struct
-{
-  uint8_t maj : 4; // major version number
-  uint8_t min : 4; // minor version number
-} LIBLIMEADE_VERSION;
-
-extern LIBLIMEADE_VERSION LIMEADE_PROTOCOL_VERSION;
-
-// packet types
-typedef enum
-{
-  // client packets
-  LIMEADE_CLIENT_SYSOVERV,      // basic system info
-  LIMEADE_CLIENT_EVENTS,        // syscalls
-  LIMEADE_CLIENT_PROCS_GENERIC, // process table info
-  LIMEADE_CLIENT_PROCS_UPDATE,  // process table info (dynamic)
-  LIMEADE_CLIENT_PERF,          // resource usage info
-  LIMEADE_CLIENT_ASK,           // ask to connect
-  
-  // host packets
-  LIMEADE_HOST_ANSWER,     // confirm connection (or disband connection)
-  LIMEADE_HOST_COMMANDEER, // execute command on the client
-} LIMEADE_PACKET_TYPE;
-
-// field delimiter
-static char LIMEADE_FIELD_DELIM = '\xFE';
-static char LIMEADE_ROW_DELIM = '\xFF';
-
-// the flags themselves
-// note that this datatype isn't used by the developer, but interally by the
-// library
-typedef struct
-{
-  LIBLIMEADE_VERSION version;
-  LIMEADE_PACKET_TYPE type : 4;
-  uint16_t datasz_before_compression : 14;
-  uint16_t datasz_after_compression : 14;
-  char field_delim;
-  char row_delim;
-} LIMEADE_PACKET_FLAGS;
-
-/// 3. session id
-// handed out by the host (via HOST_ANSWER)
-// pseudorandomly generated, always 5 bytes
-// included in both client and host packets except in CLIENT_ASK packets where
-// the client has never connected before or otherwise lacks a session id
-typedef char LIMEADE_SESSION[5];
-
-/// 4. data
-// takes various forms, depending on packet type
-//  - generally visualized as a table, with fields and rows separated with
-//    LIMEADE_FIELD_DELIM and LIMEADE_ROW_DEMLIM
-//  - strings do not have nullbytes at the end
-
-// timestamps
-typedef struct
-{
-  uint32_t s;
-  uint16_t ms;
-} TS;
-
-// CLINET_SYSOVERV
-typedef struct
-{
-  char *hostname;       // the hostname
-  char *kernelver;      // the Linux Kernel version
-  char *distro;         // the Linux distribution
-  char *ipaddr;         // IP address
-  char *macaddr;        // MAC address
-  char *processor;      // CPU type
-  char *processor_vend; // the CPU's VendorID
-  uint8_t ram_gbs;      // no. gigabytes of RAM
-} LIMEADE_PACKET_SYSOVERV;
-
-// CLIENT_EVENTS
-typedef struct
-{
-  TS ts;
-  pid_t pid;     // PID of the calling process
-  char *type;    // type of syscall    (open, get)
-  char *subtype; // subtype of syscall (opensysat2, geteuid)
-  char *arg1;    // RDI at call time ("/dev/null", etc.)
-  char *arg2;    // RSI at call time (b00010010, etc.)
-  int retval;    // return value from syscall
-} EVENT;
-
-typedef struct
-{
-  uint16_t nr_events;
-  EVENT **events[]; // TODO this can't be right..?
-} LIMEADE_PACKET_EVENTS;
-
-// CLIENT_PROCS_GENERIC
-typedef struct
-{
-  pid_t pid;
-  pid_t ppid;
-  uid_t uid;
-  uint16_t threads;   // no. threads
-  uint32_t cpu_ticks; // CPU usage
-  uint32_t vm_rss_kb; // memory usage (in KB)
-  char *comm;         // command
-} LIMEADE_PACKET_PROC;
-
-typedef struct
-{
-  TS ts;
-  uint16_t nr_processes;
-  LIMEADE_PACKET_PROC *processes[];
-} LIMEADE_PACKET_PROCS_GENERIC;
-
-// CLIENT_PROCS_UPDATE
-typedef struct
-{
-  // NOT IMPLEMENTED
-  uint8_t filler;
-} LIMEADE_PACKET_PROCS_UPDATE;
-
-typedef struct
-{
-  TS ts;
-  uint8_t cores;
-  uint32_t avg_cpu_pct;
-  uint32_t mem_total_kb;
-  uint32_t mem_free_kb;
-  uint32_t mem_available_kb;
-  uint32_t mem_cached_kb;
-  double load_1m;
-  double load_5m;
-  double load_15m;
-  char *cores_json;
-} LIMEADE_PACKET_PERF;
-
-typedef struct
-{
-  uint8_t is_new_device;  // if this device has connected before
-  uint8_t is_new_session; // if this is a new running instance of the client
-  TS ts; // timestamp (s and ms) of send time (so the host can infer latency)
-} LIMEADE_PACKET_ASK;
-
-typedef struct
-{
-  bool accepted;
-} LIMEADE_PACKET_ANSWER;
-
-typedef struct
-{
-  char *command;         // executable/command to run on the client (+args)
-  uint8_t require_tty;   // if command needs a pty-like execution context
-  uint8_t require_admin; // if elevated permissions are required
-} LIMEADE_PACKET_COMMANDEER;
 
 
-/*** ENCODING ***/
+/*** *** ERROR BUFFER *** ***/
 
-LIMEADE_PACKET limeade_compile_sysoverv(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_SYSOVERV in);
-LIMEADE_PACKET limeade_compile_events(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_EVENTS in);
-LIMEADE_PACKET limeade_compile_procs_generic(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PROCS_GENERIC in);
-LIMEADE_PACKET limeade_compile_procs_update(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PROCS_UPDATE in); // NOT IMPLEMENTED
-LIMEADE_PACKET limeade_compile_perf(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_PERF in);
-LIMEADE_PACKET limeade_compile_ask(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_ASK in);
-LIMEADE_PACKET limeade_compile_answer(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_ANSWER in);
-LIMEADE_PACKET limeade_compile_commandeer(LIMEADE_CONTEXT ctx, LIMEADE_PACKET_COMMANDEER in);
-
-/***  DECODING  ***/
-
-// all data from parsing a packet
-typedef struct
-{
-  TS when_parsed;             // when the packet was parsed
-  LIMEADE_PACKET_FLAGS flags; // packet flags
-  LIMEADE_SESSION sessionid;  // packet session ID
-  void *data;                 // packet data
-} LIMEADE_PARSED;
-
-// parses packet (can wrap limeade_*_recv)
-LIMEADE_PARSED limeade_parse_packet(LIMEADE_PACKET pkt);
-
-// TODO
-
-/***  ERRORS  ***/
 
 // since errors can't always be indicated via return values (because not all
 // errors are completely fatal, so the actual return values tend to still be
-// useful) they are instead indicated via an internal buffer that stores the
-// last 5 errors (orTuccesses)
+// useful) they are instead indicated via an internal ring buffer that stores
+// the last 5 errors (or successes)
 
-// not all functions insert into this buffer, but most do
-// the origin of the error is generally indicated by its name
+// all failable functions in this library utilize this buffer. If a function in
+// this library calls another function in the library and that one fails, it
+// pushes an error, then the externally called function returns and passes the
+// original error on the the user
 
 // all types of errors
 typedef enum
 {
   // the error that wasn't
   LIMEADE_SUCCESS,
-
-  // errors invoking SSH
-  LIMEADE_ERROR_SSH_INIT,        
-  LIMEADE_ERROR_SSH_LISTEN,
-  LIMEADE_ERROR_SSH_ACCEPT,
-  LIMEADE_ERROR_SSH_KEX,
-  LIMEADE_ERROR_SSH_AUTH,
-  LIMEADE_ERROR_SSH_CHANNEL,
-  LIMEADE_ERROR_SSH_SUBSYSTEM,
-  LIMEADE_ERROR_SSH_IO,
-  LIMEADE_ERROR_SSH_BIND,
-
-  // error invoking zlib
-  LIMEADE_ERROR_ZLIB,
 
   // errors caused by malformed packet segments
   LIMEADE_ERROR_PACKET_MAGIC,      // improper/no magic
@@ -327,57 +86,295 @@ typedef enum
 
   // miscellaneous
   LIMEADE_ERROR_GARBAGE,         // user gave garbage data
-  LIMEADE_ERROR_TIMEOUT,         // timeout reached before packet end was observed
+  LIMEADE_ERROR_SSH_PROC,        // error spawning SSH process to tunnel
   LIMEADE_ERROR_INVALID_CONTEXT, // LIMEADE_CONTEXT passed was malformed
+  LIMEADE_ERROR_MEMORY,          // memory allocation error
+  LIEMADE_ERROR_OTHER            // something impossible enough to not define
 } LIMEADE_ERROR_TYPE;
 
-typedef unsigned int LIMEADE_ERROR;
+typedef uint8_t LIMEADE_ERROR;
 
-static uint8_t LIMEADE_ERRORS[5];
+// the buffer itself
+static LIMEADE_ERROR LIMEADE_ERRORS[5];
 
-// which index in the buffer is the latest error
+// manages which index in the buffer is the latest error
 // if =1, the latest error is at [1], the previous [0], and the next previous
 // [5], etc.
-static uint8_t LIMEADE_ERROR_INDEX;
+static LIMEADE_ERROR LIMEADE_ERROR_INDEX;
 
-// errors are added by a handler function,
-void limeade_inserror(LIMEADE_ERROR_TYPE error);
+/* limeade_inserror
+ *
+ * inserts an error into the ring buffer
+ *
+ * no return, can't fail
+ */
+void limeade_inserror(LIMEADE_ERROR error);
 
-// and read (popped, actually) by another handler function
-LIMEADE_ERROR_TYPE limeade_poperror(void);
+/* limeade_poperror
+ *
+ * pops the last error from the ring buffer
+ *
+ * returns the error, can't fail
+ */
+LIMEADE_ERROR limeade_poperror(void);
 
-/***  VERSIONS  ***/
 
-// packet versions have to be checked for compatibility, as (inevitably) not
-// every version of the protocol will be compatible with others
-//
-// generally, every version tries to be compatible with the previous major
-// version (a client won't send a CLIENT_PROCS_UPDATE if the previous major
-// version doesn't support it, etc.), unless:
-//  - it just can't be done, for whatever reason
-//  - the previous major version is 0
-//  - it just isn't done, for whatever reason
-// if both versions are 0.*, they have to be the exact same version to be
-// considered compatible
 
-// enum for compatibility test outcomes
-// IS_COMPATIBLE: full compatibility between versions
-// IS_NOT_COMPATIBILITY: no compatibility between versions
-// INDETERMINATE_COMPATIBILITY: compatibility is possible but not guaranteed
-typedef enum
+/*** *** INITIALIZATION *** ***/
+
+
+// the name of the SSH subsystem this library represents
+#define LIMEADE_SUBSYSTEM_NAME "limeade"
+
+/* limeade_client_init
+ * 
+ * spanws an SSH child process to initialize the subsystem on the SSH host and
+ * dups the fds required to send/recv on the tunnel, and stores the necessary data
+ * in the return struct
+ * 
+ * port: the network port to attempt the connection on
+ * dest: the destination of the connection (user@ipordomain.com)
+ *
+ * returns a LIMEADE_CONTEXT instance usable for all send/recv/deconstructor
+ * functions
+ */
+LIMEADE_CONTEXT limeade_client_init(uint16_t port, const char *dest);
+
+/* limeade_host_init
+ *
+ * populates the return struct with the necessary data for communicating through
+ * an SSH tunnel, assuming that the program was executed by sshd to act as the
+ * subsystem
+ *
+ * no arguments
+ *
+ * returns a LIMEADE_CONTEXT instance usable for all send/recv/deconstructor
+ * functions
+ */
+LIMEADE_CONTEXT limeade_host_init();
+
+
+
+/*** *** DECONSTRUCTION FUNCTIONS *** ***/
+
+
+/* limeade_client_free
+ *
+ * deconstructs and free the connection instance represented by the argument for
+ * the client side of the connection
+ *
+ * self: the context representing the connection to deconstruct
+ *
+ * no return, can't fail
+ */
+void limeade_client_free(LIMEADE_CONTEXT self);
+
+/* limeade_host_free
+ *
+ * deconstructs and frees the connection instance represented by the argument for
+ * the host side of the connection
+ *
+ * self: the context representing the connection to deconstruct
+ *
+ * no return, can't fail
+ */
+void limeade_host_free(LIMEADE_CONTEXT self);
+
+
+
+/*** *** PACKET ANATOMY *** ***/
+
+
+// LIMEADE_PACKET
+// types of packets in the Limeade suite
+enum LIMEADE_PACKET
 {
-  IS_COMPATIBLE,
-  IS_NOT_COMPATIBLE,
-  INDETERMINATE_COMPATIBILITY
-} LIBLIMEADE_COMPATIBILITY;
+  // init
+  LIMEADE_PACKET_ASK,    // initial connection request by client
+  LIMEADE_PACKET_ASNWER, // acknowledgement by host
 
-// used internally to determine when two versions of the protocol can
-// communicate successfully
-// local_ver: this program's version
-// target_ver: the presumed communicating program's version of this same
-// software
-LIBLIMEADE_COMPATIBILITY
-liblimeade_check_versioning(LIBLIMEADE_VERSION local_ver,
-                            LIBLIMEADE_VERSION target_ver);
+  // data
+  LIMEADE_PACKET_EVENT,        // syscall (event) information
+  LIMEADE_PACKET_EVENTS,       // more sycalls
+  LIMEADE_PACKET_PROC_GENERIC, // proc table information
+  LIMEADE_PACKET_PROC_UPDATE,  // dynamic proc table information
+  LIMEADE_PACKET_PERF,         // resource usage information
 
-#endif /* _LIBLIMEADE_ENTRY_H */
+  // other
+  LIMEADE_PACKET_COMMANDEER, // request command execution (host only)
+  LIMEADE_PACKET_CLOSE       // formally close connection
+};
+
+// packet magic at the start and end of every packet
+static char LIMEADE_MAGIC[12];
+#define LIMEADE_MAGIC_RAW "\xFF\xFFLMPRT^@^\xFF\xFF";
+
+// packet data, while variadic, is consistently visualized into rows & columns.
+// As much, there are specific characters used for delimeting fields and row
+// breaks
+#define LIMEADE_FIELD_DELIM "\xFF" // put between each field
+#define LIMEADE_ROW_DELIM   "\xFE" // put between each row
+
+// LIMEADE_ASK
+typedef struct
+{
+  char *hostname;  // client's hostname
+  char *kernelver; // client's kernel version
+  char *distro;    // client's Linux distribution
+  char *ipaddr     // client's IP address
+  char *macaddr    // client's MAC address
+  char *processor; // client's processor's name
+  char *processor_vend; // client's processor's vendor
+  char *ram;       // amount of RAM on the system
+  unsigned int response_wait_secs; // amount of time the client's willing to
+  // wait for LIMEADE_ANSWER
+} LIMEADE_ASK;
+
+// LIMEADE_ANSWER
+typedef struct
+{
+  uint64_t sessionid; // the client's new assigned sessionID
+} LIMEADE_ANSWER;
+
+// LIMEADE_EVENT
+typedef struct
+{
+  uint32_t ts_s;
+  uint16_t ts_ms
+  pid_t pid;
+  char *syscall;
+  char *arg1;
+  char *arg2;
+  int retval;
+} LIMEADE_EVENT;
+
+// LIMEADE_EVENTS
+typedef struct
+{
+  uint16_t nr_events;
+  LIMEADE_EVENT **events;
+} LIMEADE_EVENTS;
+
+// LIMEADE_PROC
+// single process in process table
+typedef struct
+{
+  pid_t pid;
+  pid_t ppid;
+  uid_t uid;
+  uint16_t threads;   // no. threads
+  uint32_t cpu_ticks; // CPU usage
+  uint32_t vm_rss_kb; // memory usage (in KB)
+  char *command;
+} LIMEADE_PROC;
+
+// LIMEADE_PROC_GENERIC
+typedef struct
+{
+  uint32_t ts_s;
+  uint16_t ts_ms;
+  uint16_t total;       // no. of processes
+  LIMEADE_PROC **procs; // process data
+} LIMEADE_PROC_GENERIC;
+
+// LIMEADE_PROC_UPDATE
+typedef struct
+{
+  uint32_t ts_s;
+  uint16_t ts_ms;
+  uint16_t total_altered;  // no. processes with changed data (including perf)
+  uint16_t total_died;     // no. processes that died
+  pid_t *died[];           // list of dead processes
+  LIMEADE_PROC *altered[]; // list of altered processes with revised data
+} LIMEADE_PROC_UPDATE;
+
+// LIMEADE_PERF
+typedef struct
+{
+  uint32_t ts_s;
+  uint16_t ts_ms;
+  uint8_t cores;
+  uint32_t avg_cpu_pct;
+  uint32_t mem_total_kb;
+  uint32_t mem_free_kb;
+  uint32_t mem_available_kb;
+  uint32_t mem_cached_kb;
+  double load_1m;
+  double load_5m;
+  double load_15m;
+  char *cores_json;
+} LIMEADE_PERF;
+
+// LIMEADE_COMMANDEER
+typedef struct
+{
+  char *command;
+  uint8_t exec_with_root;
+  uint8_t exec_with_tty;
+  uint8_t exec_with_jail;
+} LIMEADE_COMMANDEER;
+
+// LIMEADE_CLOSE
+typedef struct {} LIMEADE_CLOSE;
+
+
+
+/*** *** SENDING & RECEIVING *** ***/
+
+
+/* limeade_send
+ *
+ * sends a full constructed packet
+ *
+ * this: the context representing the connection
+ * type: the type of packet (from enum LIMEADE_PACKET)
+ * ... (1): the packet itself (of the struct type equivalent to `type`)
+ *
+ * 0 on success, -1 on failure
+ */
+int limeade_send(LIMEADE_CONTEXT this, int type, ...);
+
+// LIMEADE_RECV
+// received data before parsing
+typedef struct
+{
+  unsigned int type; // LIMEADE_PACKET value
+  void *data;        // pointer to data
+} LIMEADE_RECV;
+
+/* limeade_wait_recv
+ *
+ * hangs until it receives a full packet from the wire, and returns it
+ *
+ * returns a LIMEADE_RECV of the packet
+ */
+LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this);
+
+// I'm not giving each of these their own docstring
+// each of these take a LIMEADE_RECV and the connection context and return a
+// specific type of packet. On the library user's side, it'd look something
+// like the following:
+//
+// LIMEADE_RECV tmp = limeade_wait_recv(ctx);
+//
+// switch(tmp)
+// {
+//   case LIMEADE_PACKET_ASK:
+//     LIMEADE_ASK data = limeade_process_ask(ctx, tmp);
+//     -- SNIP --
+//   case LIMEADE_PACKET_ANSWER:
+//     LIMEADE_ANSWER data = limeade_process_answer(ctx, tmp);
+//   -- SNIP --  
+// }
+//
+LIMEADE_ASK          limeade_process_ask         (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_ANSWER       limeade_process_answer      (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_EVENT        limeade_process_event       (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_EVENTS       limeade_process_events      (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_PROC_UPDATE  limeade_process_proc_update (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_PERF         limeade_process_perf        (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_COMMANDEER   limeade_process_commandeer  (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+// no reason for limeade_process_close
+
+#endif /* _LIBLIMEADE_H_ */
