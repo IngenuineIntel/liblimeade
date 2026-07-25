@@ -367,6 +367,9 @@ LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this);
 //   -- SNIP --  
 // }
 //
+// NOTE ABOUT THESE FUNCTIONS
+// they free the `data` argument they're provided from the heap, and their returns live
+// on the stack, but any/all pointers in the return value point to the heap
 LIMEADE_ASK          limeade_process_ask         (LIMEADE_CONTEXT this, LIMEADE_RECV data);
 LIMEADE_ANSWER       limeade_process_answer      (LIMEADE_CONTEXT this, LIMEADE_RECV data);
 LIMEADE_EVENT        limeade_process_event       (LIMEADE_CONTEXT this, LIMEADE_RECV data);
@@ -376,5 +379,17 @@ LIMEADE_PROC_UPDATE  limeade_process_proc_update (LIMEADE_CONTEXT this, LIMEADE_
 LIMEADE_PERF         limeade_process_perf        (LIMEADE_CONTEXT this, LIMEADE_RECV data);
 LIMEADE_COMMANDEER   limeade_process_commandeer  (LIMEADE_CONTEXT this, LIMEADE_RECV data);
 // no reason for limeade_process_close
+
+// it is because of such heapiness that this exists:
+/* limeade_release
+ *
+ * frees limeade packet data from heap
+ *
+ * type: describes the type of the data you want to free, either
+ *       LIMEADE_PACKET_TYPE or -1 for LIMEADE_RECV
+ *
+ * always succeeds, no return value
+ */
+void limeade_release(int type, ...);
 
 #endif /* _LIBLIMEADE_H_ */

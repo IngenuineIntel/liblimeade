@@ -17,7 +17,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include<stdarg.h>
+#include <stdarg.h>
+#include <string.h>
 
 #include <liblimeade.h>
 
@@ -36,7 +37,7 @@ LIMEADE_MAGIC = LIMEADE_MAGIC_RAW;
 #define LIMEADE_RECV_CHUNK_SZ 20
 #define LIMEADE_RECV_CHUNKS_BEFORE_REALLOC 5
 
-char *prep_str(char *str)
+char *limeade_prep_str(char *str)
 {
     /* sanatizes string before write 
      * !, 0xFF, and 0xFE are escaped
@@ -66,14 +67,14 @@ char *limeade_prep_uint(uint64_t in)
     /* int to str & sanatize */
     char ret[18]; // len(hex(2 ** 64)) - 2 + 1
     snprintf(&ret, 17, "%X", in);
-    return prep_str(&ret);
+    return limeade_prep_str(&ret);
 }
 
 char *limeade_prep_sint(int64_t in)
 {
     char ret[18];
     snprintf(&ret, 17, "%X", in);
-    return prep_str(&ret);
+    return limeade_prep_str(&ret);
 }
 
 char *limeade_prep_double(double in)
@@ -81,7 +82,7 @@ char *limeade_prep_double(double in)
     /* double to str & sanatize */
     char ret[25] // 25 bytes is an arbitrary choice on my end
     snprintf(&ret, 25, "%.*e", in);
-    return prep_str(&ret);
+    return limeade_prep_str(&ret);
 }
 
 // shorthands
@@ -339,10 +340,32 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
 #undef RDELIM
 #undef CHECK
 
+bool limeade_has_magic(void *sector)
+{
+    /* checks for magic at end of chunk to detect packet end */
+
+    if ()
+    {
+        return false;
+    }
+    return true;
+
+}
+
+#define HAS_MAGIC(x)                          \
+memcmp(                                       \
+    x + diff,                                 \
+    &LIMEADE_MAGIC_RAW, sizeof(LIMEADE_MAGIC) \
+)                                             \
+? false : true;
+
 LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this)
 {
+    int diff = LIMEADE_RECV_CHUNK_SZ - sizeof(LIMEADE_MAGIC); // arbitrary arithmetic beforehand
+
     uint16_t alloc_inc = LIMEADE_RECV_CHUNK_SZ * LIMEADE_RECV_CHUNKS_BEFORE_REALLOC;
     uint8_t factor = 1;
+    size_t step = 0;
 
     LIMEADE_RECV ret;
 
@@ -352,16 +375,16 @@ LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this)
     {
         for(int i = 0; i < LIMEADE_RECV_CHUNKS_BEFORE_REALLOC; i++)
         {
-            read(this.recv_fd, ret.data, LIMEADE_RECV_CHUNK_SZ);
-            // TODO check for magic at end
+            read(this.recv_fd, ret.data + step, LIMEADE_RECV_CHUNK_SZ);
+            if(HAS_MAGIC(ret.data + step))
             {
                 goto breakout;
             }
+            step += LIMEADE_RECV_CHUNK_SZ;
         }
 
         factor++;
-        realloc(ret.data, alloc_inx * factor);
-        continue
+        realloc(ret.data, alloc_inc * factor);
     }
 
     breakout:
@@ -369,4 +392,174 @@ LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this)
     ret.type = *ret.data[sizeof(LIMEADE_MAGIC) + 2];
 
     return ret;
+}
+
+#undef HAS_MAGIC
+
+
+static int limeade_delimeter_strlen(const char *x)
+{
+    /* Alternative to strlen that can be used internally against delimeters */
+    char *i = x;
+    int j   = 0;
+    while(true)
+    {
+        if(*i == LIMEADE_FIELD_DELIM || *i == LIMEADE_ROW_DELIM)
+        {
+            return j;
+        }
+        i++;
+        j++;
+    }
+}
+
+#define ALTSTRLEN(x) limeade_delimeter_strlen(x);
+
+#define INC() \
+i += j;       \
+j = ALTSTRLEN(i) + 1;
+
+LIMEADE_ASK limeade_process_ask(LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    char *i = data.data;
+    int j;
+    i += 13; // size of inital packet data in bytes that we want to skip
+
+    char *response_wait_secs_tmp; // when receiving as string
+
+    LIMEADE_ASK ret;
+
+    j = ALTSTRLEN(i) + 1;
+    ret.hostname = malloc(j); // +1 for null byte
+    memcpy(ret.hostname, i, j);
+    INC();
+    ret.kernelver = malloc(j);
+    memcpy(ret.kernelver, i, j);
+    INC();
+    ret.distro = malloc(j);
+    memcpy(ret.distro, i, j);
+    INC();
+    ret.ipaddr = malloc(j);
+    memcpy(ret.ipaddr, i, j);
+    INC();
+    ret.macaddr = malloc(j);
+    memcpy(ret.macaddr, i, j);
+    INC();
+    ret.processor = malloc(j);
+    memcpy(ret.processor, i, j);
+    INC();
+    ret.processor_vend = malloc(j);
+    memcpy(ret.processor_vend, i, j);
+    INC();
+    ret.ram = malloc(j);
+    memcpy(ret.ram, i, j);
+    INC();
+    response_wait_secs_tmp = malloc(j);
+    memcpy(response_wait_secs_tmp, i, j);
+
+    // TODO cast response_wait_secs_tmp to data.response_wait_secs (str to int)
+    
+    free(data.data);
+    return ret;
+}
+
+LIMEADE_ANSWER limeade_process_answer (LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    // TODO
+}
+
+LIMEADE_EVENT limeade_process_event (LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    // TODO
+}
+
+LIMEADE_EVENTS limeade_process_events (LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    // TODO
+}
+
+LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    // TODO
+}
+
+LIMEADE_PROC_UPDATE limeade_process_proc_update(LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    // TODO
+}
+
+LIMEADE_PERF limeade_process_perf (LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    // TODO
+}
+
+LIMEADE_COMMANDEER limeade_process_commandeer (LIMEADE_CONTEXT this, LIMEADE_RECV data)
+{
+    // TODO
+}
+
+#undef ALTSTRLEN
+#undef INC
+
+void limeade_release(int type, ...)
+{
+    va_list args;
+    va_start(args, 1);
+
+    switch(type)
+    {
+        case -1: // LIMEADE_RECV
+        {
+            LIMEADE_RECV data = va_arg(args, LIMEADE_RECV);
+            free(data.data);
+        }
+        case LIMEADE_PACKET_ASK:
+        {
+            LIMEADE_ASK data = va_arg(args, LIMEADE_ASK);
+            free(data.hostname);
+            free(data.kernelver);
+            free(data.distro);
+            free(data.ipaddr);
+            free(data.macaddr);
+            free(data.processor);
+            free(data.processor_vend);
+            free(data.ram);
+        }
+        case LIMEADE_PACKET_ANSWER:
+        {
+            LIMEADE_ANSWER data = va_arg(args, LIMEADE_ANSWER);
+            // TODO
+        }
+        case LIMEADE_PACKET_EVENT:
+        {
+            LIMEADE_EVENT data = va_arg(args, LIMEADE_EVENT);
+            // TODO
+        }
+        case LIMEADE_PACKET_EVENTS:
+        {
+            LIMEADE_EVENTS data = va_arg(args, LIMEADE_EVENTS);
+            // TODO
+        }
+        case LIMEADE_PACKET_PROC_GENERIC:
+        {
+            LIMEADE_PROC_GENERIC data = va_arg(args, LIMEADE_PROC_GENERIC);
+            // TODO
+        }
+        case LIMEADE_PACKET_PROC_UPDATE:
+        {
+            LIMEADE_PROC_UPDATE data = va_arg(args, LIMEADE_PROC_UPDATE);
+            // TODO
+        }
+        case LIMEADE_PACKET_PERF:
+        {
+            LIMEADE_PERF data = va_arg(args, LIMEADE_PERF);
+            // TODO
+        }
+        case LIMEADE_PACKET_COMMANDEER:
+        {
+            LIMEADE_COMMANDEER data = va_arg(args, LIMEADE_COMMANDEER);
+            // TODO
+        }
+        case LIMEADE_PACKET_CLOSE: {} // nothing to be done
+    }
 }
