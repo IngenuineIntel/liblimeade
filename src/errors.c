@@ -14,10 +14,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>
+#include "../include/liblimeade.h"
+//#include <liblimeade.h>
 
-#include <liblimeade.h>
-
-void limeade_inserror(LIMEADE_ERROR_TYPE error)
+void limeade_inserror(LIMEADE_ERROR error)
 {
   if (LIMEADE_ERROR_INDEX == 5)
   {
@@ -28,7 +28,7 @@ void limeade_inserror(LIMEADE_ERROR_TYPE error)
   LIMEADE_ERROR_INDEX++;
 }
 
-LIMEADE_ERROR_TYPE limeade_poperror(void)
+LIMEADE_ERROR limeade_poperror(void)
 {
   LIMEADE_ERROR_TYPE ret = LIMEADE_ERRORS[LIMEADE_ERROR_INDEX];
   if (LIMEADE_ERROR_INDEX == 0)

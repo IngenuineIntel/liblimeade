@@ -20,7 +20,7 @@
 #define _LIBLIMEADE_H_
 
 #include <stdint.h>
-
+#include <stdlib.h>
 
 
 /*** *** VERSION *** ***/
@@ -77,12 +77,16 @@ typedef enum
   LIMEADE_SUCCESS,
 
   // errors caused by malformed packet segments
-  LIMEADE_ERROR_PACKET_MAGIC,      // improper/no magic
-  LIMEADE_ERROR_PACKET_FORMAT,     // improper/no flags
-  LIMEADE_ERROR_PACKET_SIZE,       // disingenuous/incorrent packet size
-  LIMEADE_ERROR_PACKET_SESSION,    // wrong/no session
-  LIMEADE_ERROR_PACKET_DATA,       // malformed/lacking data
-  LIMEADE_ERROR_PACKET_COMPRESSED, // improper compressed data
+  LIMEADE_ERROR_PACKET_MAGIC,          // improper/no magic
+  LIMEADE_ERROR_PACKET_FORMAT,         // improper/no flags
+  LIMEADE_ERROR_PACKET_SIZE,           // disingenuous/incorrent packet size
+  LIMEADE_ERROR_PACKET_SESSION,        // wrong/no session
+  LIMEADE_ERROR_PACKET_DATA,           // malformed/lacking data
+  LIMEADE_ERROR_PACKET_COMPRESSED,     // improper compressed data
+
+  // decoding errors
+  LIMEADE_ERROR_DECODING_FATAL,    // i.e. packet ends prematurely
+  LIMEADE_ERROR_DECODING_NONFATAL, // i.e. unparsable int
 
   // miscellaneous
   LIMEADE_ERROR_GARBAGE,         // user gave garbage data
@@ -127,11 +131,11 @@ LIMEADE_ERROR limeade_poperror(void);
 #define LIMEADE_SUBSYSTEM_NAME "limeade"
 
 /* limeade_client_init
- * 
+ *
  * spanws an SSH child process to initialize the subsystem on the SSH host and
  * dups the fds required to send/recv on the tunnel, and stores the necessary data
  * in the return struct
- * 
+ *
  * port: the network port to attempt the connection on
  * dest: the destination of the connection (user@ipordomain.com)
  *
@@ -191,7 +195,7 @@ enum LIMEADE_PACKET
 {
   // init
   LIMEADE_PACKET_ASK,    // initial connection request by client
-  LIMEADE_PACKET_ASNWER, // acknowledgement by host
+  LIMEADE_PACKET_ANSWER, // acknowledgement by host
 
   // data
   LIMEADE_PACKET_EVENT,        // syscall (event) information
@@ -221,8 +225,8 @@ typedef struct
   char *hostname;  // client's hostname
   char *kernelver; // client's kernel version
   char *distro;    // client's Linux distribution
-  char *ipaddr     // client's IP address
-  char *macaddr    // client's MAC address
+  char *ipaddr;    // client's IP address
+  char *macaddr;   // client's MAC address
   char *processor; // client's processor's name
   char *processor_vend; // client's processor's vendor
   char *ram;       // amount of RAM on the system
@@ -240,7 +244,7 @@ typedef struct
 typedef struct
 {
   uint32_t ts_s;
-  uint16_t ts_ms
+  uint16_t ts_ms;
   pid_t pid;
   char *syscall;
   char *arg1;
@@ -284,8 +288,8 @@ typedef struct
   uint16_t ts_ms;
   uint16_t total_altered;  // no. processes with changed data (including perf)
   uint16_t total_died;     // no. processes that died
-  pid_t *died[];           // list of dead processes
-  LIMEADE_PROC *altered[]; // list of altered processes with revised data
+  pid_t **died;           // list of dead processes
+  LIMEADE_PROC **altered; // list of altered processes with revised data
 } LIMEADE_PROC_UPDATE;
 
 // LIMEADE_PERF
@@ -332,13 +336,14 @@ typedef struct {} LIMEADE_CLOSE;
  *
  * 0 on success, -1 on failure
  */
-int limeade_send(LIMEADE_CONTEXT this, int type, ...);
+int limeade_send(LIMEADE_CONTEXT self, int type, ...);
 
 // LIMEADE_RECV
 // received data before parsing
 typedef struct
 {
   unsigned int type; // LIMEADE_PACKET value
+  size_t len;
   void *data;        // pointer to data
 } LIMEADE_RECV;
 
@@ -348,7 +353,7 @@ typedef struct
  *
  * returns a LIMEADE_RECV of the packet
  */
-LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this);
+LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT self);
 
 // I'm not giving each of these their own docstring
 // each of these take a LIMEADE_RECV and the connection context and return a
@@ -364,20 +369,20 @@ LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this);
 //     -- SNIP --
 //   case LIMEADE_PACKET_ANSWER:
 //     LIMEADE_ANSWER data = limeade_process_answer(ctx, tmp);
-//   -- SNIP --  
+//   -- SNIP --
 // }
 //
 // NOTE ABOUT THESE FUNCTIONS
 // they free the `data` argument they're provided from the heap, and their returns live
 // on the stack, but any/all pointers in the return value point to the heap
-LIMEADE_ASK          limeade_process_ask         (LIMEADE_CONTEXT this, LIMEADE_RECV data);
-LIMEADE_ANSWER       limeade_process_answer      (LIMEADE_CONTEXT this, LIMEADE_RECV data);
-LIMEADE_EVENT        limeade_process_event       (LIMEADE_CONTEXT this, LIMEADE_RECV data);
-LIMEADE_EVENTS       limeade_process_events      (LIMEADE_CONTEXT this, LIMEADE_RECV data);
-LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this, LIMEADE_RECV data);
-LIMEADE_PROC_UPDATE  limeade_process_proc_update (LIMEADE_CONTEXT this, LIMEADE_RECV data);
-LIMEADE_PERF         limeade_process_perf        (LIMEADE_CONTEXT this, LIMEADE_RECV data);
-LIMEADE_COMMANDEER   limeade_process_commandeer  (LIMEADE_CONTEXT this, LIMEADE_RECV data);
+LIMEADE_ASK          limeade_process_ask         (LIMEADE_CONTEXT self, LIMEADE_RECV data);
+LIMEADE_ANSWER       limeade_process_answer      (LIMEADE_CONTEXT self, LIMEADE_RECV data);
+LIMEADE_EVENT        limeade_process_event       (LIMEADE_CONTEXT self, LIMEADE_RECV data);
+LIMEADE_EVENTS       limeade_process_events      (LIMEADE_CONTEXT self, LIMEADE_RECV data);
+LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT self, LIMEADE_RECV data);
+LIMEADE_PROC_UPDATE  limeade_process_proc_update (LIMEADE_CONTEXT self, LIMEADE_RECV data);
+LIMEADE_PERF         limeade_process_perf        (LIMEADE_CONTEXT self, LIMEADE_RECV data);
+LIMEADE_COMMANDEER   limeade_process_commandeer  (LIMEADE_CONTEXT self, LIMEADE_RECV data);
 // no reason for limeade_process_close
 
 // it is because of such heapiness that this exists:
