@@ -93,7 +93,7 @@ typedef enum
   LIMEADE_ERROR_SSH_PROC,        // error spawning SSH process to tunnel
   LIMEADE_ERROR_INVALID_CONTEXT, // LIMEADE_CONTEXT passed was malformed
   LIMEADE_ERROR_MEMORY,          // memory allocation error
-  LIEMADE_ERROR_OTHER            // something impossible enough to not define
+  LIMEADE_ERROR_OTHER            // something impossible enough to not define
 } LIMEADE_ERROR_TYPE;
 
 typedef uint8_t LIMEADE_ERROR;
@@ -171,7 +171,7 @@ LIMEADE_CONTEXT limeade_host_init();
  *
  * no return, can't fail
  */
-void limeade_client_free(LIMEADE_CONTEXT self);
+void limeade_client_free(LIMEADE_CONTEXT *self);
 
 /* limeade_host_free
  *
@@ -182,7 +182,7 @@ void limeade_client_free(LIMEADE_CONTEXT self);
  *
  * no return, can't fail
  */
-void limeade_host_free(LIMEADE_CONTEXT self);
+void limeade_host_free(LIMEADE_CONTEXT *self);
 
 
 

@@ -1,4 +1,4 @@
-// errors.c
+// limecap.h
 //
 // Copyright (C) 2026 Roan Rothrock
 //
@@ -14,31 +14,3 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#include <liblimeade/liblimeade.h>
-
-void limeade_inserror(LIMEADE_ERROR error)
-{
-  if (LIMEADE_ERROR_INDEX == 5)
-  {
-    // must loop around
-    LIMEADE_ERROR_INDEX = 0;
-  }
-  LIMEADE_ERRORS[LIMEADE_ERROR_INDEX] = error;
-  LIMEADE_ERROR_INDEX++;
-}
-
-LIMEADE_ERROR limeade_poperror(void)
-{
-  LIMEADE_ERROR_TYPE ret = LIMEADE_ERRORS[LIMEADE_ERROR_INDEX];
-  if (LIMEADE_ERROR_INDEX == 0)
-  {
-    // must loop around
-    LIMEADE_ERROR_INDEX = 4;
-  }
-  else
-  {
-    LIMEADE_ERROR_INDEX--;
-  }
-  return ret;
-}

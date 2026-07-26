@@ -1,13 +1,30 @@
 #!/usr/bin/make
 
-objs: # compiles into .o files
-	-mkdir ./bin
-	gcc -fPIC -c ./src/encode.c -o ./bin/encode.o -Iinclude
-	gcc -fPIC -c ./src/decode.c -o ./bin/decode.o -Iinclude
-	gcc -fPIC -c ./src/errors.c -o ./bin/errors.o -Iinclude
-	gcc -fPIC -c ./src/ssh-compat.c -o ./bin/ssh-compat.o -Iinclude
-	gcc -fPIC -c ./src/versioning.c -o ./bin/versioning.o -Iinclude
+CC := clang
+CFLAGS := -fPIC -O2 -Wall -Iinclude -std=c11
+SRCS := $(wildcard src/*.c)
+OBJS := $(SRCS:.c=.o)
 
-so: objs # compiles into .so file
-	# TODO * here is kinda bad?
-	gcc -shared -o liblimeade.so ./bin/*.o
+.PHONY: objs so clean build_tests help
+
+objs: $(OBJS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+so: objs
+	$(CC) -shared -o liblimeade.so $(OBJS)
+
+build_tests:
+	$(MAKE) -C tests
+
+clean:
+	rm -f src/*.o liblimeade.so
+
+help:
+	@echo "Available targets:"
+	@echo "  objs        - compile source files into object files"
+	@echo "  so          - build shared library liblimeade.so"
+	@echo "  clean       - remove object files and library"
+	@echo "  build_tests - invoke Makefile in tests/ directory"
+	@echo "  help        - show this message"
