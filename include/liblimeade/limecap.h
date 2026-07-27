@@ -14,8 +14,8 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#include<stdint.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 // This file is provided alongside liblimeade. It represents a library for
 // creating/modifying/reading Limecap files, which are files designed to hold
@@ -36,15 +36,15 @@ typedef struct
   uint8_t limeade_maj_ver; // the major version number of Limeade
   uint8_t limeade_min_ver; // the minor version number of Limeade
   char *short_description; // small comment about the file
-  char *long_description;  // long comment about the file
+  char *long_description;  // large comment about the file
 } LIMECAP_HEADER;
 
 // detailed timestamps
 typedef struct
 {
   uint64_t s;  // seconds (UNIX time)
-  uint16_t ms; // milliseconds from last second
-  uint16_t ns; // nanoseconds from last millisecond
+  uint16_t ms; // milliseconds since the last second
+  uint16_t ns; // nanoseconds since the last millisecond
 } LIMECAP_TS;
 
 // header for each packet
@@ -65,7 +65,7 @@ typedef struct
   char mode; // the mode of the file's opening ("r", "w", "a")
   int fd;    // file descriptor of the file
   size_t nr_events;   // number of events found within the file
-  size_t **event_szs; // sizes of event data 
+  size_t **event_szs; // sizes of event data
 } LIMECAP_CONTEXT;
 
 
@@ -106,4 +106,3 @@ int limecap_w_index(LIMECAP_CONTEXT ctx, unsigned int index, LIMECAP_PACKET new)
 
 // appending
 int limecap_append(LIMECAP_CONTEXT ctx, LIMECAP_PACKET new);
-

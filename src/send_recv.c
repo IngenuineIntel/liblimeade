@@ -16,7 +16,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -533,6 +532,9 @@ fatal:
   goto end;
 }
 
+// note about these functions:
+// if the function fails, `data.data` will not be freed
+
 LIMEADE_ANSWER limeade_process_answer(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 {
   char *i = data.data;
@@ -588,12 +590,13 @@ LIMEADE_EVENT limeade_process_event(LIMEADE_CONTEXT this, LIMEADE_RECV data)
   ret.pid = STOL(pid_tmp);
   ret.retval = STOL(retval_tmp);
 
+free(data.data);
+
 end:
   free(ts_s_tmp);
   free(ts_ms_tmp);
   free(pid_tmp);
   free(retval_tmp);
-  free(data.data);
   return ret;
 
 fatal:
@@ -605,13 +608,189 @@ fatal:
 
 LIMEADE_EVENTS limeade_process_events(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 {
-  // TODO
+
+  char *i = data.data;
+  int j, k;
+  i += 13;
+  LIMEADE_EVENT *l;
+
+  void *nr_events_tmp, *ts_s_tmp, *ts_ms_tmp, *pid_tmp, *retval_tmp;
+
+  LIMEADE_EVENTS ret;
+
+  j = ALTSTRLEN(i) + 1;
+  nr_events_tmp = malloc(j);
+  memcpy(nr_events_tmp, i, j);
+  ret.nr_events = STOL(nr_events_tmp);
+  free(nr_events_tmp);
+
+  ret.events = (LIMEADE_EVENT**)malloc(sizeof(LIMEADE_EVENT) * ret.nr_events);
+
+  for(k = 0; k < ret.nr_events; k++)
+  {
+    l = ret.events[k];
+
+    // unintializaing these pointers so we can check which ones we have to free
+    // when backing out from an error
+
+    ts_s_tmp = NULL;
+    ts_ms_tmp = NULL;
+    pid_tmp = NULL;
+    retval_tmp = NULL;
+
+    INC();
+    ts_s_tmp = malloc(j);
+    memcpy(ts_s_tmp, i, j);
+    INC();
+    ts_ms_tmp = malloc(j);
+    memcpy(ts_ms_tmp, i, j);
+    INC();
+    pid_tmp = malloc(j);
+    memcpy(pid_tmp, i, j);
+    INC();
+    l->syscall = malloc(j);
+    memcpy(l->syscall, i, j);
+    INC();
+    l->arg1 = malloc(j);
+    memcpy(l->arg1, i, j);
+    INC();
+    l->arg2 = malloc(j);
+    memcpy(l->arg2, i, j);
+    INC();
+    retval_tmp = malloc(j);
+    memcpy(retval_tmp, i, j);
+
+    l->ts_s   = STOL(ts_s_tmp);
+    l->ts_ms  = STOL(ts_ms_tmp);
+    l->pid    = STOL(pid_tmp);
+    l->retval = STOL(retval_tmp);
+
+    free(ts_s_tmp);
+    free(ts_ms_tmp);
+    free(pid_tmp);
+    free(retval_tmp);
+
+    continue;
+
+    fatal:
+
+    if(ts_s_tmp)   free(ts_s_tmp);
+    if(ts_ms_tmp)  free(ts_ms_tmp);
+    if(pid_tmp)    free(pid_tmp);
+    if(retval_tmp) free(retval_tmp);
+
+    // now iterating backwards to free previous events in sequence
+    for(k = k; k >= 0; k--)
+    {
+      l = ret.events[k];
+      if(l->syscall) free(l->syscall);
+      if(l->arg1)    free(l->arg1);
+      if(l->arg2)    free(l->arg2);
+    }
+    free(ret.events);
+    return ret;
+  }
+  free(data.data);
+  return ret;
 }
 
 LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this,
                                                   LIMEADE_RECV data)
 {
-  // TODO
+
+  char *i = data.data;
+  int j, k;
+  i += 13;
+  LIMEADE_PROC *l;
+
+  void *ts_s_tmp, *ts_ms_tmp, *total_tmp;
+  void *pid_tmp, *ppid_tmp, *uid_tmp, *threads_tmp, *cpu_ticks_tmp, *vm_rss_kb_tmp;
+
+  LIMEADE_PROC_GENERIC ret;
+
+  j = ALTSTRLEN(i) + 1;
+  ts_s_tmp = malloc(j);
+  memcpy(ts_s_tmp, i, j);
+  INC();
+  ts_ms_tmp = malloc(j);
+  memcpy(ts_ms_tmp, i, j);
+  INC();
+  total_tmp = malloc(j);
+  memcpy(total_tmp, i, j);
+  ret.ts_s = STOL(ts_s_tmp);
+  ret.ts_ms = STOL(ts_ms_tmp);
+  ret.total = STOL(total_tmp);
+  free(ts_s_tmp);
+  free(ts_ms_tmp);
+  free(total_tmp);
+
+  ret.procs = (LIMEADE_PROC**)malloc(sizeof(LIMEADE_PROC) * ret.total);
+
+  for(k = 0; k < ret.total; k++)
+  {
+    l = ret.procs[k];
+
+    pid_tmp = NULL;
+    ppid_tmp = NULL;
+    uid_tmp = NULL;
+    threads_tmp = NULL;
+    cpu_ticks_tmp = NULL;
+    vm_rss_kb_tmp = NULL;
+
+    INC();
+    pid_tmp = malloc(j);
+    memcpy(pid_tmp, i, j);
+    INC();
+    ppid_tmp = malloc(j);
+    memcpy(ppid_tmp, i, j);
+    INC();
+    uid_tmp = malloc(j);
+    memcpy(uid_tmp, i, j);
+    INC();
+    threads_tmp = malloc(j);
+    memcpy(threads_tmp, i, j);
+    INC();
+    vm_rss_kb_tmp = malloc(j);
+    memcpy(vm_rss_kb_tmp, i, j);
+    INC();
+    l->command = malloc(j);
+    memcpy(l->command, i, j);
+
+    l->pid       = STOL(pid_tmp);
+    l->ppid      = STOL(ppid_tmp);
+    l->uid       = STOL(uid_tmp);
+    l->threads   = STOL(threads_tmp);
+    l->cpu_ticks = STOL(cpu_ticks_tmp);
+    l->vm_rss_kb = STOL(vm_rss_kb_tmp);
+
+    free(pid_tmp);
+    free(ppid_tmp);
+    free(uid_tmp);
+    free(threads_tmp);
+    free(cpu_ticks_tmp);
+    free(vm_rss_kb_tmp);
+
+    continue;
+
+    fatal:
+
+    if(pid_tmp) free(pid_tmp);
+    if(ppid_tmp) free(ppid_tmp);
+    if(uid_tmp)  free(uid_tmp);
+    if(threads_tmp) free(threads_tmp);
+    if(cpu_ticks_tmp) free(cpu_ticks_tmp);
+    if(vm_rss_kb_tmp) free(vm_rss_kb_tmp);
+
+    for(k = k; k >= 0; k++)
+    {
+      free(ret.procs[k]->command);
+    }
+    free(ret.procs);
+    return ret;
+  }
+
+  free(data.data);
+  return ret;
 }
 
 LIMEADE_PROC_UPDATE limeade_process_proc_update(LIMEADE_CONTEXT this,
@@ -622,7 +801,85 @@ LIMEADE_PROC_UPDATE limeade_process_proc_update(LIMEADE_CONTEXT this,
 
 LIMEADE_PERF limeade_process_perf(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 {
-  // TODO
+  char *i = data.data;
+  int j;
+  i += 13;
+
+  void *ts_s_tmp, *ts_ms_tmp, *cores_tmp, *avg_cpu_pct_tmp, *mem_total_kb_tmp, *mem_free_kb_tmp;
+  void *mem_available_kb_tmp, *mem_cached_kb_tmp, *load_1m_tmp, *load_5m_tmp, *load_15m_tmp;
+
+  LIMEADE_PERF ret;
+
+  j = ALTSTRLEN(i) + 1;
+  ts_s_tmp = malloc(j);
+  memcpy(ts_s_tmp, i, j);
+  INC();
+  ts_ms_tmp = malloc(j);
+  memcpy(ts_ms_tmp, i, j);
+  INC();
+  cores_tmp = malloc(j);
+  memcpy(cores_tmp, i, j);
+  INC();
+  avg_cpu_pct_tmp = malloc(j);
+  memcpy(avg_cpu_pct_tmp, i, j);
+  INC();
+  mem_total_kb_tmp = malloc(j);
+  memcpy(mem_total_kb_tmp, i, j);
+  INC();
+  mem_free_kb_tmp = malloc(j);
+  memcpy(mem_free_kb_tmp, i, j);
+  INC();
+  mem_available_kb_tmp = malloc(j);
+  memcpy(mem_available_kb_tmp, i, j);
+  INC();
+  mem_cached_kb_tmp = malloc(j);
+  memcpy(mem_cached_kb_tmp, i, j);
+  INC();
+  load_1m_tmp = malloc(j);
+  memcpy(load_1m_tmp, i, j);
+  INC();
+  load_5m_tmp = malloc(j);
+  memcpy(load_5m_tmp, i, j);
+  INC();
+  load_15m_tmp = malloc(j);
+  memcpy(load_15m_tmp, i, j);
+  INC();
+  ret.cores_json = malloc(j);
+  memcpy(ret.cores_json, i, j);
+
+  ret.ts_s             = STOL(ts_s_tmp);
+  ret.ts_ms            = STOL(ts_ms_tmp);
+  ret.cores            = STOL(cores_tmp);
+  ret.avg_cpu_pct      = STOL(avg_cpu_pct_tmp);
+  ret.mem_total_kb     = STOL(mem_total_kb_tmp);
+  ret.mem_free_kb      = STOL(mem_free_kb_tmp);
+  ret.mem_available_kb = STOL(mem_available_kb_tmp);
+  ret.mem_cached_kb    = STOL(mem_cached_kb_tmp);
+  ret.load_1m          = STOD(load_1m_tmp);
+  ret.load_5m          = STOD(load_5m_tmp);
+  ret.load_15m         = STOD(load_15m_tmp);
+
+  free(data.data);
+
+  end:
+
+  free(ts_s_tmp);
+  free(ts_ms_tmp);
+  free(cores_tmp);
+  free(avg_cpu_pct_tmp);
+  free(mem_total_kb_tmp);
+  free(mem_free_kb_tmp);
+  free(mem_available_kb_tmp);
+  free(mem_cached_kb_tmp);
+  free(load_1m_tmp);
+  free(load_5m_tmp);
+  free(load_15m_tmp);
+
+  return ret;
+
+  fatal:
+  free(ret.cores_json);
+  goto end;
 }
 
 LIMEADE_COMMANDEER limeade_process_commandeer(LIMEADE_CONTEXT this,
@@ -678,6 +935,7 @@ void limeade_release(int type, ...)
 
       for (int i = 0; i < data.nr_events; i++)
       {
+        // TODO
       }
     }
     case LIMEADE_PACKET_PROC_GENERIC:
