@@ -461,6 +461,11 @@ static double limeade_strtod_errq(const char *x)
 #define STOL(x) limeade_strol_err(x);
 #define STOD(x) limeade_strol_err(x);
 #define ALTSTRLEN(x) limeade_delimeter_strlen(x);
+
+// macros for repetition reduction
+#define ASSIGN_START();\
+j = ALTSTRLEN(i) + 1;
+
 #define INC()                                       \
   i += j;                                           \
   if (i > (char*)data.data + data.len)              \
@@ -469,6 +474,10 @@ static double limeade_strtod_errq(const char *x)
     goto fatal;                                     \
   }                                                 \
   j = ALTSTRLEN(i) + 1;
+
+#define ASSIGN(x) \
+x = malloc(j);    \
+memcpy(x, i, j);
 
 LIMEADE_ASK limeade_process_ask(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 {
@@ -480,33 +489,22 @@ LIMEADE_ASK limeade_process_ask(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 
   LIMEADE_ASK ret;
 
-  j = ALTSTRLEN(i) + 1;
-  ret.hostname = malloc(j);
-  memcpy(ret.hostname, i, j);
+  ASSIGN_START();
+  ASSIGN(ret.hostname);
   INC();
-  ret.kernelver = malloc(j);
-  memcpy(ret.kernelver, i, j);
+  ASSIGN(ret.kernelver);
   INC();
-  ret.distro = malloc(j);
-  memcpy(ret.distro, i, j);
+  ASSIGN(ret.distro);
   INC();
-  ret.ipaddr = malloc(j);
-  memcpy(ret.ipaddr, i, j);
+  ASSIGN(ret.ipaddr);
   INC();
-  ret.macaddr = malloc(j);
-  memcpy(ret.macaddr, i, j);
+  ASSIGN(ret.macaddr);
   INC();
-  ret.processor = malloc(j);
-  memcpy(ret.processor, i, j);
+  ASSIGN(ret.processor);
   INC();
-  ret.processor_vend = malloc(j);
-  memcpy(ret.processor_vend, i, j);
+  ASSIGN(ret.processor_vend);
   INC();
-  ret.ram = malloc(j);
-  memcpy(ret.ram, i, j);
-  INC();
-  response_wait_secs_tmp = malloc(j);
-  memcpy(response_wait_secs_tmp, i, j);
+  ASSIGN(ret.ram);
 
   // casting non-strings
   ret.response_wait_secs = STOL(response_wait_secs_tmp);
@@ -545,12 +543,12 @@ LIMEADE_ANSWER limeade_process_answer(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 
   LIMEADE_ANSWER ret;
 
-  j = ALTSTRLEN(i + 1);
-  sessionid_tmp = malloc(j);
-  memcpy(sessionid_tmp, i, j);
+  ASSIGN_START();
+  ASSIGN(sessionid_tmp);
   ret.sessionid = (uint64_t)STOL(sessionid_tmp);
   free(sessionid_tmp);
 
+  free(data.data);
   return ret;
 }
 
@@ -564,26 +562,20 @@ LIMEADE_EVENT limeade_process_event(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 
   LIMEADE_EVENT ret;
 
-  j = ALTSTRLEN(i) + 1;
-  ts_s_tmp = malloc(j);
-  memcpy(ts_s_tmp, i, j);
+  ASSIGN_START();
+  ASSIGN(ts_s_tmp);
   INC();
-  ts_ms_tmp = malloc(j);
-  memcpy(ts_ms_tmp, i, j);
+  ASSIGN(ts_ms_tmp);
   INC();
-  pid_tmp = malloc(j);
-  memcpy(pid_tmp, i, j);
+  ASSIGN(pid_tmp);
   INC();
-  ret.syscall = malloc(j);
-  memcpy(ret.syscall, i, j);
+  ASSIGN(ret.syscall);
   INC();
-  ret.arg1 = malloc(j);
-  memcpy(ret.arg1, i, j);
+  ASSIGN(ret.arg1);
   INC();
-  ret.arg2 = malloc(j);
-  memcpy(ret.arg2, i, j);
-  retval_tmp = malloc(j);
-  memcpy(retval_tmp, i, j);
+  ASSIGN(ret.arg2);
+  INC();
+  ASSIGN(retval_tmp);
 
   ret.ts_s = STOL(ts_s_tmp);
   ret.ts_ms = STOL(ts_ms_tmp);
@@ -618,9 +610,9 @@ LIMEADE_EVENTS limeade_process_events(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 
   LIMEADE_EVENTS ret;
 
-  j = ALTSTRLEN(i) + 1;
-  nr_events_tmp = malloc(j);
-  memcpy(nr_events_tmp, i, j);
+  ASSIGN_START();
+  ASSIGN(nr_events_tmp);
+
   ret.nr_events = STOL(nr_events_tmp);
   free(nr_events_tmp);
 
@@ -639,26 +631,19 @@ LIMEADE_EVENTS limeade_process_events(LIMEADE_CONTEXT this, LIMEADE_RECV data)
     retval_tmp = NULL;
 
     INC();
-    ts_s_tmp = malloc(j);
-    memcpy(ts_s_tmp, i, j);
+    ASSIGN(ts_s_tmp);
     INC();
-    ts_ms_tmp = malloc(j);
-    memcpy(ts_ms_tmp, i, j);
+    ASSIGN(ts_ms_tmp);
     INC();
-    pid_tmp = malloc(j);
-    memcpy(pid_tmp, i, j);
+    ASSIGN(pid_tmp);
     INC();
-    l->syscall = malloc(j);
-    memcpy(l->syscall, i, j);
+    ASSIGN(l->syscall);
     INC();
-    l->arg1 = malloc(j);
-    memcpy(l->arg1, i, j);
+    ASSIGN(l->arg1);
     INC();
-    l->arg2 = malloc(j);
-    memcpy(l->arg2, i, j);
+    ASSIGN(l->arg2);
     INC();
-    retval_tmp = malloc(j);
-    memcpy(retval_tmp, i, j);
+    ASSIGN(retval_tmp);
 
     l->ts_s   = STOL(ts_s_tmp);
     l->ts_ms  = STOL(ts_ms_tmp);
@@ -674,10 +659,10 @@ LIMEADE_EVENTS limeade_process_events(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 
     fatal:
 
-    if(ts_s_tmp)   free(ts_s_tmp);
-    if(ts_ms_tmp)  free(ts_ms_tmp);
-    if(pid_tmp)    free(pid_tmp);
-    if(retval_tmp) free(retval_tmp);
+    free(ts_s_tmp);
+    free(ts_ms_tmp);
+    free(pid_tmp);
+    free(retval_tmp);
 
     // now iterating backwards to free previous events in sequence
     for(k = k; k >= 0; k--)
@@ -708,15 +693,13 @@ LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this,
 
   LIMEADE_PROC_GENERIC ret;
 
-  j = ALTSTRLEN(i) + 1;
-  ts_s_tmp = malloc(j);
-  memcpy(ts_s_tmp, i, j);
+  ASSIGN_START();
+  ASSIGN(ts_s_tmp);
   INC();
-  ts_ms_tmp = malloc(j);
-  memcpy(ts_ms_tmp, i, j);
+  ASSIGN(ts_ms_tmp);
   INC();
-  total_tmp = malloc(j);
-  memcpy(total_tmp, i, j);
+  ASSIGN(total_tmp);
+
   ret.ts_s = STOL(ts_s_tmp);
   ret.ts_ms = STOL(ts_ms_tmp);
   ret.total = STOL(total_tmp);
@@ -738,23 +721,17 @@ LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this,
     vm_rss_kb_tmp = NULL;
 
     INC();
-    pid_tmp = malloc(j);
-    memcpy(pid_tmp, i, j);
+    ASSIGN(pid_tmp);
     INC();
-    ppid_tmp = malloc(j);
-    memcpy(ppid_tmp, i, j);
+    ASSIGN(ppid_tmp);
     INC();
-    uid_tmp = malloc(j);
-    memcpy(uid_tmp, i, j);
+    ASSIGN(uid_tmp);
     INC();
-    threads_tmp = malloc(j);
-    memcpy(threads_tmp, i, j);
+    ASSIGN(threads_tmp);
     INC();
-    vm_rss_kb_tmp = malloc(j);
-    memcpy(vm_rss_kb_tmp, i, j);
+    ASSIGN(vm_rss_kb_tmp);
     INC();
-    l->command = malloc(j);
-    memcpy(l->command, i, j);
+    ASSIGN(l->command);
 
     l->pid       = STOL(pid_tmp);
     l->ppid      = STOL(ppid_tmp);
@@ -796,7 +773,116 @@ LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this,
 LIMEADE_PROC_UPDATE limeade_process_proc_update(LIMEADE_CONTEXT this,
                                                 LIMEADE_RECV data)
 {
-  // TODO
+  char *i = data.data;
+  int j, k;
+  LIMEADE_PROC *l;
+  i += 13;
+
+  // booleans for managing error fallback
+  uint8_t died_completed = 0;
+
+  void *ts_s_tmp, *ts_ms_tmp, *total_altered_tmp, *total_died_tmp;
+  void *pid_tmp, *ppid_tmp, *uid_tmp, *threads_tmp, *cpu_ticks_tmp, *vm_rss_kb_tmp;
+
+  LIMEADE_PROC_UPDATE ret;
+
+  ASSIGN_START();
+  INC();
+  ASSIGN(ts_s_tmp);
+  INC();
+  ASSIGN(ts_ms_tmp);
+  INC();
+  ASSIGN(total_altered_tmp);
+  INC();
+  ASSIGN(total_died_tmp);
+
+  ret.ts_s = STOL(ts_s_tmp);
+  ret.ts_ms = STOL(ts_ms_tmp);
+  ret.total_altered = STOL(total_altered_tmp);
+  ret.total_died = STOL(total_died_tmp);
+
+  free(ts_s_tmp);
+  free(ts_ms_tmp);
+  free(total_altered_tmp);
+  free(total_died_tmp);
+
+  ret.altered = (LIMEADE_PROC**)malloc(sizeof(LIMEADE_PROC) * ret.total_altered);
+  ret.died = (pid_t*)malloc(sizeof(pid_t) + ret.total_died);
+
+  for(k = 0; k < ret.total_died; k++)
+  {
+    pid_tmp = NULL;
+    INC();
+    ASSIGN(pid_tmp);
+    ret.died[k] = STOL(pid_tmp);
+    free(pid_tmp);
+  }
+
+  died_completed = 1;
+
+  for(k = 0; k < ret.total_altered; k++)
+  {
+    l = ret.altered[k];
+
+    pid_tmp = NULL;
+    ppid_tmp = NULL;
+    uid_tmp = NULL;
+    threads_tmp = NULL;
+    cpu_ticks_tmp = NULL;
+    vm_rss_kb_tmp = NULL;
+
+    INC();
+    ASSIGN(pid_tmp);
+    INC();
+    ASSIGN(ppid_tmp);
+    INC();
+    ASSIGN(uid_tmp);
+    INC();
+    ASSIGN(threads_tmp);
+    INC();
+    ASSIGN(vm_rss_kb_tmp);
+    INC();
+    ASSIGN(l->command);
+
+    l->pid       = STOL(pid_tmp);
+    l->ppid      = STOL(ppid_tmp);
+    l->uid       = STOL(uid_tmp);
+    l->threads   = STOL(threads_tmp);
+    l->cpu_ticks = STOL(cpu_ticks_tmp);
+    l->vm_rss_kb = STOL(vm_rss_kb_tmp);
+
+    free(pid_tmp);
+    free(ppid_tmp);
+    free(uid_tmp);
+    free(threads_tmp);
+    free(cpu_ticks_tmp);
+    free(vm_rss_kb_tmp);
+  }
+
+  free(data.data);
+  return ret;
+
+  fatal:
+
+  if(died_completed)
+  {
+    // freeing `ret.altered`
+    for(k = k; k >= 0; k--)
+    {
+      free(ret.altered[k]->command);
+    }
+    free(ret.altered);
+  }
+  free(ret.died);
+
+  free(pid_tmp);
+  free(ppid_tmp);
+  free(uid_tmp);
+  free(threads_tmp);
+  free(cpu_ticks_tmp);
+  free(vm_rss_kb_tmp);
+  return ret;
+
 }
 
 LIMEADE_PERF limeade_process_perf(LIMEADE_CONTEXT this, LIMEADE_RECV data)
@@ -810,42 +896,22 @@ LIMEADE_PERF limeade_process_perf(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 
   LIMEADE_PERF ret;
 
-  j = ALTSTRLEN(i) + 1;
-  ts_s_tmp = malloc(j);
-  memcpy(ts_s_tmp, i, j);
+  ASSIGN_START();
+  ASSIGN(ts_s_tmp);
   INC();
-  ts_ms_tmp = malloc(j);
-  memcpy(ts_ms_tmp, i, j);
+  ASSIGN(ts_ms_tmp);
   INC();
-  cores_tmp = malloc(j);
-  memcpy(cores_tmp, i, j);
+  ASSIGN(cores_tmp);
   INC();
-  avg_cpu_pct_tmp = malloc(j);
-  memcpy(avg_cpu_pct_tmp, i, j);
+  ASSIGN(avg_cpu_pct_tmp);
   INC();
-  mem_total_kb_tmp = malloc(j);
-  memcpy(mem_total_kb_tmp, i, j);
+  ASSIGN(mem_total_kb_tmp);
   INC();
-  mem_free_kb_tmp = malloc(j);
-  memcpy(mem_free_kb_tmp, i, j);
+  ASSIGN(mem_free_kb_tmp);
   INC();
-  mem_available_kb_tmp = malloc(j);
-  memcpy(mem_available_kb_tmp, i, j);
+  ASSIGN(mem_available_kb_tmp);
   INC();
-  mem_cached_kb_tmp = malloc(j);
-  memcpy(mem_cached_kb_tmp, i, j);
-  INC();
-  load_1m_tmp = malloc(j);
-  memcpy(load_1m_tmp, i, j);
-  INC();
-  load_5m_tmp = malloc(j);
-  memcpy(load_5m_tmp, i, j);
-  INC();
-  load_15m_tmp = malloc(j);
-  memcpy(load_15m_tmp, i, j);
-  INC();
-  ret.cores_json = malloc(j);
-  memcpy(ret.cores_json, i, j);
+  ASSIGN(mem_cached_kb_tmp);
 
   ret.ts_s             = STOL(ts_s_tmp);
   ret.ts_ms            = STOL(ts_ms_tmp);
@@ -885,12 +951,48 @@ LIMEADE_PERF limeade_process_perf(LIMEADE_CONTEXT this, LIMEADE_RECV data)
 LIMEADE_COMMANDEER limeade_process_commandeer(LIMEADE_CONTEXT this,
                                               LIMEADE_RECV data)
 {
-  // TODO
+  char *i = data.data;
+  int j;
+  i += 13;
+
+  void *exec_root_tmp, *exec_tty_tmp, *exec_jail_tmp;
+
+  LIMEADE_COMMANDEER ret;
+
+  ASSIGN_START();
+  ASSIGN(exec_root_tmp);
+  INC();
+  ASSIGN(exec_tty_tmp);
+  INC();
+  ASSIGN(exec_jail_tmp);
+  INC();
+  ASSIGN(ret.command);
+
+  ret.exec_with_root = STOL(exec_root_tmp);
+  ret.exec_with_tty  = STOL(exec_tty_tmp);
+  ret.exec_with_jail = STOL(exec_jail_tmp);
+
+  free(data.data);
+
+  end:
+
+  free(exec_root_tmp);
+  free(exec_tty_tmp);
+  free(exec_jail_tmp);
+
+  return ret;
+
+  fatal:
+
+  free(ret.command);
+  goto end;
 }
 
 #undef STOL
 #undef STOD
 #undef ALTSTRLEN
+#undef ASSIGN_START
+#undef ASSIGN
 #undef INC
 
 void limeade_release(int type, ...)
@@ -932,11 +1034,16 @@ void limeade_release(int type, ...)
     case LIMEADE_PACKET_EVENTS:
     {
       LIMEADE_EVENTS data = va_arg(args, LIMEADE_EVENTS);
+      LIMEADE_EVENT *j;
 
       for (int i = 0; i < data.nr_events; i++)
       {
-        // TODO
+        j = data.events[i];
+        free(j->syscall);
+        free(j->arg1);
+        free(j->arg2);
       }
+      free(data.events);
     }
     case LIMEADE_PACKET_PROC_GENERIC:
     {

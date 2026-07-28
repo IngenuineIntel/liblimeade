@@ -286,9 +286,9 @@ typedef struct
 {
   uint32_t ts_s;
   uint16_t ts_ms;
-  uint16_t total_altered;  // no. processes with changed data (including perf)
-  uint16_t total_died;     // no. processes that died
-  pid_t **died;           // list of dead processes
+  uint16_t total_altered; // no. processes with changed data (including perf)
+  uint16_t total_died;    // no. processes that died
+  pid_t *died;            // list of dead processes
   LIMEADE_PROC **altered; // list of altered processes with revised data
 } LIMEADE_PROC_UPDATE;
 
