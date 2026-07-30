@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -162,7 +163,7 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
   // stays within a single packet while doing so, the packet will have empty
   // space between the last piece of data and the ending magic
   // `sz` is the size of written data used to calculate this
-  unsigned int sz;
+  unsigned int sz = 0;
 
   // notes on packet structure:
 
@@ -287,7 +288,46 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
   case LIMEADE_PACKET_PROC_UPDATE:
   {
     LIMEADE_PROC_UPDATE data = va_arg(args, LIMEADE_PROC_UPDATE);
-    // TODO
+
+    LIMEADE_PROC *j;
+
+    UCAST(data.ts_s);
+    FDELIM();
+    UCAST(data.ts_ms);
+    FDELIM();
+    UCAST(data.total_altered);
+    FDELIM();
+    UCAST(data.total_died);
+
+    RDELIM();
+
+    for(int i = 0; i < data.total_died; i++)
+    {
+      UCAST(data.died[i]);
+      if(i != data.total_died - 1)
+      {
+      FDELIM();
+      }
+    }
+    RDELIM();
+    for(int i = 0; i < data.total_altered; i++)
+    {
+      j = data.altered[i];
+      UCAST(j->pid);
+      FDELIM();
+      UCAST(j->ppid);
+      FDELIM();
+      UCAST(j->uid);
+      FDELIM();
+      UCAST(j->threads);
+      FDELIM();
+      UCAST(j->cpu_ticks);
+      FDELIM();
+      UCAST(j->vm_rss_kb);
+      FDELIM();
+      SCAST(j->command);
+      RDELIM();
+    }
   }
 
   case LIMEADE_PACKET_PERF:
@@ -392,7 +432,7 @@ LIMEADE_RECV limeade_wait_recv(LIMEADE_CONTEXT this)
 
 breakout:
 
-  ret.type = ((int*)ret.data)[sizeof(LIMEADE_MAGIC) + 2];
+  ret.type = ((uint8_t*)ret.data)[sizeof(LIMEADE_MAGIC) + 2];
   ret.len  = step;
 
   return ret;
@@ -416,7 +456,7 @@ static int limeade_delimeter_strlen(const char *x)
   }
 }
 
-static long limeade_strol_err(const char *x)
+long limeade_strol_err(const char *x)
 {
   /* wrapper for strol that manages edgecases
    * note: cast returns appropriately to avoid mangling large unsigned values
@@ -439,7 +479,7 @@ static long limeade_strol_err(const char *x)
   return ret;
 }
 
-static double limeade_strtod_errq(const char *x)
+double limeade_strtod_errq(const char *x)
 {
   /* wrapper for strtod that manages edgecases
    */
@@ -459,12 +499,12 @@ static double limeade_strtod_errq(const char *x)
 
 // hiding the lack-of-namespace cludge
 #define STOL(x) limeade_strol_err(x);
-#define STOD(x) limeade_strol_err(x);
+#define STOD(x) limeade_strtod_errq(x);
 #define ALTSTRLEN(x) limeade_delimeter_strlen(x);
 
 // macros for repetition reduction
 #define ASSIGN_START();\
-j = ALTSTRLEN(i) + 1;
+j = 1 + ALTSTRLEN(i);
 
 #define INC()                                       \
   i += j;                                           \
@@ -473,7 +513,7 @@ j = ALTSTRLEN(i) + 1;
     limeade_inserror(LIMEADE_ERROR_DECODING_FATAL); \
     goto fatal;                                     \
   }                                                 \
-  j = ALTSTRLEN(i) + 1;
+  j = 1 + ALTSTRLEN(i);
 
 #define ASSIGN(x) \
 x = malloc(j);    \
@@ -485,9 +525,12 @@ LIMEADE_ASK limeade_process_ask(LIMEADE_CONTEXT this, LIMEADE_RECV data)
   int j;
   i += 13; // size of inital packet data in bytes that we want to skip
 
-  char *response_wait_secs_tmp; // when receiving as string
+  char *response_wait_secs_tmp = NULL; // when receiving as string
 
   LIMEADE_ASK ret;
+
+  // to avoid -Wmaybe-uninitialized
+  ret.ram = NULL;
 
   ASSIGN_START();
   ASSIGN(ret.hostname);
@@ -539,7 +582,7 @@ LIMEADE_ANSWER limeade_process_answer(LIMEADE_CONTEXT this, LIMEADE_RECV data)
   int j;
   i += 13;
 
-  char *sessionid_tmp; // sessionID before conversion to uint64_t
+  char *sessionid_tmp = NULL; // sessionID before conversion to uint64_t
 
   LIMEADE_ANSWER ret;
 
@@ -558,7 +601,8 @@ LIMEADE_EVENT limeade_process_event(LIMEADE_CONTEXT this, LIMEADE_RECV data)
   int j;
   i += 13;
 
-  void *ts_s_tmp, *ts_ms_tmp, *pid_tmp, *retval_tmp;
+  char *ts_s_tmp, *ts_ms_tmp, *pid_tmp, *retval_tmp;
+  ts_s_tmp = ts_ms_tmp = pid_tmp = retval_tmp = NULL;
 
   LIMEADE_EVENT ret;
 
@@ -606,7 +650,7 @@ LIMEADE_EVENTS limeade_process_events(LIMEADE_CONTEXT this, LIMEADE_RECV data)
   i += 13;
   LIMEADE_EVENT *l;
 
-  void *nr_events_tmp, *ts_s_tmp, *ts_ms_tmp, *pid_tmp, *retval_tmp;
+  char *nr_events_tmp, *ts_s_tmp, *ts_ms_tmp, *pid_tmp, *retval_tmp;
 
   LIMEADE_EVENTS ret;
 
@@ -665,7 +709,7 @@ LIMEADE_EVENTS limeade_process_events(LIMEADE_CONTEXT this, LIMEADE_RECV data)
     free(retval_tmp);
 
     // now iterating backwards to free previous events in sequence
-    for(k = k; k >= 0; k--)
+    for(k = 0; k >= 0; k--)
     {
       l = ret.events[k];
       if(l->syscall) free(l->syscall);
@@ -688,8 +732,10 @@ LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this,
   i += 13;
   LIMEADE_PROC *l;
 
-  void *ts_s_tmp, *ts_ms_tmp, *total_tmp;
-  void *pid_tmp, *ppid_tmp, *uid_tmp, *threads_tmp, *cpu_ticks_tmp, *vm_rss_kb_tmp;
+  char *ts_s_tmp, *ts_ms_tmp, *total_tmp;
+  char *pid_tmp, *ppid_tmp, *uid_tmp, *threads_tmp, *cpu_ticks_tmp, *vm_rss_kb_tmp;
+  ts_s_tmp = ts_ms_tmp = total_tmp = pid_tmp = ppid_tmp = uid_tmp = threads_tmp = NULL;
+  cpu_ticks_tmp = vm_rss_kb_tmp = NULL;
 
   LIMEADE_PROC_GENERIC ret;
 
@@ -758,7 +804,7 @@ LIMEADE_PROC_GENERIC limeade_process_proc_generic(LIMEADE_CONTEXT this,
     if(cpu_ticks_tmp) free(cpu_ticks_tmp);
     if(vm_rss_kb_tmp) free(vm_rss_kb_tmp);
 
-    for(k = k; k >= 0; k++)
+    for(k = 0; k >= 0; k++)
     {
       free(ret.procs[k]->command);
     }
@@ -783,6 +829,8 @@ LIMEADE_PROC_UPDATE limeade_process_proc_update(LIMEADE_CONTEXT this,
 
   void *ts_s_tmp, *ts_ms_tmp, *total_altered_tmp, *total_died_tmp;
   void *pid_tmp, *ppid_tmp, *uid_tmp, *threads_tmp, *cpu_ticks_tmp, *vm_rss_kb_tmp;
+  ts_s_tmp = ts_ms_tmp = total_altered_tmp = total_died_tmp = ppid_tmp = uid_tmp = NULL;
+  threads_tmp = cpu_ticks_tmp = vm_rss_kb_tmp = NULL;
 
   LIMEADE_PROC_UPDATE ret;
 
@@ -867,7 +915,7 @@ LIMEADE_PROC_UPDATE limeade_process_proc_update(LIMEADE_CONTEXT this,
   if(died_completed)
   {
     // freeing `ret.altered`
-    for(k = k; k >= 0; k--)
+    for(k = 0; k >= 0; k--)
     {
       free(ret.altered[k]->command);
     }
@@ -891,8 +939,10 @@ LIMEADE_PERF limeade_process_perf(LIMEADE_CONTEXT this, LIMEADE_RECV data)
   int j;
   i += 13;
 
-  void *ts_s_tmp, *ts_ms_tmp, *cores_tmp, *avg_cpu_pct_tmp, *mem_total_kb_tmp, *mem_free_kb_tmp;
-  void *mem_available_kb_tmp, *mem_cached_kb_tmp, *load_1m_tmp, *load_5m_tmp, *load_15m_tmp;
+  char *ts_s_tmp, *ts_ms_tmp, *cores_tmp, *avg_cpu_pct_tmp, *mem_total_kb_tmp, *mem_free_kb_tmp;
+  char *mem_available_kb_tmp, *mem_cached_kb_tmp, *load_1m_tmp, *load_5m_tmp, *load_15m_tmp;
+  ts_s_tmp = ts_ms_tmp = cores_tmp = avg_cpu_pct_tmp = mem_total_kb_tmp = mem_free_kb_tmp = NULL;
+  mem_available_kb_tmp = mem_cached_kb_tmp = load_1m_tmp = load_5m_tmp = load_15m_tmp = NULL;
 
   LIMEADE_PERF ret;
 
@@ -955,9 +1005,11 @@ LIMEADE_COMMANDEER limeade_process_commandeer(LIMEADE_CONTEXT this,
   int j;
   i += 13;
 
-  void *exec_root_tmp, *exec_tty_tmp, *exec_jail_tmp;
+  char *exec_root_tmp, *exec_tty_tmp, *exec_jail_tmp;
+  exec_root_tmp = exec_tty_tmp = exec_jail_tmp = NULL;
 
   LIMEADE_COMMANDEER ret;
+  ret.command = NULL;
 
   ASSIGN_START();
   ASSIGN(exec_root_tmp);
@@ -1021,7 +1073,6 @@ void limeade_release(int type, ...)
     }
     case LIMEADE_PACKET_ANSWER:
     {
-      LIMEADE_ANSWER data = va_arg(args, LIMEADE_ANSWER);
       // no need?
     }
     case LIMEADE_PACKET_EVENT:
@@ -1048,22 +1099,31 @@ void limeade_release(int type, ...)
     case LIMEADE_PACKET_PROC_GENERIC:
     {
       LIMEADE_PROC_GENERIC data = va_arg(args, LIMEADE_PROC_GENERIC);
-      // TODO
+      for(int i = 0; i < data.total; i++)
+      {
+        free(data.procs[i]->command);
+      }
+      free(data.procs);
     }
     case LIMEADE_PACKET_PROC_UPDATE:
     {
       LIMEADE_PROC_UPDATE data = va_arg(args, LIMEADE_PROC_UPDATE);
-      // TODO
+      for(int i = 0; i < data.total_altered; i++)
+      {
+        free(data.altered[i]->command);
+      }
+      free(data.altered);
+      free(data.died);
     }
     case LIMEADE_PACKET_PERF:
     {
       LIMEADE_PERF data = va_arg(args, LIMEADE_PERF);
-      // TODO
+      free(data.cores_json);
     }
     case LIMEADE_PACKET_COMMANDEER:
     {
       LIMEADE_COMMANDEER data = va_arg(args, LIMEADE_COMMANDEER);
-      // TODO
+      free(data.command);
     }
     case LIMEADE_PACKET_CLOSE:
     {

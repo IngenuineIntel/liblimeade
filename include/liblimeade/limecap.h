@@ -63,7 +63,7 @@ typedef struct
 typedef struct
 {
   char mode; // the mode of the file's opening ("r", "w", "a")
-  int fd;    // file descriptor of the file
+  int fd;    // file descriptor
   size_t nr_events;   // number of events found within the file
   size_t **event_szs; // sizes of event data
 } LIMECAP_CONTEXT;
@@ -71,16 +71,14 @@ typedef struct
 
 /*** INIT ***/
 
-// the following 3 functions all do the same thing: open a .limecap file
-// however, they all do so for different reasons
-// _r: readonly
-// _w: reading, altering preexisting information, and adding new information
-// _a: append only
-// all return a LIMECAP_CONTEXT item that is required for subsequent calls in
-// the API
-LIMECAP_CONTEXT limecap_open_r(const char *path);
-LIMECAP_CONTEXT limecap_open_w(const char *path);
-LIMECAP_CONTEXT limecap_open_a(const char *path);
+// for opening a file
+// path: path to the file
+// mode: mode of file opening:
+//  - "r": readonly
+//  - "a": append only
+//  - "w": append and edit preexisting data
+//  - "u": all
+LIMECAP_CONTEXT limecap_open(const char *path, char mode);
 
 // for closing a file:
 void limecap_close(LIMECAP_CONTEXT ctx);
