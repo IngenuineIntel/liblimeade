@@ -5,7 +5,7 @@ repository. The contents of this document are not future-proof yet.
 
 ## Guidelines
 
-There should be three kinds of tests:
+There should be two kinds of tests:
 
  - Tests of functionality & compatibility
  - Tests against regression
