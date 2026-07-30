@@ -205,6 +205,7 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
     SCAST(data.ram);
     FDELIM();
     UCAST(data.response_wait_secs);
+    RDELIM();
   }
 
   case LIMEADE_PACKET_ANSWER:
@@ -212,6 +213,7 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
     LIMEADE_ANSWER data = va_arg(args, LIMEADE_ANSWER);
 
     UCAST(data.sessionid);
+    RDELIM();
   }
 
   case LIMEADE_PACKET_EVENT:
@@ -231,6 +233,7 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
     SCAST(data.arg2);
     FDELIM();
     ICAST(data.retval);
+    RDELIM();
   }
 
   case LIMEADE_PACKET_EVENTS:
@@ -357,6 +360,7 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
     DCAST(data.load_15m);
     FDELIM();
     SCAST(data.cores_json);
+    RDELIM();
   }
 
   case LIMEADE_PACKET_COMMANDEER:
@@ -370,6 +374,7 @@ int limeade_send(LIMEADE_CONTEXT this, int type, ...)
     UCAST(data.exec_with_tty);
     FDELIM();
     UCAST(data.exec_with_jail);
+    RDELIM();
   }
 
   //case LIMEADE_CLOSE:
