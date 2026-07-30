@@ -1,7 +1,7 @@
 #!/usr/bin/make
 
 CC := clang
-CFLAGS := -fPIC -O2 -Wall -Iinclude -std=c11
+CFLAGS := -fPIC -O2 -Wall -Iinclude -std=gnu11
 SRCS := $(wildcard src/*.c)
 OBJS := $(SRCS:.c=.o)
 
@@ -15,16 +15,13 @@ objs: $(OBJS)
 so: objs
 	$(CC) -shared -o liblimeade.so $(OBJS)
 
-build_tests:
-	$(MAKE) -C tests
-
 clean:
 	rm -f src/*.o liblimeade.so
 
 help:
 	@echo "Available targets:"
-	@echo "  objs        - compile source files into object files"
-	@echo "  so          - build shared library liblimeade.so"
-	@echo "  clean       - remove object files and library"
-	@echo "  build_tests - invoke Makefile in tests/ directory"
-	@echo "  help        - show this message"
+	@echo "  objs"
+	@echo "  so"
+	@echo "  clean"
+	@echo "  build_tests"
+	@echo "  help"

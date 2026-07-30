@@ -19,17 +19,20 @@
 #ifndef _LIBLIMEADE_H_
 #define _LIBLIMEADE_H_
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIC_C_SOURCE
+#endif /* _POSIC_C_SOURCE */
+
 #include <stdint.h>
 #include <stdlib.h>
-
+#include <sys/types.h>
 
 /*** *** VERSION *** ***/
 // liblimeade v0.1
+#define LIBLIMEADE_VERSION_STR "0.1"
 #define LIBLIMEADE_MAJOR_VERSION 0
 #define LIBLIMEADE_MINOR_VERSION 1
-static uint8_t LIBLIMEADE_VERSION[2];
-
-
+extern uint8_t LIBLIMEADE_VERSION[2];
 
 /*** *** CONTEXT *** ***/
 
@@ -286,9 +289,9 @@ typedef struct
 {
   uint32_t ts_s;
   uint16_t ts_ms;
-  uint16_t total_altered;  // no. processes with changed data (including perf)
-  uint16_t total_died;     // no. processes that died
-  pid_t **died;           // list of dead processes
+  uint16_t total_altered; // no. processes with changed data (including perf)
+  uint16_t total_died;    // no. processes that died
+  pid_t *died;            // list of dead processes
   LIMEADE_PROC **altered; // list of altered processes with revised data
 } LIMEADE_PROC_UPDATE;
 
@@ -396,5 +399,26 @@ LIMEADE_COMMANDEER   limeade_process_commandeer  (LIMEADE_CONTEXT self, LIMEADE_
  * always succeeds, no return value
  */
 void limeade_release(int type, ...);
+
+
+
+/*** DIAGNOSTICS ***/
+
+
+// the following functions are for diagnostic purposes. While they can be
+// included in production code, debugging should be disabled in production code
+// and enabled during test, both of which are acheived by the following functions:
+void limeade_enable_debugging();
+void limeade_disable_debugging();
+
+// setting verbosity
+// setting the verbosity outside 1-3 does nothing to the value
+void limeade_set_verbosity(int level);
+
+// the following functions print visual representation of data types endemic to
+// this library
+void limeade_diag_repr_context(LIMEADE_CONTEXT ctx);
+void limeade_diag_repr_recv(LIMEADE_RECV recv);
+void limeade_diag_repr_pkt(int type, ...);
 
 #endif /* _LIBLIMEADE_H_ */
