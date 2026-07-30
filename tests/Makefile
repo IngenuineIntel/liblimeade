@@ -24,5 +24,7 @@
 #
 # For more information, please refer to <https://unlicense.org/>
 
+CC := clang
+
 test_diagnostic_output_c:
-	clang test_diagnostic_output.c -o bin/test_diagnostic_output_c
+	clang test_diagnostic_output.c -o bin/test_diagnostic_output_c -llimeade

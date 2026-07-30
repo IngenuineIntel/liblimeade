@@ -174,7 +174,7 @@ LIMEADE_CONTEXT limeade_host_init();
  *
  * no return, can't fail
  */
-void limeade_client_free(LIMEADE_CONTEXT *self);
+void limeade_client_free(LIMEADE_CONTEXT self);
 
 /* limeade_host_free
  *
@@ -185,7 +185,7 @@ void limeade_client_free(LIMEADE_CONTEXT *self);
  *
  * no return, can't fail
  */
-void limeade_host_free(LIMEADE_CONTEXT *self);
+void limeade_host_free(LIMEADE_CONTEXT self);
 
 
 

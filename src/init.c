@@ -26,8 +26,7 @@
   if(expr)                        \
   {                               \
     limeade_inserror(err);        \
-    ctx = (LIMEADE_CONTEXT*)NULL; \
-    return *ctx;                   \
+    return ctx;                   \
   }                               \
 }
 
@@ -51,8 +50,7 @@ LIMEADE_CONTEXT limeade_client_init(uint16_t port, const char *dest)
    *  - optimized from a queueing perspective
    * going with 2 atm
    */
-  LIMEADE_CONTEXT *ctx = (LIMEADE_CONTEXT*)calloc(1, sizeof(*ctx));
-  CHECK(ctx == NULL, LIMEADE_ERROR_MEMORY);
+  LIMEADE_CONTEXT ctx;
 
   int to_ssh[2];
   int from_ssh[2];
@@ -83,48 +81,44 @@ LIMEADE_CONTEXT limeade_client_init(uint16_t port, const char *dest)
   close(to_ssh[0]);
   close(from_ssh[1]);
 
-  ctx->recv_fd = from_ssh[0];
-  ctx->send_fd = to_ssh[1];
-  ctx->ssh_child_pid = pid;
-  ctx->role = LIMEADE_ROLE_HOST;
+  ctx.recv_fd = from_ssh[0];
+  ctx.send_fd = to_ssh[1];
+  ctx.ssh_child_pid = pid;
+  ctx.role = LIMEADE_ROLE_CLIENT;
+  ctx.sessionid = 0; // for now
 
-  return *ctx;
+  return ctx;
 
 }
 
 LIMEADE_CONTEXT limeade_host_init()
 {
-  LIMEADE_CONTEXT *ctx = (LIMEADE_CONTEXT*)calloc(1, sizeof(*ctx));
+
+  LIMEADE_CONTEXT ctx;
 
   // send/recv fds are passed to SSH subsystems as stdin & stdout
-  ctx->send_fd = 1; // STDOUT
-  ctx->recv_fd = 0; // STDIN
-  ctx->role = LIMEADE_ROLE_CLIENT;
-  //ctx.ssh_child_pid = 0; // not used by the host
+  ctx.send_fd = 1; // STDOUT
+  ctx.recv_fd = 0; // STDIN
+  ctx.role = LIMEADE_ROLE_HOST;
+  ctx.sessionid = 0;
+  ctx.ssh_child_pid = 0; // not used by the host
 
-  return *ctx;
+  return ctx;
 
 }
 
-void limeade_host_free(LIMEADE_CONTEXT *self)
+void limeade_host_free(LIMEADE_CONTEXT self)
+{
+  // nothing to do
+}
+
+void limeade_client_free(LIMEADE_CONTEXT self)
 {
   // kill SSH child process
-  kill(self->ssh_child_pid, SIGKILL);
+  kill(self.ssh_child_pid, SIGKILL);
 
-  // likewise, close fds
-  close(self->recv_fd);
-  close(self->send_fd);
-
-  // free context
-  free((void*)self);
-}
-
-void limeade_client_free(LIMEADE_CONTEXT *self)
-{
-  close(self->recv_fd);
-  close(self->send_fd);
-
-  free((void*)self);
+  close(self.recv_fd);
+  close(self.send_fd);
 }
 
 #undef CHECK

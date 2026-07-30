@@ -47,7 +47,7 @@ void limeade_set_verbosity(int level)
 
 void limeade_diag_print_header(void)
 {
-  printf("liblimeade v%i.%i diagnostic visualization\n\n",
+  printf("\nliblimeade v%i.%i diagnostic visualization\n\n",
   LIBLIMEADE_VERSION[0], LIBLIMEADE_VERSION[1]);
 }
 
