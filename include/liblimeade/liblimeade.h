@@ -34,6 +34,8 @@
 #define LIBLIMEADE_MINOR_VERSION 1
 extern uint8_t LIBLIMEADE_VERSION[2];
 
+
+
 /*** *** CONTEXT *** ***/
 
 
@@ -67,7 +69,7 @@ enum LIMEADE_ROLE
 // errors are completely fatal, so the actual return values tend to still be
 // useful) they are instead indicated via an internal ring buffer that stores
 // the last 5 errors (or successes)
-
+#define LIMEADE_ERROR_BUFFER_SIZE 10
 // all failable functions in this library utilize this buffer. If a function in
 // this library calls another function in the library and that one fails, it
 // pushes an error, then the externally called function returns and passes the
@@ -102,12 +104,12 @@ typedef enum
 typedef uint8_t LIMEADE_ERROR;
 
 // the buffer itself
-static LIMEADE_ERROR LIMEADE_ERRORS[5];
+LIMEADE_ERROR LIMEADE_ERRORS[LIMEADE_ERROR_BUFFER_SIZE];
 
 // manages which index in the buffer is the latest error
 // if =1, the latest error is at [1], the previous [0], and the next previous
 // [5], etc.
-static LIMEADE_ERROR LIMEADE_ERROR_INDEX;
+LIMEADE_ERROR LIMEADE_ERROR_INDEX;
 
 /* limeade_inserror
  *
@@ -420,5 +422,8 @@ void limeade_set_verbosity(int level);
 void limeade_diag_repr_context(LIMEADE_CONTEXT ctx);
 void limeade_diag_repr_recv(LIMEADE_RECV recv);
 void limeade_diag_repr_pkt(int type, ...);
+
+// diagnostically prints all data associated with the error buffer
+void limeade_diag_repr_errors(void);
 
 #endif /* _LIBLIMEADE_H_ */

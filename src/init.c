@@ -52,6 +52,9 @@ LIMEADE_CONTEXT limeade_client_init(uint16_t port, const char *dest)
    */
   LIMEADE_CONTEXT ctx;
 
+  ctx.role = LIMEADE_ROLE_CLIENT;
+  ctx.sessionid = 0; // for now
+
   int to_ssh[2];
   int from_ssh[2];
 
@@ -84,8 +87,6 @@ LIMEADE_CONTEXT limeade_client_init(uint16_t port, const char *dest)
   ctx.recv_fd = from_ssh[0];
   ctx.send_fd = to_ssh[1];
   ctx.ssh_child_pid = pid;
-  ctx.role = LIMEADE_ROLE_CLIENT;
-  ctx.sessionid = 0; // for now
 
   return ctx;
 

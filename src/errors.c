@@ -9,7 +9,7 @@
 //
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
@@ -17,28 +17,27 @@
 
 #include <liblimeade/liblimeade.h>
 
+
+
 void limeade_inserror(LIMEADE_ERROR error)
 {
-  if (LIMEADE_ERROR_INDEX == 5)
-  {
-    // must loop around
-    LIMEADE_ERROR_INDEX = 0;
-  }
   LIMEADE_ERRORS[LIMEADE_ERROR_INDEX] = error;
-  LIMEADE_ERROR_INDEX++;
+
+  if(LIMEADE_ERROR_INDEX == LIMEADE_ERROR_BUFFER_SIZE - 1)
+  {
+    LIMEADE_ERROR_INDEX = 0;
+  } else {
+    LIMEADE_ERROR_INDEX++;
+  }
 }
 
 LIMEADE_ERROR limeade_poperror(void)
 {
-  LIMEADE_ERROR_TYPE ret = LIMEADE_ERRORS[LIMEADE_ERROR_INDEX];
   if (LIMEADE_ERROR_INDEX == 0)
   {
-    // must loop around
-    LIMEADE_ERROR_INDEX = 4;
-  }
-  else
+    return LIMEADE_ERRORS[LIMEADE_ERROR_BUFFER_SIZE - 1];
+  } else
   {
-    LIMEADE_ERROR_INDEX--;
+    return LIMEADE_ERRORS[LIMEADE_ERROR_INDEX - 1];
   }
-  return ret;
 }

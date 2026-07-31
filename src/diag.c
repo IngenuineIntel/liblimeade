@@ -265,4 +265,57 @@ void limeade_diag_repr_pkt(int type, ...)
   }
 }
 
+static char *limeade_diag_repr_error(LIMEADE_ERROR err)
+{
+  switch(err)
+  {
+    case LIMEADE_SUCCESS:
+      return "SUCCESS";
+    case LIMEADE_ERROR_PACKET_MAGIC:
+      return "Bad Magic";
+    case LIMEADE_ERROR_PACKET_FORMAT:
+      return "Bad Format";
+    case LIMEADE_ERROR_PACKET_SIZE:
+      return "Bad Size";
+    case LIMEADE_ERROR_PACKET_SESSION:
+      return "Bad Session ID";
+    case LIMEADE_ERROR_PACKET_DATA:
+      return "Bad Packet Data";
+    case LIMEADE_ERROR_PACKET_COMPRESSED:
+      return "Bad Compression";
+    case LIMEADE_ERROR_DECODING_FATAL:
+      return "Fatal Decoding Error";
+    case LIMEADE_ERROR_DECODING_NONFATAL:
+      return "Non-Fatal Decoding Error";
+    case LIMEADE_ERROR_GARBAGE:
+      return "Garbage Argument";
+    case LIMEADE_ERROR_SSH_PROC:
+      return "SSH Tunneling Child Error";
+    case LIMEADE_ERROR_INVALID_CONTEXT:
+      return "Garbage Context";
+    case LIMEADE_ERROR_MEMORY:
+      return "Bad Allocation";
+    case LIMEADE_ERROR_OTHER:
+      return "Other";
+    default:
+      return "invalid";
+  }
+}
+
+void limeade_diag_repr_errors(void)
+{
+  DBG_OR_QUIT();
+
+  limeade_diag_print_header();
+
+  printf("Error Buffer size: %i\n", LIMEADE_ERROR_BUFFER_SIZE);
+  printf("Current index: %i\n", LIMEADE_ERROR_INDEX);
+
+  for(int i = 0; i < LIMEADE_ERROR_INDEX; i++)
+  {
+    printf("%s (%i)\n", limeade_diag_repr_error(LIMEADE_ERRORS[i]), LIMEADE_ERRORS[i]);
+  }
+
+}
+
 #undef DBG_OR_QUIT
