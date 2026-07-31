@@ -44,11 +44,14 @@ LIMEADE_ERROR limeade_poperror(void)
 {
   if (limeade_error_index == 0)
   {
-    return limeade_errors[LIMEADE_ERROR_BUFFER_SIZE - 1];
+    limeade_error_index = LIMEADE_ERROR_BUFFER_SIZE - 1;
   } else
   {
-    return limeade_errors[limeade_error_index - 1];
+    limeade_error_index --;
   }
+
+  limeade_errors[limeade_error_index] = LIMEADE_BLANK_ERROR;
+  return limeade_errors[limeade_error_index];
 }
 
 void *limeade_get_errors(void)

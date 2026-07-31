@@ -23,9 +23,16 @@ int main(int argc, char **argv)
   limeade_client_free(c2);
   limeade_diag_repr_context(c2);
 
-  //limeade_inserror(c2, LIMEADE_ERROR_INVALID_CONTEXT);
-
-  limeade_inserror(LIMEADE_ERROR_INVALID_CONTEXT);
+  // taking a moment to test error ring buffer wraparound logic
+  for(int i = 0; i < LIMEADE_ERROR_BUFFER_SIZE; i++)
+  {
+    limeade_inserror(LIMEADE_ERROR_OTHER);
+  }
+  limeade_inserror(LIMEADE_ERROR_GARBAGE);
+  for(int i = 0; i < LIMEADE_ERROR_BUFFER_SIZE; i++)
+  {
+    LIMEADE_ERROR _ = limeade_poperror();
+  }
   limeade_inserror(LIMEADE_ERROR_GARBAGE);
   limeade_diag_repr_errors();
 

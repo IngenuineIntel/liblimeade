@@ -78,8 +78,8 @@ enum LIMEADE_ROLE
 // all types of errors
 typedef enum
 {
-  // the error that wasn't
-  LIMEADE_SUCCESS,
+  LIMEADE_BLANK_ERROR = 0, // unset error (over-popped)
+  LIMEADE_SUCCESS,         // something that worked
 
   // errors caused by malformed packet segments
   LIMEADE_ERROR_PACKET_MAGIC,          // improper/no magic

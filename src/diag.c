@@ -269,6 +269,8 @@ static char *limeade_diag_repr_error(LIMEADE_ERROR err)
 {
   switch(err)
   {
+    case LIMEADE_BLANK_ERROR:
+      return "uninitialized error";
     case LIMEADE_SUCCESS:
       return "SUCCESS";
     case LIMEADE_ERROR_PACKET_MAGIC:
