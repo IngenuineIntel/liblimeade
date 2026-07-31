@@ -308,12 +308,16 @@ void limeade_diag_repr_errors(void)
 
   limeade_diag_print_header();
 
-  printf("Error Buffer size: %i\n", LIMEADE_ERROR_BUFFER_SIZE);
-  printf("Current index: %i\n", LIMEADE_ERROR_INDEX);
+  unsigned int index = limeade_get_error_index();
 
-  for(int i = 0; i < LIMEADE_ERROR_INDEX; i++)
+  printf("Error Buffer size: %i\n", LIMEADE_ERROR_BUFFER_SIZE);
+  printf("Current index: %i\n", index);
+
+  LIMEADE_ERROR *errorbuf = limeade_get_errors();
+
+  for(int i = 0; i < LIMEADE_ERROR_BUFFER_SIZE; i++)
   {
-    printf("%s (%i)\n", limeade_diag_repr_error(LIMEADE_ERRORS[i]), LIMEADE_ERRORS[i]);
+    printf("%s (%i)\n", limeade_diag_repr_error(errorbuf[i]), errorbuf[i]);
   }
 
 }

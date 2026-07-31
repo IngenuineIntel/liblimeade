@@ -18,26 +18,47 @@
 #include <liblimeade/liblimeade.h>
 
 
+// the buffer itself
+LIMEADE_ERROR limeade_errors[LIMEADE_ERROR_BUFFER_SIZE];
+
+// manages which index in the buffer is the latest error
+// if =1, the latest error is at [1], the previous [0], and the next previous
+// [5], etc.
+unsigned int limeade_error_index;
+
+
 
 void limeade_inserror(LIMEADE_ERROR error)
 {
-  LIMEADE_ERRORS[LIMEADE_ERROR_INDEX] = error;
+  limeade_errors[limeade_error_index] = error;
 
-  if(LIMEADE_ERROR_INDEX == LIMEADE_ERROR_BUFFER_SIZE - 1)
+  if(limeade_error_index == LIMEADE_ERROR_BUFFER_SIZE - 1)
   {
-    LIMEADE_ERROR_INDEX = 0;
+    limeade_error_index = 0;
   } else {
-    LIMEADE_ERROR_INDEX++;
+    limeade_error_index++;
   }
 }
 
 LIMEADE_ERROR limeade_poperror(void)
 {
-  if (LIMEADE_ERROR_INDEX == 0)
+  if (limeade_error_index == 0)
   {
-    return LIMEADE_ERRORS[LIMEADE_ERROR_BUFFER_SIZE - 1];
+    return limeade_errors[LIMEADE_ERROR_BUFFER_SIZE - 1];
   } else
   {
-    return LIMEADE_ERRORS[LIMEADE_ERROR_INDEX - 1];
+    return limeade_errors[limeade_error_index - 1];
   }
+}
+
+void *limeade_get_errors(void)
+{
+  /* wrapper to access the buffer externally */
+  return &limeade_errors;
+}
+
+unsigned int limeade_get_error_index(void)
+{
+  /* wrapper to access the index externally */
+  return limeade_error_index;
 }

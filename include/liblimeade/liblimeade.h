@@ -103,14 +103,6 @@ typedef enum
 
 typedef uint8_t LIMEADE_ERROR;
 
-// the buffer itself
-LIMEADE_ERROR LIMEADE_ERRORS[LIMEADE_ERROR_BUFFER_SIZE];
-
-// manages which index in the buffer is the latest error
-// if =1, the latest error is at [1], the previous [0], and the next previous
-// [5], etc.
-LIMEADE_ERROR LIMEADE_ERROR_INDEX;
-
 /* limeade_inserror
  *
  * inserts an error into the ring buffer
@@ -126,6 +118,11 @@ void limeade_inserror(LIMEADE_ERROR error);
  * returns the error, can't fail
  */
 LIMEADE_ERROR limeade_poperror(void);
+
+// functions used internally by diagnostic functions to access key information
+// about the error buffer
+void *limeade_get_errors(void);
+unsigned int limeade_get_error_index(void);
 
 
 
