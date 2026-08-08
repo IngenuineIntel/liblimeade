@@ -1,125 +1,210 @@
 // init.c
-// initialization and shutdown for liblimeade
 //
-// Copyright (C) 2026 Roan Rothrock
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published
-// by the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// [AGPL here]
 
-#include <signal.h>
-#include <unistd.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <pthread.h>
 
 #include <liblimeade/liblimeade.h>
 
-#define CHECK(expr, err)          \
-{                                 \
-  if(expr)                        \
-  {                               \
-    limeade_inserror(err);        \
-    return ctx;                   \
-  }                               \
+void *limeade_csm(void *arg)
+{
+  struct limeade_context ctx = *(struct limeade_context*)arg;
+
+  // TODO
+  
+  return NULL;
 }
 
-LIMEADE_CONTEXT limeade_client_init(uint16_t port, const char *dest)
+#define CHECK(expr, err) \
+if(expr)                 \
+{                        \
+  limeade_inserror(err); \
+  goto err;              \
+}
+#define CHILDCHECK(expr, err)\
+if(expr){exit(EXIT_FAILURE);}
+
+struct limeade_context *limeade_init(uint8_t flags, ...)
 {
-  /* There are two ways to do this
-   * 1: libssh
-   * utilize libssh to create a connection, and secure from that connection
-   * file descriptors needed to send and recv
 
-   * 2: pipe/dup/fork/exec
-   * spawn an SSH process that initializes the connection and subsystem on the
-   * host, and pipe the file descriptors for send/recv from that processes, and
-   * kill it when done
-   *
-   * pros of 1:
-   *  - memory efficiency
-   * pros of 2:
-   *  - it's how the SFTP client is implemented
-   *  - pretty programmatically simplistic
-   *  - optimized from a queueing perspective
-   * going with 2 atm
-   */
-  LIMEADE_CONTEXT ctx;
+  va_list arg;
+  va_start(arg, flags);
 
-  ctx.role = LIMEADE_ROLE_CLIENT;
-  ctx.sessionid = 0; // for now
+  struct limeade_context *ret = (struct limeade_context*)malloc(sizeof(struct limeade_context));
 
-  int to_ssh[2];
-  int from_ssh[2];
+  ret->mode = flags & 00001111;
+  ret->compr_mode = flags & 11110000;
 
-  // create pipes
-  CHECK(pipe(to_ssh) == -1, LIMEADE_ERROR_OTHER);
-  CHECK(pipe(from_ssh) == -1, LIMEADE_ERROR_OTHER);
+  uint8_t allow_compr = 1;
 
-  pid_t pid = fork();
-
-  if(pid == 0) // child
+  switch(ret->mode)
   {
-    // create dups
-    CHECK(dup2(to_ssh[0], STDIN_FILENO) == -1, LIMEADE_ERROR_OTHER);
-    CHECK(dup2(from_ssh[1], STDOUT_FILENO) == -1, LIMEADE_ERROR_OTHER);
+    case LIMEADE_MODE_HOST_SSH:
+    {
+      ret->rfd = STDOUT_FILENO;
+      ret->sfd = STDOUT_FILENO;
+      allow_compr = 0;
+    }
+    case LIMEADE_MODE_CLIENT_SSH:
+    {
+      const char *dest = va_arg(arg, const char*);
 
-    // close fds
-    close(to_ssh[0]);
-    close(to_ssh[1]);
-    close(from_ssh[0]);
-    close(from_ssh[1]);
+      int ssh_in[2];
+      int ssh_out[2];
 
-    execlp("ssh", "ssh", "-s", dest, LIMEADE_SUBSYSTEM_NAME, (char*)NULL);
-    exit(-1);
+      CHECK(pipe(to_ssh) == -1, LIMEADE_ERROR_OTHER);
+      CHECK(pipe(fr_ssh) == -1, LIMEADE_ERROR_OTHER);
 
+      switch(fork())
+      {
+        case -1:
+          CHECK(1 == 1, LIMEADE_ERROR_OTHER);
+        case 0:
+          CHILDCHECK(dup2(ssh_out[1], STDOUT_FILENO) == 1, LIMEADE_ERROR_OTHER);
+          CHILDCHECK(dup2(ssh_in[0], STDIN_FILENO) == 1, LIMEADE_ERROR_OTHER);
+
+          CHILDCHECK(close(ssh_out[0]) == -1, LIMEADE_ERROR_OTHER);
+          CHILDCHECK(close(ssh_out[1]) == -1, LIMEADE_ERROR_OTHER);
+          CHILDCHECK(close(ssh_in[0]) == -1, LIMEADE_ERROR_OTHER);
+          CHILDCHECK(close(ssh_in[1]) == -1, LIMEADE_ERROR_OTHER);
+
+          execlp("ssh", "ssh", "-s", LIMEADE_SUBSYSTEM_NAME, dest, (char*)NULL);
+          exit(-1);
+        default:
+          CHECK(close(ssh_out[1]) == -1, LIMEADE_ERROR_OTHER);
+          CHECK(close(ssh_in[0]) == -1, LIMEADE_ERROR_OTHER);
+          ret->rfd = ssh_out[0];
+          ret->sfd = ssh_in[1];
+      }
+    }
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+    {
+      // TODO
+    }
+    case LIMEADE_MODE_HOST_ETH:
+    {
+      // TODO
+      
+      struct sockaddr_in s;
+
+      ret->rfd = socket(AF_INET, SOCK_DGRAM, 0);
+      CHECK(ret->sfd < 0, LIMEADE_ERROR_NETWORK);
+      ret->sfd = ret->rfd;
+
+      
+
+      s.sin_family = AF_INET;
+      s.sin_addr.s_addr = INADDR_ANY;
+      s.sin_port = htons(PORT);
+
+      CHECK(
+        bind(ret->rfd, (const struct sockaddr*)&servaddr, sizeof(servaddr)) < 0,
+        LIMEADE_ERROR_NETWORK
+      );
+
+    }
+    case LIMEADE_MODE_CLIENT_ETH:
+    {
+      const char *dest = va_arg(arg, const char*);
+      int port         = va_arg(arg, int);
+
+      ret->sfd = socket(AF_INET, SOCK_DGRAM, 0);
+      CHECK(ret->sfd < 0, LIMEADE_ERROR_NETWORK);
+      ret->rfd = ret->sfd;
+
+      memset(&ret->saddr, 0, sizeof(ret->server_addr));
+
+      ret->saddr.sin_family = AF_INET;
+      ret->saddr.sin_port   = port;
+      ret->saddr.sin_addr.s_addr = inet_addr(dest);
+
+      socklen_t ret->saddr_len = sizeof(ret->saddr);
+    }
   }
 
-  close(to_ssh[0]);
-  close(from_ssh[1]);
+  switch(ret->compr_mode)
+  {
+    case LIMEADE_MODE_NO_COMPRESSION:
+      ret->compr_lvl = 0;
+    case LIMEADE_MODE_LOW_COMPRESSION:
+      ret->compr_lvl = 1;
+    case LIMEADE_MODE_MED_COMPRESSION:
+      ret->compr_lvl = 4;
+    case LIMEADE_MODE_HIGH_COMPRESSION:
+      ret->compr_lvl = 7;
+    default: 
+      ret->csm = (struct limeade_csm_data*)malloc(sizeof(limeade_csm_data));
 
-  ctx.recv_fd = from_ssh[0];
-  ctx.send_fd = to_ssh[1];
-  ctx.ssh_child_pid = pid;
+      CHECK(ret->csm == NULL, LIMEADE_ERROR_MEMORY);
 
-  return ctx;
+      ret->csm->hist_compr_sz = LIMEADE_CSM_BENCH_BUFFER_SIZE;
+      ret->csm->hist_bandw_sz = LIMEADE_CSM_BENCH_BUFFER_SIZE;
+      ret->csm->hist_compr_benches = malloc(sizeof(uint32_t) * LIMEADE_CSM_BENCH_BUFFER_SIZE);
+      ret->csm->hist_bandw_benches = malloc(sizeof(uint32_t) * LIMEADE_CSM_BENCH_BUFFER_SIZE);
+  
+      CHECK(ret->csm->hist_compr_benches == NULL, LIMEADE_ERROR_MEMORY);
+      CEHCK(ret->csm->hist_bandw_benches == NULL, LIMEADE_ERROR_MEMORY);
 
+      ret->csm->hist_compr_idx = 0;
+      ret->csm->hist_bandw_idx = 0;
+
+      ret->csm->freq_s = LIMEADE_CSM_FREQ_S;
+      ret->csm->id = malloc(sizeof(pthread_t));
+
+      CHECK(ret->csm->id == NULL, LIMEADE_ERROR_MEMORY);
+
+      CHECK(
+        pthread_create(ret->csm->id, NULL, limeade_csm, (void*)ret) != 0,
+        LIMEADE_ERROR_CSM
+      );
+  }
+
+  // TODO
+
+  return ret;
+
+  err:
+  if (ret->csm != NULL)
+  {
+    free(ret->csm->hist_compr_benches);
+    free(ret->csm->hist_bandw_benches);
+  }
+  free(ret->csm);
+  free(ret);
+  return (LIMEADE_CONTEXT*)NULL;
 }
 
-LIMEADE_CONTEXT limeade_host_init()
+int limeade_connect(struct limeade_context *ctx)
 {
 
-  LIMEADE_CONTEXT ctx;
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_HOST_SSH:
+    {
+      return 0; // nothing to do
+    }
+    case LIMEADE_MODE_CLIENT_SSH:
+    {
+      // the SSH connection has already been made, but the Limeade connection
+      // has not
 
-  // send/recv fds are passed to SSH subsystems as stdin & stdout
-  ctx.send_fd = 1; // STDOUT
-  ctx.recv_fd = 0; // STDIN
-  ctx.role = LIMEADE_ROLE_HOST;
-  ctx.sessionid = 0;
-  ctx.ssh_child_pid = 0; // not used by the host
 
-  return ctx;
-
+      // TODO
+    }
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+    {
+      // TODO
+    }
+    case LIMEADE_MODE_HOST_ETH:
+    {
+      return 0;
+    }
+    case LIMEADE_MODE_CLIENT_ETH:
+    {
+      // TODO
+    }
+  }
 }
 
-void limeade_host_free(LIMEADE_CONTEXT self)
-{
-  // nothing to do
-}
-
-void limeade_client_free(LIMEADE_CONTEXT self)
-{
-  // kill SSH child process
-  kill(self.ssh_child_pid, SIGKILL);
-
-  close(self.recv_fd);
-  close(self.send_fd);
-}
-
-#undef CHECK

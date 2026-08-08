@@ -270,7 +270,7 @@ static char *limeade_diag_repr_error(LIMEADE_ERROR err)
   switch(err)
   {
     case LIMEADE_BLANK_ERROR:
-      return "uninitialized error";
+      return "Uninitialized Error";
     case LIMEADE_SUCCESS:
       return "SUCCESS";
     case LIMEADE_ERROR_PACKET_MAGIC:
@@ -304,6 +304,7 @@ static char *limeade_diag_repr_error(LIMEADE_ERROR err)
   }
 }
 
+// FIXME by using present functions that utilize a mutex!!
 void limeade_diag_repr_errors(void)
 {
   DBG_OR_QUIT();
@@ -312,14 +313,16 @@ void limeade_diag_repr_errors(void)
 
   unsigned int index = limeade_get_error_index();
 
+  printf("ERROR BUFFER\n");
+
   printf("Error Buffer size: %i\n", LIMEADE_ERROR_BUFFER_SIZE);
-  printf("Current index: %i\n", index);
+  printf("Current index: %i\n\n", index);
 
   LIMEADE_ERROR *errorbuf = limeade_get_errors();
 
   for(int i = 0; i < LIMEADE_ERROR_BUFFER_SIZE; i++)
   {
-    printf("%s (%i)\n", limeade_diag_repr_error(errorbuf[i]), errorbuf[i]);
+    printf("%i: %s (%i)\n", i, limeade_diag_repr_error(errorbuf[i]), errorbuf[i]);
   }
 
 }

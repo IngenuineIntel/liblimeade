@@ -17,6 +17,7 @@
 
 #include <liblimeade/liblimeade.h>
 
+// FIXME with a mutex!!
 
 // the buffer itself
 LIMEADE_ERROR limeade_errors[LIMEADE_ERROR_BUFFER_SIZE];
