@@ -43,6 +43,7 @@ enum limeade_error
   LIMEADE_ERROR_CSM,       // CSM either failed to start or died
 
   // errors with decoding
+  LIMEADE_ERROR_NO_DATA,         // no data on port
   LIMEADE_ERROR_BAD_MAGIC,       // improper/no magic
   LIMEADE_ERROR_BAD_FORMAT,      // indecipherable flags
   LIMEADE_ERROR_BAD_DATA,        // faliure to parse data
@@ -487,19 +488,51 @@ int limeade_send(limeade_context *ctx, limeade_packet type, ...);
 
 // struct limeade_recv
 // received data before parsing
-struct limeade_recv
-{
-  limeade_packet type;
-  uint32_t pkt_sz;
-  union
-  {
-    void *flags;
-    void *pkt;
-  };
-  void *data;
-};
+typedef struct limeade_packet_data struct limeade_recv;
 
-// TODO
+// to receive packets, there are various functions that do nearly the same
+// thing.
+
+// holds indefinitely until a packet is received
+struct limeade_recv limeade_recv_wait(struct limeade_context *ctx);
+
+// waits for a packet for `hold_time_s` seconds
+struct limeade_recv limeade_recv_fixed(struct limeade_context *ctx, int hold_time_s);
+
+// flags can be extracted as so:
+struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data);
+
+// for the packet's body, there is a function for each packet type, and the
+// type should be checked before parsing:
+//
+//struct limeade_recv pkt = limeade_recv_wait(ctx);
+//
+//switch(pkt.type)
+//{
+//  case LIMEADE_PACKET_KNOCK:
+//    struct limeade_knock data = limeade_parse_knock(pkt);
+//  --SNIP--
+//  case LIMEADE_PACKET_RECOGNIZE:
+//    struct limeade_recognize data = limeade_parse_recognize(pkt);
+//  --SNIP--
+//}
+//
+// note that if the wrong function is called for parsing, it will detect it
+// and push a LIMEADE_ERROR_GARBAGE and return NULL
+struct limeade_knock limeade_parse_knock(struct limeade_recv pkt);
+struct limeade_recognize limeade_parse_recognize(struct limeade_recv pkt);
+struct limeade_intro limeade_parse_introduction(struct limeade_recv pkt);
+#define limeade_parse_intro(x) limeade_parse_introduction(x)
+struct limeade_ack limeade_parse_acknowledge(struct limeade_recv pkt);
+#define limeade_parse_ack(x) limeade_parse_acknowledge(x)
+struct limeade_events limeade_parse_events(struct limeade_recv pkt);
+struct limeade_proc_generic limeade_parse_proc_generic(struct limeade_recv pkt);
+struct limeade_proc_update limeade_parse_proc_update(struct limeade_recv pkt);
+struct limeade_perf limeade_parse_perf(struct limeade_recv pkt);
+struct limeade_commandeer limeade_parse_commandeer(struct limeade_recv pkt);
+struct limeade_exited limeade_parse_exited(struct limeade_recv pkt);
+struct limeade_close limeade_parse_close(struct limeade_recv pkt);
+
 
 
 /*** *** INTERNAL *** ***/

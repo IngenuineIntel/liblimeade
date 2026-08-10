@@ -325,34 +325,26 @@ void limeade_populate_packet(struct limeade_packet_data *in, struct limeade_flag
 void limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *pkt)
 {
   /* sends packet */
-  switch(ctx->mode)
+
+  if (ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH\
+    || ctx->mode == LIMEADE_MODE_HOST_ETH || ctx->mode == LIMEADE_MODE_CLIENT_ETH)
   {
-    case LIMEADE_MODE_HOST_SSH:
+    if(write(ctx->sfd, &LIMEADE_MAGIC, sizeof(LIMEADE_MAGIC)) != sizeof(LIMEADE_MAGIC))
     {
-      if(write(ctx->sfd, pkt->pkt, pkt->pkt_sz) != pkt->pkt_sz)
-      {
-        limeade_inserr(LIMEADE_ERROR_NETWORKING);
-      } else
-      {
-        limeade_inserr(LIMEADE_SUCCESS);
-      }
-    }
-    case LIMEADE_MODE_CLIENT_SSH:
+      limeade_inserr(LIMEADE_ERROR_NETWORKING);
+    } else if (write(ctx->sfd, pkt->pkt, pkt->pkt_sz) != pkt->pkt_sz)
     {
-      if(write(ctx->sfd, pkt->pkt, pkt->pkt_sz) != pkt->pkt_sz)
-      {
-        limeade_inserr(LIMEADE_ERROR_NETWORKING);
-      } else
-      {
-        limeade_inserr(LIMEADE_SUCCESS);
-      }
+      limeade_inserr(LIMEADE_ERROR_NETWORKING);
+    } else
+    {
+      limeade_inserr(LIMEADE_SUCCESS);
     }
-    case LIMEADE_MODE_CLIENT_LIBSSH:
-    {}
-    case LIMEADE_MODE_HOST_ETH:
-    {}
-    case LIMEADE_MODE_CLIENT_ETH:
-    {}
+  } else if (ctx->mode == LIMEADE_MODE_CLIENT_LIBSSH)
+  {
+    // TODO
+  } else
+  {
+    limeade_inserr(LIMEADE_ERROR_INVALID_CONTEXT);
   }
 }
 
