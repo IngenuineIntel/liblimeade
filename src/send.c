@@ -3,6 +3,7 @@
 // [AGPL here]
 
 #include <stdarg.h>
+#include <stdio.h>
 
 #include <zlib.h>
 
@@ -10,12 +11,12 @@
 
 static void prep_str(char *in)
 {
-  for(char *i = in; i > NULL; i++)
+  for(char *i = in; (void*)i > NULL; i++)
   {
     if(*i == LIMEADE_FIELD_DELIM || *i == LIMEADE_ROW_DELIM)
     {
-      *i = " ";
-    } else if (*i == "\x00")
+      *i = ' ';
+    } else if (*i == '\x00')
     {
       break;
     }
@@ -99,7 +100,7 @@ void limeade_populate_packet(struct limeade_packet_data *in, struct limeade_flag
   int len; // reused often for string length/write length calculation
 
   in->pkt = malloc(realloc_increment * 2); // *2 is arbitrary atm
-  
+
   // note on the packet flags:
   // flags.packet_size, flags.ts_s, & flags.ts_ms are all filled in retroactively,
   // & are not within the scope of this function
@@ -361,13 +362,13 @@ int limeade_send(struct limeade_context *ctx, limeade_packet type, ...)
 
   va_list arg;
   va_start(arg, type);
-  
+
   LIMEADE_ERROR e;
 
   struct limeade_packet_data pkt;
   struct limeade_packet_flags flags;
   struct limeade_csm_compression_entry entry;
-  
+
   struct timespec compr_ts[2], sendts;
 
   limeade_monotonic(&compr_ts[0]);
@@ -376,7 +377,7 @@ int limeade_send(struct limeade_context *ctx, limeade_packet type, ...)
   entry.compr_lvl = ctx->compr_lvl;
 
   pkt.type = flags.type = type;
-  
+
   pthread_mutex_lock(&ctx->compr_lvl_mtx);
   flags.compr_lvl = ctx->compr_lvl;
   pthread_mutex_unlock(&ctx->compr_lvl_mtx);

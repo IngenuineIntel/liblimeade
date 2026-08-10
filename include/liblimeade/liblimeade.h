@@ -5,13 +5,8 @@
 #ifndef _LIBLIMEADE_H_
 #define _LIBLIMEADE_H_
 
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE
-#endif
-
 #include <stdint.h>
 #include <sys/socket.h>
-
 
 /*** *** ERROR MANAGEMENT *** ***/
 // errors are stored in a ring buffer that can be pushed & popped via wrappres.
@@ -23,7 +18,7 @@ typedef uint8_t LIMEADE_ERROR;
 // safe & don't fail
 // limeade_pusherr: pushes an error to the ring buffer
 // limeade_poperr : pops an error from the ring buffer1
-void limeade_pusherr(LIMEADE_ERROR err);
+void limeade_inserr(LIMEADE_ERROR err);
 LIMEADE_ERROR limeade_poperr(void);
 
 enum limeade_error
@@ -34,7 +29,7 @@ enum limeade_error
   // errors while sending
   LIMEADE_ERROR_GARBAGE, // user supplied useless data to the library
   LIMEADE_ERROR_COMPRESSION, // errors when compressing
-  
+
   // errors with particular libraries/intefaces
   LIMEADE_ERROR_LIBSSH,    // error with libssh
   LIMEADE_ERROR_SSH_CHILD, // error with SSH child process
@@ -48,7 +43,7 @@ enum limeade_error
   LIMEADE_ERROR_BAD_FORMAT,      // indecipherable flags
   LIMEADE_ERROR_BAD_DATA,        // faliure to parse data
   LIMEADE_ERROR_BAD_COMPRESSION, // failure to decompress
-                                 
+
 
   // miscellaneous
   LIMEADE_ERROR_REJECTED,        // no acknowledgement from ricipient
@@ -99,7 +94,7 @@ enum limeade_mode
 enum limeade_compression_mode
 {
   // there are 3 options for compression
-  
+
   // 1. no compression
   LIMEADE_MODE_NO_COMPRESSION = 0,
 
@@ -141,14 +136,14 @@ struct limeade_csm_compression_entry
   uint32_t precompr_sz;  // size of data before compression
   uint32_t postcompr_sz; // size of data after compression
   uint32_t elapsed_ms;   // elapsed time in milliseconds
-}
+};
 
 // the data for a single entry of latency data
 struct limeade_csm_latency_entry
 {
   uint32_t send_sz;    // size of data sent
   uint32_t elapsed_ms; // elapsed time in milliseconds
-}
+};
 
 struct limeade_csm_data
 {
@@ -164,14 +159,14 @@ struct limeade_csm_data
 };
 
 // wrapper functions for adding data to benchmark ring buffers
-void limeade_csm_add_compr_entry(struct limeade_context *ctx, struct limeade_csm_compression_entry *entry);
-void limeade_csm_add_latency_entry(struct limeade_context *ctx, struct limeade_csm_latency_entry *entry);
+void limeade_csm_add_compr_entry(void *ctx, struct limeade_csm_compression_entry *entry);
+void limeade_csm_add_latency_entry(void *ctx, struct limeade_csm_latency_entry *entry);
 
 // size of hist_* ring buffers
 #define LIMEADE_CSM_BENCH_BUFFER_SIZE 30
 // frequency
 // can be altered after calling `limeade_init` with:
-// 
+//
 //pthread_mutex_lock(ctx->csm_mtx);
 //ctx->csm->freq_s = 3
 //pthread_mutex_unlock(ctx->csm_mtx);
@@ -188,7 +183,7 @@ struct limeade_eth_host_indiv_client
 {
   uint64_t session;
   void *addr; //(struct sockaddr*)
-}
+};
 
 // limeade_context
 // serves as the context object for the functions in this library
@@ -214,9 +209,9 @@ struct limeade_context
       uint32_t nr_clients;
       struct limeade_eth_host_indiv_client **clients;
     };
-    struct
+    struct // for LIMEADE_MODE_CLIENT_ETH
     {
-      struct sockaddr_in saddr; // for LIMEADE_MODE_CLIENT_ETH
+      struct sockaddr_in *saddr;
       socklen_t saddr_len;
     };
   };
@@ -313,8 +308,8 @@ typedef uint64_t LIMEADE_SESSION;
 // packet data, while variadic, is consistenly visualized into rows
 // & columns, Likewise, there are specific characters used for delimiting
 // fields & rows:
-#define LIMEADE_FIELD_DELIM "\xFF" // put between each field...
-#define LIMEADE_ROW_DELIM   "\xFE" // unless this is there to separate the rows
+#define LIMEADE_FIELD_DELIM '\xFF' // put between each field...
+#define LIMEADE_ROW_DELIM   '\xFE' // unless this is there to separate the rows
 
 // limeade_packet_flags
 // representation of packet flags in memory
@@ -324,11 +319,11 @@ struct limeade_packet_flags
   uint8_t type:4;       // type of packet (limeade_packet)
   uint8_t compr_lvl:4;  // level of compression (0 for none)
   uint32_t ts_s;        // UNIX time at send time
-  uint16_t ts_ms        // milliseconds since UNIX time at send time
+  uint16_t ts_ms;       // milliseconds since UNIX time at send time
   union
   {
     uint8_t reserved[7];
-  }
+  };
   LIMEADE_SESSION session;
 };
 
@@ -343,7 +338,7 @@ struct limeade_knock
 struct limeade_recognize
 {
   uint8_t accepted; // if the client is accepted (generally not no)
-  limeade_session new_session; // new session the server assigns
+  LIMEADE_SESSION new_session; // new session the server assigns
 };
 
 // equivalent to LIMEADE_PACKET_INTRODUCTION
@@ -393,7 +388,7 @@ struct limeade_events
 struct limeade_indiv_proc
 {
   pid_t pid;
-  ppid_t ppid;
+  pid_t ppid;
   uid_t uid;
   uint16_t threads;
   union             // representations of CPU usage
@@ -482,13 +477,13 @@ struct limeade_close
  *
  * ...: struct limeade_* associated with `type`
  *
- * 0 on success, -1 on error, and the error is pushed to the error buffer 
+ * 0 on success, -1 on error, and the error is pushed to the error buffer
  */
-int limeade_send(limeade_context *ctx, limeade_packet type, ...);
+int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...);
 
 // struct limeade_recv
 // received data before parsing
-typedef struct limeade_packet_data struct limeade_recv;
+typedef struct limeade_packet_data limeade_recv;
 
 // to receive packets, there are various functions that do nearly the same
 // thing.
@@ -539,7 +534,6 @@ struct limeade_close limeade_parse_close(struct limeade_recv pkt);
 // the below functions exist not for the end user, but for use interally
 // by the library
 void limeade_deflate_packet(struct limeade_packet_data *in, int compr_lvl);
-void limeade_monotonic(clockid_t clockid, struct timespec *ts);
+void limeade_monotonic(struct timespec *ts);
 
 #endif /* _LIBLIMEADE_H_ */
-

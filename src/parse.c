@@ -39,7 +39,7 @@ static int limeade_recvfrom_safe(int sockfd, void *buf, size_t size, int flags)
 #define F (struct limeade_packet_flags*)ret.pkt
 #define RECV(x, y, z)\
 {\
-  int len = limeade_recvfrom_safe(ctx->rfd, x, y, z, &ctx->saddr);\
+  len = limeade_recvfrom_safe(ctx->rfd, x, y, z, &ctx->saddr);\
   if(len < 1 && y > len)\
   {\
     free(tmp_magic);\
@@ -48,26 +48,47 @@ static int limeade_recvfrom_safe(int sockfd, void *buf, size_t size, int flags)
     return ret;\
   }\
 }
+#define READ(x, y)\
+{\
+  len = read(ctx->rfd, x, y);\
+  if (len != y)\
+  {\
+    free(tmp_magic);\
+    free(ret.pkt);\
+    limeade_inserr(LIEMADE_ERROR_NO_DATA);\
+    return ret;\
+  }
 struct limeade_recv limeade_recv_wait(struct limeade_context *ctx)
 {
   struct limeade_recv ret;
+  int len;
 
-  void *tmp_magic = malloc();
+  void *tmp_magic = malloc(MAGSZ);
   ret.pkt = malloc(FLAGSZ);
 
   if(ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH)
   {
-    // TODO
+    // when reading in this mode, we don't have a MSG_PEEK-like option when
+    // managing garbage
+    // therefore, we have to read in chunks until we find part of the magic
+    // and/or flags, then copy the useful data to another buffer, and continue
+    // to read the packet into that buffer at an offset
+
+    READ(tmp_magic, MAGSZ);
+    // assuming the stream isn't borked in order to offset the performance
+    // downgrade to solely the edge case
+    if(memcmp(tmp_magic, &LIMEADE_MAGIC, MAGSZ) != 0)
+    {
+
+    }
+
+
   } else if (ctx->LIMEADE_MODE_HOST_ETH || ctx->mode == LIMEADE_MODE_CLIENT_ETH)
   {
-    int len = RECV(tmp_magic, MAGSZ, flags|MSG_PEEK);
+    int flags = MSG_WAITALL;
+    RECV(tmp_magic, MAGSZ, flags|MSG_PEEK);
 
-    if (len != MAGSZ)
-    {
-      free(tmp_magic);
-      limeade_inserr(LIMEADE_ERROR_NETWORKING);
-      return ret;
-    } else if(memcmp(tmp_magic, &LIMEADE_MAGIC, MAGSZ != 0))
+i   if(memcmp(tmp_magic, &LIMEADE_MAGIC, MAGSZ) != 0)
     {
       // there is garbage in the queue
       // we assume there will be a magic eventually, so we look for it & clear
@@ -76,21 +97,7 @@ struct limeade_recv limeade_recv_wait(struct limeade_context *ctx)
       char *magic_inst;
       do
       {
-        RECV(tmp_magic, MAGSZ * 4, flags|MSG_PEEK);
-        magic_inst = memmem(tmp_magic, MAGSZ*4, &LIMEADE_MAGIC, MAGSZ);
-        if(magic_inst != NULL)
-        {
-          RECV(tmp_magic, magic_inst - tmp_magic + MAGSZ, flags);
-          break;
-        }
-        RECV(tmp_magic, MAGSZ * 5, flags|MSG_PEEK);
-        magic_inst = memmem(tmp_magic, MAGSZ*5, &LIMEADE_MAGIC, MAGSZ);
-        if(magic_inst != NULL)
-        {
-          RECV(tmp_magic, magic_inst - tmp_magic + MAGSZ, flags);
-          break;
-        }
-        RECV(tmp_magic, MAGSZ * 4, flags);
+
       }
     } else
     {
