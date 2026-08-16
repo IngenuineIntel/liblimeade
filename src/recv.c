@@ -1,83 +1,12 @@
 // th_recv.c
 
-struct limeade_th_csm_data;
+#include<pthread.h>
+#include<stdint.h>
+#include<stdlib.h>
+#include<sys/socket.h>
+#include<time.h>
 
-struct limeade_indiv_recv
-{
-  void *data;
-  uint16_t sz;
-  void *mtx;
-  union
-  {
-    uint8_t flags;
-
-    struct
-    {
-      uint8_t has_been_read:1;
-      uint8_t reserved:7;
-    };
-  };
-};
-
-struct limeade_th_recv_data
-{
-  tid_t tid;
-  uint16_t nr_pkts;
-  uint16_t read_idx;
-  uint16_t wr_idx;
-  uint16_t pkts_lost;
-  uint16_t hz;
-  struct limeade_indiv_recv **pkts;
-  void *mtx_idx;
-  void *mtx_kys;
-  void *mtx_lost;
-};
-
-struct limeade_context
-{
-  int mode;
-  int compr_lvl;
-
-  int sfd;
-  int rfd;
-
-  union
-  {
-    pid_t ssh_pid;   // LIMEADE_MODE_CLIENT_SSH
-
-    void **ssh_data; // LIMEADE_MODE_CLIENT_LIBSSH
-  
-    struct           // LIMEADE_MODE_HOST_ETH
-    {
-      uint32_t nr_clients;
-      struct limeae_eth_host_indiv_client **clients;
-    };
-
-    struct           // LIMEADE_MODE_CLIENT_ETH
-    {
-      struct sockaddr_in *saddr;
-      socketlen_t saddr_len;
-    };
-  };
-
-  // thread data
-
-  struct limeade_th_csm_data csm;
-  struct limeade_th_recv_data recv;
-
-  // "public attributes"
-  char *destination;
-  int port;
-  uint64_t sessionid;
-
-  // mutexes
-  void *mtx_sfd;
-  void *mtx_rfd;
-  void *mtx_mode_union;
-  void *mtx_csm;
-  void *mtx_recv;
-  void *mtx_public_attrs;
-}
+#include<liblimeade/liblimeade.h>
 
 void th_recv_client_eth(struct limeade_context *ctx)
 {
@@ -166,6 +95,5 @@ void th_recv_client_eth(struct limeade_context *ctx)
   err:
   
   free(interim);
-
 }
 

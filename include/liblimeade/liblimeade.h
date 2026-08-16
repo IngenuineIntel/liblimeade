@@ -178,6 +178,42 @@ void limeade_csm_add_latency_entry(void *ctx, struct limeade_csm_latency_entry *
 // on a host machine (particularly LIMEADE_MODE_HOST_ETH), a list of clients has to be
 // stored
 
+// limeade_recv_data
+// liblimeade hosts an additional thread used for receiving data, making recv
+// calls by the main thread faster, as they simply copy the data from a buffer
+// in memory
+// packets are kept in a ring buffer with both a read and write index
+struct limeade_indiv_recv
+{
+  void *data;
+  uint16_t sz;
+  void *mtx;
+  union
+  {
+    uint8_t flags;
+    struct
+    {
+      uint8_t has_been_read:1;
+      uint8_t reserved:7;
+    };
+  };
+};
+
+struct limeade_recv_data
+{
+  tid_t tid;
+  uint16_t nr_pkts;
+  uint16_t read_idx;
+  uint16_t wr_idx;
+  uint16_t pkts_lost;
+  uint16_t hz;
+  struct limeade_indiv_recv **pkts;
+
+  void *mtx_idx;
+  void *mtx_kys;
+  void *mtx_lost;
+};
+
 // individual client
 struct limeade_eth_host_indiv_client
 {
@@ -186,49 +222,53 @@ struct limeade_eth_host_indiv_client
 };
 
 // limeade_context
-// serves as the context object for the functions in this library
+// serves as the state/instance holder for the functions in this library
 struct limeade_context
 {
-  union
-  {
-    uint8_t reserved[6];
-  };
+  int mode;
+  int compr_mode;
+  int compr_lvl;
 
-  uint8_t mode; // mode of operation
-  uint8_t compr_mode; // mode of compression
-
-  uint8_t compr_lvl; // level of compression
-  void *compr_lvl_mtx; // mutex for compr_lvl
+  int sfd;
+  int rfd;
 
   union
   {
     pid_t ssh_pid;  // LIMEADE_MODE_CLIENT_SSH
     void *ssh_data; // LIMEADE_MODE_CLIENT_LIBSSH
+  
     struct          // LIMEADE_MODE_HOST_ETH
     {
       uint32_t nr_clients;
       struct limeade_eth_host_indiv_client **clients;
     };
-    struct // for LIMEADE_MODE_CLIENT_ETH
+
+    struct          // LIMEADE_MODE_CLIENT_ETH
     {
       struct sockaddr_in *saddr;
       socklen_t saddr_len;
     };
   };
 
-  int sfd; // file descriptor for sending
-  int rfd; // file descriptor for receiving
-  void *fd_mtx; // mutex for file descriptors
+  // recv thread
+  struct limeade_recv_data recv;
 
-  // data for CSM
-  struct limeade_csm_data *csm;
-  void *csm_mtx; // mutex for csm
+  // csm thread
+  struct limeade_csm_data csm;
 
-  // attributes intended to be read/write
-  char *destination;  // if client, URI of host
-  int port;           // port to connect on
-  uint64_t sessionid; // sessionID (might be changed internally)
-};
+  // "public attributes"
+  char *destination;
+  int port;
+  uint64_t sessionid;
+
+  // mutexes
+  void *mtx_sfd;        // sfd
+  void *mtx_rfd;        // rfd
+  void *mtx_mode_union; // anything in the union
+  void *mtx_compr;      // compr_*
+  void *mtx_th_csm;     // csm
+  void *mtx_pub;        // pub attrs
+}
 
 /* limeade_init
  *
@@ -275,7 +315,9 @@ enum limeade_packet
   LIMEADE_PACKET_PERF,         // resource usage/performance data
   LIMEADE_PACKET_COMMANDEER,   // request command execution on the client
   LIMEADE_PACKET_EXITED,       // indication of the command's completion
-  LIMEADE_PACKET_CLOSE         // connection deinitialization
+  LIMEADE_PACKET_CLOSE,        // connection deinitialization
+
+  LIMEADE_PACKET_MAX
 };
 
 // aliases for conveience
@@ -483,16 +525,10 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...);
 
 // struct limeade_recv
 // received data before parsing
-typedef struct limeade_packet_data limeade_recv;
+typedef struct limeade_packet_data struct limeade_recv;
 
-// to receive packets, there are various functions that do nearly the same
-// thing.
-
-// holds indefinitely until a packet is received
-struct limeade_recv limeade_recv_wait(struct limeade_context *ctx);
-
-// waits for a packet for `hold_time_s` seconds
-struct limeade_recv limeade_recv_fixed(struct limeade_context *ctx, int hold_time_s);
+// for receiving a packet, returns NULL if there are no packets to receive
+struct limeade_recv limeade_recv(struct limeade_context *ctx);
 
 // flags can be extracted as so:
 struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data);
