@@ -1,5 +1,24 @@
 // init.c
-// AGPL
+//
+// Copyright (C) 2026 Roan Rothrock
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#include<stdarg.h>
+#include<stdlib.h>
+
+#include<liblimeade/liblimeade.h>
 
 #define CHECK(expr, err) \
 if(expr)                 \
@@ -61,7 +80,7 @@ struct limeade_context *limeade_init(uint8_t flags, ...)
           execlp("ssh", "ssh", "-s",
                  LIMEADE_SUBSYSTEM_NAME, dest, (char*)NULL);
           exit(-1);
-          
+
         }
         default:
           CHECK(close(fr_ssh[1]) == -1, LIMEADE_ERROR_OTHER);
@@ -184,7 +203,7 @@ int limeade_connect(struct limeade_context *ctx)
 
     CHECK(ret->csm->hist_compr_benches == NULL, LIMEADE_ERROR_MEMORY);
     CHECK(ret->csm->hist_bandw_benches == NULL, LIMEADE_ERROR_MEMORY);
-    
+
     ret->csm->hist_compr_idx = 0;
     ret->csm->hist_bandw_idx = 0;
 

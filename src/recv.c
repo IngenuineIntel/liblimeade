@@ -1,4 +1,19 @@
 // th_recv.c
+//
+// Copyright (C) 2026 Roan Rothrock
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include<pthread.h>
 #include<stdint.h>
@@ -15,7 +30,7 @@ void th_recv_client_eth(struct limeade_context *ctx)
   uint16_t wr_idx;
   // lock?
   struct timespec rmtp, rqtp = {0, 1000000000/r->hz};
-  
+
   void *mag1, *mag2, *end, *interim = malloc(65535);
   int a, b;
 
@@ -54,19 +69,19 @@ void th_recv_client_eth(struct limeade_context *ctx)
     do
     {
       mag1 = memmem(mag1, end - mag1, &LIMEADE_MAGIC, MAGSZ);
-      
+
       if(mag1 == NULL || mag1 == end - MAGSZ)
       {
         break;
       }
-      
+
       mag2 = memmem(mag1 + MAGSZ, end - mag1 - MAGSZ, &LIMEADE_MAGIC, MAGSZ);
-      
+
       if(mag2 == NULL)
       {
         mag2 = end;
       }
-      
+
       if(((struct limeade_packet_flags*)mag1 + MAGSZ).type == LIMEADE_RECV)
       {
         // TODO optimize
@@ -95,7 +110,7 @@ void th_recv_client_eth(struct limeade_context *ctx)
         d->flags = 0;
         pthread_mutex_unlock(d->mtx);
       }
-      
+
       if(mag2 == end)
       {
         break;
@@ -107,7 +122,6 @@ void th_recv_client_eth(struct limeade_context *ctx)
   }
 
   err:
-  
+
   free(interim);
 }
-
