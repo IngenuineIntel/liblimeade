@@ -209,10 +209,19 @@ struct limeade_recv_data
   uint16_t hz;
   struct limeade_indiv_recv **pkts;
 
+  // if a packet is LIMEADE_ACK, it is put elsewhere
+  // not a ring buffer, because it shouldn't have to be
+  void *ack;
+  // mutex for waiting for ACKs
+  // almost always locked; one must already be waiting
+  void *mtx_acks;
+
+
   void *mtx_idx;
   void *mtx_kys;
   void *mtx_lost;
 };
+#define LIMEADE_NR_PKTS_DEFAULT 5
 
 // individual client
 struct limeade_eth_host_indiv_client
@@ -225,9 +234,9 @@ struct limeade_eth_host_indiv_client
 // serves as the state/instance holder for the functions in this library
 struct limeade_context
 {
-  int mode;
-  int compr_mode;
-  int compr_lvl;
+  uint8_t mode;
+  uint8_t compr_mode;
+  uint8_t compr_lvl;
 
   int sfd;
   int rfd;
@@ -236,25 +245,24 @@ struct limeade_context
   {
     pid_t ssh_pid;  // LIMEADE_MODE_CLIENT_SSH
     void *ssh_data; // LIMEADE_MODE_CLIENT_LIBSSH
-  
-    struct          // LIMEADE_MODE_HOST_ETH
-    {
-      uint32_t nr_clients;
-      struct limeade_eth_host_indiv_client **clients;
-    };
 
-    struct          // LIMEADE_MODE_CLIENT_ETH
+    struct          // LIMEADE_MODE_*_ETH
     {
       struct sockaddr_in *saddr;
       socklen_t saddr_len;
+
+      // LIMEADE_MODE_HOST_ETH
+      struct sockaddr_in *cliaddr;
+      uint32_t nr_clients;
+      struct limeade_eth_host_indiv_client **clients;
     };
   };
 
   // recv thread
-  struct limeade_recv_data recv;
+  struct limeade_recv_data *recv;
 
   // csm thread
-  struct limeade_csm_data csm;
+  struct limeade_csm_data *csm;
 
   // "public attributes"
   char *destination;
@@ -283,6 +291,8 @@ struct limeade_context
  *     const char *dest // like "user@machine"
  *   if LIMEADE_MODE_CLIENT_ETH:
  *     const char *dest, // host IP address
+ *     int port          // port (generally LIMEADE_PORT)
+ *   if LIMEADE_MODE_HOST_ETH:
  *     int port          // port (generally LIMEADE_PORT)
  *
  * on success, returns a valid LIMEADE_CONTEXT*

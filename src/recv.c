@@ -13,7 +13,7 @@ void th_recv_client_eth(struct limeade_context *ctx)
   struct limeade_recv_data *r = &ctx->recv;
   struct limeade_indiv_recv *d;
   uint16_t wr_idx;
-
+  // lock?
   struct timespec rmtp, rqtp = {0, 1000000000/r->hz};
   
   void *mag1, *mag2, *end, *interim = malloc(65535);
@@ -67,21 +67,35 @@ void th_recv_client_eth(struct limeade_context *ctx)
         mag2 = end;
       }
       
-      pthread_mutex_lock(r->mtx_idx);
-      r->wr_idx++;
-      if(r->wr_idx == r->nr_pkts)
+      if(((struct limeade_packet_flags*)mag1 + MAGSZ).type == LIMEADE_RECV)
       {
-        r->wr_idx = 0;
+        // TODO optimize
+        uint64_t pkt_sz = mag2 - mag1 - MAGSZ;
+        free(r->ack);
+        r->ack = malloc(pkt_sz);
+        memcpy(r->ack, mag1 + MAGSZ, pkt_sz);
+        pthread_mutex_unlock(r->mtx_ack);
+        // if you forgot to wait, clearly it wasn't that important in the first
+        // place
+        pthread_mutex_lock(r->mtx_ack);
+      } else
+      {
+        pthread_mutex_lock(r->mtx_idx);
+        r->wr_idx++;
+        if(r->wr_idx == r->nr_pkts)
+        {
+          r->wr_idx = 0;
+        }
+        d = r->pkts[r->wr_idx];
+        pthread_mutex_unlock(r->mtx_idx);
+
+        pthread_mutex_lock(d->mtx);
+        d->sz = mag2 - mag1 - MAGSZ;
+        memcpy(d->data, mag1 + MAGSZ, d->sz);
+        d->flags = 0;
+        pthread_mutex_unlock(d->mtx);
       }
-      d = r->pkts[r->wr_idx];
-      pthread_mutex_unlock(r->mtx_idx);
-
-      pthread_mutex_lock(d->mtx);
-      d->sz = mag2 - mag1;
-      memcpy(d->data, mag1 + MAGSZ, d->sz);
-      d->flags = 0;
-      pthread_mutex_unlock(d->mtx);
-
+      
       if(mag2 == end)
       {
         break;
