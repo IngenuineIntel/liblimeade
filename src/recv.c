@@ -21,7 +21,7 @@
 #include<sys/socket.h>
 #include<time.h>
 
-#include<liblimeade/liblimeade.h>
+#include<liblimeade/liblimeade-internal.h>
 
 void th_recv_client_eth(struct limeade_context *ctx)
 {

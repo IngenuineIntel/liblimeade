@@ -20,7 +20,7 @@
 #include<stdlib.h>
 #include<string.h>
 
-#include<liblimeade/liblimeade.h>
+#include<liblimeade/liblimeade-internal.h>
 
 struct limeade_recv limeade_recv(struct limeade_context *ctx)
 {

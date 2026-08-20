@@ -18,7 +18,7 @@
 #include<stdarg.h>
 #include<stdlib.h>
 
-#include<liblimeade/liblimeade.h>
+#include<liblimeade/liblimeade-internal.h>
 
 #define CHECK(expr, err) \
 if(expr)                 \

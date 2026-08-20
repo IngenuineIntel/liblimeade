@@ -20,7 +20,7 @@
 
 #include <zlib.h>
 
-#include <liblimeade/liblimeade.h>
+#include <liblimeade/liblimeade-internal.h>
 
 static void prep_str(char *in)
 {
@@ -563,7 +563,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   recvwait.tv_sec  = 0;
   recvwait.tv_nsec = 1000000; // 1ms
 
-  uint64_t iters = 0, retries = 0;
+  uint64_t iters = 0, retries_iter = 0;
 
   // please note that I currently don't care if this is an accurate timer or not
   do
@@ -575,10 +575,10 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
       limeade_inserr(LIMEADE_REJECTED);
       pthread_cancel(recv_ack_tid);
       goto err;
-    } else if(iters >= retries * ctx->retry_interval)
+    } else if(iters >= retries_iter)
     {
       limeade_base_send(ctx, &pkt);
-      retry_interval++;
+      retries_iter += ctx->retry_interval;
     }
   } while(pthread_mutex_trylock(&recv_ack.mtx) != EBUSY);
 
