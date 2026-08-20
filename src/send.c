@@ -497,7 +497,7 @@ void *limeade_th_await(void *arg)
   return NULL;
 }
 
-int limeade_send_await(struct limeade_context *ctx, limeade_pacekt type, ...)
+int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ...)
 {
   va_list arg;
   va_start(arg, type);
@@ -585,9 +585,11 @@ int limeade_send_await(struct limeade_context *ctx, limeade_pacekt type, ...)
   limeade_monotonic(&latent_ts[1]);
 
   c_entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
-  limeade_csm_add_compr_entry(ctx, &c_entry);
-
   l_entry.elapsed_ms = limeade_monotonic_diff_ms(&latent_ts[0], &latent_ts[1]);
+
+  // TODO confirm that the acknowledgement is for this packet
+
+  limeade_csm_add_compr_entry(ctx, &c_entry);
   limeade_csm_add_latency_entry(ctx, &l_entry);
 
   limeade_inserr(LIMEADE_SUCCESS);

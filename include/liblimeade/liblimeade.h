@@ -94,7 +94,6 @@ enum limeade_mode
   LIMEADE_MODE_CLIENT_ETH, // UDP client
 };
 
-// note for users of the ethernet protocol:
 // packets are sent to the standard port of the Limeade protocol:
 #define LIMEADE_PORT 12046
 
@@ -549,12 +548,29 @@ struct limeade_close
  */
 int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...);
 
+/* limeade_send_await
+ *
+ * sends a full constructed packet and waits for acknowledgement from the peer
+ *
+ * ...: struct limeade_* associated with `type`
+ *
+ * 0 on success, -1 on error, and the error is push to the error buffer
+ */
+int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ...);
+
 // struct limeade_recv
 // received data before parsing
 typedef struct limeade_packet_data struct limeade_recv;
 
-// for receiving a packet, returns NULL if there are no packets to receive
+// limeade_recv: receives a packet & sends an acknowledgement, but returns NULL if there are no packets to receive
+// limeade_recv_wait: receives a packet & sends an acknowledgement, but waits if there are no packets to receive
+// limeade_recv_noreply: receives a packet without acknowledgement, or returns NULL if there are no packets
+// limeade_recv_wait_noreply: receives a packet without acknowledgement, but waits for a packet to arrive
 struct limeade_recv limeade_recv(struct limeade_context *ctx);
+struct limeade_recv limeade_recv_wait(struct limeade_context *ctx, int wait_ms);
+struct limeade_recv limeade_recv_noreply(struct limeade_context *ctx);
+struct limeade_recv limeade_recv_wait_noreply(struct limeade_context *ctx, int wait_ms);
+// note: wait_ms <= 0 will wait forever
 
 // flags can be extracted as so:
 struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data);
@@ -562,7 +578,7 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data);
 // for the packet's body, there is a function for each packet type, and the
 // type should be checked before parsing:
 //
-//struct limeade_recv pkt = limeade_recv_wait(ctx);
+//struct limeade_recv pkt = limeade_recv(ctx);
 //
 //switch(pkt.type)
 //{
@@ -589,7 +605,6 @@ struct limeade_perf limeade_parse_perf(struct limeade_recv pkt);
 struct limeade_commandeer limeade_parse_commandeer(struct limeade_recv pkt);
 struct limeade_exited limeade_parse_exited(struct limeade_recv pkt);
 struct limeade_close limeade_parse_close(struct limeade_recv pkt);
-
 
 
 /*** *** INTERNAL *** ***/
