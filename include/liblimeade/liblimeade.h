@@ -224,10 +224,11 @@ struct limeade_recv_data
 
   // if a packet is LIMEADE_ACK, it is put elsewhere
   // not a ring buffer, because it shouldn't have to be
+  uint16_t ack_sz;
   void *ack;
   // mutex for waiting for ACKs
   // almost always locked; one must already be waiting
-  void *mtx_acks;
+  void *mtx_ack;
 
 
   void *mtx_idx;
@@ -281,6 +282,8 @@ struct limeade_context
   char *destination;
   int port;
   uint64_t sessionid;
+  uint32_t ack_wait_time_ms; // amount of time to try to send data before giving up
+  uint32_t retry_interval;   // time between resends (in milliseconds)
 
   // mutexes
   void *mtx_sfd;        // sfd

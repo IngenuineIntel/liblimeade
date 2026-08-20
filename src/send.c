@@ -404,8 +404,7 @@ e = limeade_poperr();    \
 if(e != LIMEADE_SUCCESS) \
 {                        \
   limeade_inserr(e);     \
-  free(pkt->pkt);        \
-  return -1;             \
+  goto err;              \
 }
 int limeade_send(struct limeade_context *ctx, limeae_packet type, ...)
 {
@@ -432,7 +431,7 @@ int limeade_send(struct limeade_context *ctx, limeae_packet type, ...)
   limeade_populate_packet(&pkt, &flags, arg);
   CHECK();
 
-  entry.postcompr_sz = pkt.pkt_sz;
+  entry.precompr_sz = pkt.pkt_sz;
 
   limeade_deflate_packet(&pkt, flags.compr_lvl);
   CHECK();
@@ -460,6 +459,144 @@ int limeade_send(struct limeade_context *ctx, limeae_packet type, ...)
   limeade_inserr(LIMEADE_SUCCESS);
   free(pkt.pkt);
   return 0;
+
+  err:
+  
+  free(pkt.pkt);
+  return -1;
+}
+
+struct limeade_ack_raw
+{
+  uint16_t sz;
+  void *data;
+};
+
+struct limeade_ack_recv_th_pass
+{
+  struct limeade_recv_data *in;
+  struct limeade_ack_raw *out;
+  pthread_mutex_t mtx;
+};
+
+void *limeade_th_await(void *arg)
+{
+  struct limeade_ack_recv_th_pass *data = (struct limeade_ack_recv_th_pass*)arg;
+  pthread_mutex_lock(data->mtx);
+  struct limeade_recv_data *r = data->in;
+  data->out = (struct limeade_ack_raw*)malloc(sizeof(struct limead_ack_raw));
+
+  pthread_mutex_lock(r->mtx_ack); // hangs
+
+  data->out->sz = r->ack_sz;
+  data->out->data malloc(data->out->sz);
+  memcpy(data->out->data, r->ack, data->out->sz);
+
+  pthread_mutex_unlock(r->mtx_ack);
+  pthread_mutex_unlock(data->mtx);
+  return NULL;
+}
+
+int limeade_send_await(struct limeade_context *ctx, limeade_pacekt type, ...)
+{
+  va_list arg;
+  va_start(arg, type);
+
+  LIMEADE_ERROR e;
+  struct limeade_packet_data pkt;
+  struct limeade_packet_flags flags;
+  struct limeade_csm_compression_entry c_entry;
+  struct limeade_csm_latency_entry l_entry;
+  struct limeade_ack_recv_th_pass recv_ack;
+  pthread_t recv_ack_tid;
+
+  struct timespec compr_ts[2], latent_ts[2], sendts, recvwait, sleeprem;
+
+  limeade_monotonic(&compr_ts[0]);
+  CHECK();
+
+  c_entry.compr_lvl = ctx->compr_lvl;
+
+  pkt.type = flags.type = type;
+
+  pthread_mutex_lock(ctx->mtx_compr);
+  flags.compr_lvl = ctx->compr_lvl;
+  pthread_mutex_unlock(ctx->mtx_compr);
+
+  limeade_populate_packet(&pkt, &flags, arg);
+  CHECK();
+  
+  c_entry.precompr_sz = pkt.pkt_sz;
+
+  limeade_deflate_packet(&pkt, flags.compr_lvl);
+  CHECK();
+
+  c_entry.postcompr_sz = pkt.pkt_sz;
+  l_entry.send_sz      = pkt.pkt_sz;
+
+  limeade_monotonic(&sendts);
+  CHECK();
+
+  ((struct limeade_packet_flags*)pkt.flags)->packet_size = pkt->pkt_sz;
+  ((struct limeade_packet_flags*)pkt.flags)->ts_s = sendts.tv_sec;
+  ((struct limeade_packet_flags*)pkt.flags)->ts_ms = sendts.tv_nsec / 100;
+
+  limeade_montonic(&compr_ts[1]);
+  CHECK();
+
+  limeade_monotonic(&latent_ts[0]);
+  CHECK();
+
+  limeade_base_send(ctx, &pkt);
+  CHECK();
+
+  recv_ack.in = ctx->recv;
+  pthread_mutex_init(&recv_ack.mtx);
+
+  if(pthread_create(&recv_ack_tid, NULL, limeade_th_await, &recv_ack) != 0)
+  {
+    limeade_inserr(LIMEADE_ERROR_OTHER);
+    goto err;
+  }
+  // TODO check ret
+
+  recvwait.tv_sec  = 0;
+  recvwait.tv_nsec = 1000000; // 1ms
+
+  uint64_t iters = 0, retries = 0;
+
+  // please note that I currently don't care if this is an accurate timer or not
+  do
+  {
+    nanosleep(&recvwait, &sleeprem);
+    iters++;
+    if(iters >= ctx->ack_wait_time_ms)
+    {
+      limeade_inserr(LIMEADE_REJECTED);
+      pthread_cancel(recv_ack_tid);
+      goto err;
+    } else if(iters >= retries * ctx->retry_interval)
+    {
+      limeade_base_send(ctx, &pkt);
+      retry_interval++;
+    }
+  } while(pthread_mutex_trylock(&recv_ack.mtx) != EBUSY);
+
+  limeade_monotonic(&latent_ts[1]);
+
+  c_entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
+  limeade_csm_add_compr_entry(ctx, &c_entry);
+
+  l_entry.elapsed_ms = limeade_monotonic_diff_ms(&latent_ts[0], &latent_ts[1]);
+  limeade_csm_add_latency_entry(ctx, &l_entry);
+
+  limeade_inserr(LIMEADE_SUCCESS);
+  free(pkt.pkt);
+  return 0;
+
+  err:
+  free(pkt.pkt);
+  return -1;
 }
 
 #undef CLS_INTREPR
