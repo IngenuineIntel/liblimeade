@@ -22,8 +22,126 @@
 
 #include<liblimeade/liblimeade-internal.h>
 
-struct limeade_recv limeade_recv(struct limeade_context *ctx)
+void limeade_send_acknowledge(struct limeade_context *ctx, struct limeade_recvd pkt)
 {
+  struct limeade_ack out;
+  struct timespec t_recv;
+  struct limeade_packet_flags *f = (struct limeade_packet_flags*)pkt.flags;
+  limeade_monotonic(&t_recv);
+  LIMEADE_CHECK();
+
+  out.send_ts_s  = f->ts_s;
+  out.send_ts_ms = f->ts_ms;
+  out.recv_ts_s  = t_recv.tv_sec;
+  out.recv_ts_ms = t_recv.tv_nsec / 1000000;
+
+  limeade_send(ctx, LIMEADE_ACKNOWLEDGE, out);
+  LIMEADE_CHECK();
+
+  limeade_pusherr(LIMEADE_SUCCESS);
+  err:
+  return;
+}
+
+struct limeade_recvd limeade_recv_noreply(struct limeade_context *ctx)
+{
+  struct limeade_recvd ret;
+  struct limeade_indiv_recv *r;
+  struct limeade_packet_flags *f;
+
+  pthread_mutex_lock(ctx->recv->mtx_idx);
+
+  r = ctx->recv->pkts[ctx->recv->read_idx];
+
+  pthread_mutex_unlock(ctx->recv->mtx_idx);
+
+  pthread_mutex_lock(r->mtx);
+
+  ret.pkt = malloc(r->sz);
+  memcpy(ret.pkt, r->data, r->sz);
+
+  LIMEADE_CHECKEXPR(r->has_been_read != 0, LIMEADE_ERROR_NO_DATA);
+
+  r->has_been_read = 1;
+
+  ret.pkt_sz = r->sz;
+
+  pthread_mutex_unlock(r->mtx);
+
+  ret.data = ret.pkt + sizeof(struct limeade_packet_flags);
+  
+  f = (struct limeade_packet_flags*)ret.pkt;
+  ret.type = f->type;
+  ret.compr = f->compr_lvl;
+
+  limeade_pusherr(LIMEADE_SUCCESS);
+
+  err:
+  return ret;
+}
+
+struct limeade_recvd limeade_recv(struct limeade_context *ctx)
+{
+  struct limeade_recvd ret = limeade_recv_noreply(ctx);
+  LIMEADE_CHECK();
+
+  limeade_send_acknowledge(ctx, ret);
+  LIMEADE_CHECK();
+
+  limeade_inserr(LIMEADE_SUCCESS);
+
+  err:
+  
+  return ret;
+}
+
+struct limeade_recv_waiter_data
+{
+  struct timespec wait_t;
+  pthread_mutex_t mtx;
+  pthread_t tid;
+}
+
+void *limeade_recv_waiter(void *arg)
+{
+  struct limeade_recv_wait_data *d = (struct limeade_recv_waiter_data*)arg;
+  pthread_mutex_lock(&d->indicator_mtx);
+  nanosleep(&d->wait_t, &d->wait_t);
+  pthread_mutex_unlock(&d->indicator_mtx);
+  return NULL;
+}
+
+struct limeade_recvd limeade_recv_wait_noreply(struct limeade_context *ctx, int wait_ms)
+{
+  struct limeade_recv_waiter_data d;
+  d.wait_t.tv_sec  = wait_ms / 1000;
+  d.wait_t.tv_nsec = wait_ms * 1000000;
+
+  pthread_mutex_init(&d.mtx);
+  pthread_create(&d.tid, NULL, limeade_recv_waiter, &d);
+
+  do
+  {
+    // TODO
+    // TODO try recv (return straight out of the loop
+  } while(pthread_mutex_trylock(&d.mtx) == EBUSY);
+  limeade_inserr(LIMEADE_ERROR_NO_DATA);
+  struct limeade_recv r;
+  return r;
+}
+
+struct limeade_recvd limeade_recv_wait(struct limeade_context *ctx, int wait_ms)
+{
+  struct limeade_recvd ret = limeade_recv_wait_noreply(ctx, wait_ms);
+  LIMEADE_CHECK();
+
+  limeade_send_acknowledge(ctx, ret);
+  LIMEADE_CHECK();
+
+  limeade_inserr(LIMEADE_SUCCESS);
+
+err:
+  return ret;
 }
 
 struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data)

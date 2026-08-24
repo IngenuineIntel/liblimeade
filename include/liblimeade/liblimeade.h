@@ -22,22 +22,11 @@
 #include <sys/socket.h>
 
 /*** *** ERROR MANAGEMENT *** ***/
-// errors are stored in a ring buffer that can be pushed & popped via wrappres.
-#define LIMEADE_ERROR_BUFFER_SIZE 10 // nr of errors in buffer
-
-typedef uint8_t LIMEADE_ERROR;
-
-// the ring buffer is accessed through the following functions, which are thread
-// safe & don't fail
-// limeade_pusherr: pushes an error to the ring buffer
-// limeade_poperr : pops an error from the ring buffer1
-void limeade_inserr(LIMEADE_ERROR err);
-LIMEADE_ERROR limeade_poperr(void);
-
+// the various errors liblimeade functions can return
 enum limeade_error
 {
-  LIMEADE_BLANK_ERROR = 0, // unset error
-  LIMEADE_SUCCESS,
+  LIMEADE_SUCCESS     = 0,
+  LIMEADE_OK          = 0,
 
   // errors while sending
   LIMEADE_ERROR_GARBAGE, // user supplied useless data to the library
@@ -170,10 +159,6 @@ struct limeade_csm_data
   void *id;     // thread ID (*pthread_t)
 };
 
-// wrapper functions for adding data to benchmark ring buffers
-void limeade_csm_add_compr_entry(void *ctx, struct limeade_csm_compression_entry *entry);
-void limeade_csm_add_latency_entry(void *ctx, struct limeade_csm_latency_entry *entry);
-
 // size of hist_* ring buffers
 #define LIMEADE_CSM_BENCH_BUFFER_SIZE 30
 // frequency
@@ -298,6 +283,7 @@ struct limeade_context
  * creates a context that can be passed to other functions to send/recv data
  * through the Limeade protocol
  *
+ * ctx: the context object to populate
  * flags: a combination of `limeade_mode` and `limeade_compression_mode`
  *        for example, `LIMEADE_MODE_CLIENT_LIBSSH|LIMEADE_MODE_LOW_COMPRESSION`
  *        would be a valid flags argument
@@ -313,8 +299,7 @@ struct limeade_context
  * on success, returns a valid LIMEADE_CONTEXT*
  * on fail,    returns NULL and pushes an error to the error buffer
  */
-struct limeade_context *limeade_init(uint8_t flags, ...);
-
+int limeade_init(struct limeade_context *ctx, uint8_t flags, ...);
 // after limeade_init, to make the initial network connection:
 int limeade_connect(struct limeade_context *ctx);
 // this is done in a separate in case the user wants to hack the library for
@@ -560,20 +545,20 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
 // struct limeade_recv
 // received data before parsing
-typedef struct limeade_packet_data struct limeade_recv;
+typedef struct limeade_packet_data struct limeade_recvd;
 
 // limeade_recv: receives a packet & sends an acknowledgement, but returns NULL if there are no packets to receive
 // limeade_recv_wait: receives a packet & sends an acknowledgement, but waits if there are no packets to receive
 // limeade_recv_noreply: receives a packet without acknowledgement, or returns NULL if there are no packets
 // limeade_recv_wait_noreply: receives a packet without acknowledgement, but waits for a packet to arrive
-struct limeade_recv limeade_recv(struct limeade_context *ctx);
-struct limeade_recv limeade_recv_wait(struct limeade_context *ctx, int wait_ms);
-struct limeade_recv limeade_recv_noreply(struct limeade_context *ctx);
-struct limeade_recv limeade_recv_wait_noreply(struct limeade_context *ctx, int wait_ms);
+struct limeade_recvd limeade_recv(struct limeade_context *ctx);
+struct limeade_recvd limeade_recv_wait(struct limeade_context *ctx, int wait_ms);
+struct limeade_recvd limeade_recv_noreply(struct limeade_context *ctx);
+struct limeade_recvd limeade_recv_wait_noreply(struct limeade_context *ctx, int wait_ms);
 // note: wait_ms <= 0 will wait forever
 
 // flags can be extracted as so:
-struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data);
+struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data);
 
 // for the packet's body, there is a function for each packet type, and the
 // type should be checked before parsing:
@@ -583,34 +568,35 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data);
 //switch(pkt.type)
 //{
 //  case LIMEADE_PACKET_KNOCK:
-//    struct limeade_knock data = limeade_parse_knock(pkt);
+//    struct limeade_knock data;
+//    if(limeade_parse_knock(&data, pkt) != LIMEADE_OK)
+//    {
+//      --SNIP--
+//    }
 //  --SNIP--
 //  case LIMEADE_PACKET_RECOGNIZE:
-//    struct limeade_recognize data = limeade_parse_recognize(pkt);
+//    struct limeade_recognize data;
+//    if(limeade_parse_recognize(&data, pkt) != LIMEADE_OK)
+//    {
+//      --SNIP--
+//    }
 //  --SNIP--
 //}
 //
 // note that if the wrong function is called for parsing, it will detect it
-// and push a LIMEADE_ERROR_GARBAGE and return NULL
-struct limeade_knock limeade_parse_knock(struct limeade_recv pkt);
-struct limeade_recognize limeade_parse_recognize(struct limeade_recv pkt);
-struct limeade_intro limeade_parse_introduction(struct limeade_recv pkt);
-#define limeade_parse_intro(x) limeade_parse_introduction(x)
-struct limeade_ack limeade_parse_acknowledge(struct limeade_recv pkt);
-#define limeade_parse_ack(x) limeade_parse_acknowledge(x)
-struct limeade_events limeade_parse_events(struct limeade_recv pkt);
-struct limeade_proc_generic limeade_parse_proc_generic(struct limeade_recv pkt);
-struct limeade_proc_update limeade_parse_proc_update(struct limeade_recv pkt);
-struct limeade_perf limeade_parse_perf(struct limeade_recv pkt);
-struct limeade_commandeer limeade_parse_commandeer(struct limeade_recv pkt);
-struct limeade_exited limeade_parse_exited(struct limeade_recv pkt);
-struct limeade_close limeade_parse_close(struct limeade_recv pkt);
-
-
-/*** *** INTERNAL *** ***/
-// the below functions exist not for the end user, but for use interally
-// by the library
-void limeade_deflate_packet(struct limeade_packet_data *in, int compr_lvl);
-void limeade_monotonic(struct timespec *ts);
+// and return a LIMEADE_ERROR_GARBAGE
+int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd pkt);
+int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd pkt);
+int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd pkt);
+#define limeade_parse_introduction limeade_parse_intro
+int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd pkt);
+#define limeade_parse_acknowledge limeade_parse_ack
+int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt);
+int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recv pkt);
+int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recv pkt);
+int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt);
+int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recvd pkt);
+int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt);
+int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt);
 
 #endif /* _LIBLIMEADE_H_ */

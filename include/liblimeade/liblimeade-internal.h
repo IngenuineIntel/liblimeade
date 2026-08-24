@@ -25,13 +25,13 @@
  *
  * wrapper for monotonic timestamps
  */
-void limeade_monotonic(struct timespec *ts);
+int limeade_monotonic(struct timespec *ts);
 
 /* limeade_monotonic_diff_ms
  *
  * gets milliseconds between `a` & `b`
  */
-void limeade_monotonic_diff_ms(struct timespec *a, struct timespec *b);
+int64_t limeade_monotonic_diff_ms(struct timespec *a, struct timespec *b);
 
 /* limeade_csm_add_compr_entry
  *

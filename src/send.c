@@ -108,7 +108,7 @@ static void limeade_wr_at_idx(struct limeade_pkt_wr_data d, void *data, int len)
   d.wr_idx += len;
 }
 
-static void limeade_populate_packet(struct limeade_packet_data *in,
+int limeade_populate_packet(struct limeade_packet_data *in,
                                     struct limeade_packet_flags *flags,
                                     va_list arg)
 {
@@ -329,9 +329,10 @@ static void limeade_populate_packet(struct limeade_packet_data *in,
     }
   }
 
+  return LIMEADE_SUCCESS;
 }
 
-void limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
+int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
 {
   if(compr_lvl <= 0)
   {
@@ -341,50 +342,50 @@ void limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
 
   void *compressed = malloc(pkt->pkt_sz);
   unsigned long compressed_len;
+
   if(compress2(compressed, &compressed_len, pkt->data,
-               pkt->pkt_sz - sizeof(struct limeade_packet_flags), compr_lvl) != Z_OK)
+               pkt->pkt_sz - sizeof(struct limeade_packet_flags),
+               compr_lvl) != Z_OK)
   {
     free(compressed);
-    limeade_inserr(LIMEADE_ERROR_COMPRESSION);
-    return;
+    return LIMEADE_ERROR_COMPRESSION;
   }
 
   if(memcpy(pkt->data, compressed, compressed_len) != compressed_len)
   {
     free(compressed);
-    limeade_inserr(LIMEADE_ERROR_COMPRESSION);
-    return;
+    return LIMEADE_ERROR_COMPRESSION;
   }
+
+  free(compressed);
 
   void *new_pkt = realloc(pkt->pkt, compressed_len + sizeof(struct limeade_packet_flags));
 
   if(new_pkt == NULL)
   {
-    free(compressed);
-    limeade_inserr(LIMEADE_ERROR_MEMORY);
-    return;
+    return LIMEADE_ERROR_MEMORY;
   }
 
   pkt->pkt = new_pkt;
   pkt->data = new_pkt + sizeof(struct limeade_packet_flags);
   pkt->pkt_sz = compressed_len + sizeof(struct limeade_packet_flags);
-  free(compressed);
-  limeade_inserr(LIMEADE_SUCCESS);
+
+  return LIMEADE_SUCCESS;
 }
 
-void limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *pkt)
+int limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *pkt)
 {
   if(ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH)
   {
     if(write(ctx->sfd, &LIMEADE_MAGIC, sizeof(LIMEADE_MAGIC)) != sizeof(LIMEADE_MAGIC))
     {
-      limeade_inserr(LIMEADE_ERROR_NETWORKING);
+      return LIMEADE_ERROR_NETWORKING;
     } else if(write(ctx->sfd, pkt->pkt, pkt->pkt_sz) != pkt->pkt_sz)
     {
-      limeade_inserr(LIMEADE_ERROR_NETWORKING);
+      return LIMEADE_ERROR_NETWORKING;
     } else
     {
-      limeade_inserr(LIMEADE_SUCCESS);
+      return LIMEADE_SUCCESS;
     }
   } else if(ctx->mode == LIMEADE_MODE_HOST_ETH
          || ctx->mode == LIMEADE_MODE_CLIENT_ETH)
@@ -395,30 +396,24 @@ void limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *
     // TODO
   } else
   {
-    limeade_inserr(LIMEADE_ERROR_INVALID_CONTEXT);
+    return LIMEADE_INVALID_CONTEXT;
   }
+
+  return LIMEADE_SUCCESS;
 }
 
-#define CHECK()          \
-e = limeade_poperr();    \
-if(e != LIMEADE_SUCCESS) \
-{                        \
-  limeade_inserr(e);     \
-  goto err;              \
-}
 int limeade_send(struct limeade_context *ctx, limeae_packet type, ...)
 {
   va_list arg;
   va_start(arg, type);
 
-  LIMEADE_ERROR e;
   struct limeade_packet_data pkt;
   struct limeade_packet_flags flags;
   struct limeade_csm_compression_entry entry;
   struct timespec compr_ts[2], sendts;
 
   limeade_monotonic(&compr_ts[0]);
-  CHECK();
+  LIMEADE_CHECK();
 
   entry.compr_lvl = ctx->compr_lvl;
 
@@ -429,36 +424,35 @@ int limeade_send(struct limeade_context *ctx, limeae_packet type, ...)
   pthread_mutex_unlock(ctx->mtx_compr);
 
   limeade_populate_packet(&pkt, &flags, arg);
-  CHECK();
+  LIMEADE_CHECK();
 
   entry.precompr_sz = pkt.pkt_sz;
 
   limeade_deflate_packet(&pkt, flags.compr_lvl);
-  CHECK();
+  LIMEADE_CHECK();
 
   entry.postcompr_sz = pkt.pkt_sz;
 
   limeade_monotonic(&sendts);
-  CHECK();
+  LIMEADE_CHECK();
 
   ((struct limeade_packet_flags*)pkt.flags)->packet_size = pkt->pkt_sz;
   ((struct limeade_packet_flags*)pkt.flags)->ts_s = sendts.tv_sec;
   ((struct limeade_packet_flags*)pkt.flags)->ts_ms = sendts.tv_nsec / 100;
 
   limeade_monotonic(&compr_ts[1]);
-  CHECK();
+  LIMEADE_CHECK();
 
   limeade_base_send(ctx, &pkt);
-  CHECK();
+  LIMEADE_CHECK();
 
   entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
 
   limeade_csm_add_compr_entry(ctx, &entry);
-  CHECK();
+  LIMEADE_CHECK();
 
-  limeade_inserr(LIMEADE_SUCCESS);
   free(pkt.pkt);
-  return 0;
+  return LIMEADE_SUCCESS;
 
   err:
   
@@ -502,7 +496,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   va_list arg;
   va_start(arg, type);
 
-  LIMEADE_ERROR e;
+  int _;
   struct limeade_packet_data pkt;
   struct limeade_packet_flags flags;
   struct limeade_csm_compression_entry c_entry;
@@ -512,8 +506,13 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   struct timespec compr_ts[2], latent_ts[2], sendts, recvwait, sleeprem;
 
-  limeade_monotonic(&compr_ts[0]);
-  CHECK();
+  uint64_t iters, retries_iter, iter_giveup, retry_inc;
+
+  _ = limeade_monotonic(&compr_ts[0]) 
+  if(_ != LIMEADE_SUCCESS)
+  {
+    return _;
+  }
 
   c_entry.compr_lvl = ctx->compr_lvl;
 
@@ -523,32 +522,41 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   flags.compr_lvl = ctx->compr_lvl;
   pthread_mutex_unlock(ctx->mtx_compr);
 
-  limeade_populate_packet(&pkt, &flags, arg);
-  CHECK();
-  
+  _ = limeade_populate_packet(&pkt, &flags, arg);
+  if(_ != LIMEADE_SUCCESS)
+  {
+    return _;
+  }
+
   c_entry.precompr_sz = pkt.pkt_sz;
 
-  limeade_deflate_packet(&pkt, flags.compr_lvl);
-  CHECK();
+  _ = limeade_deflate_packet(&pkt, flags.compr_lvl);
+  if(_ != LIMEADE_SUCCESS)
+  {
+    return _;
+  }
 
   c_entry.postcompr_sz = pkt.pkt_sz;
   l_entry.send_sz      = pkt.pkt_sz;
 
-  limeade_monotonic(&sendts);
-  CHECK();
+  _ = limeade_monotonic(&sendts);
+  if(_ != LIMEADE_SUCCESS)
+  {
+    return _;
+  }
 
   ((struct limeade_packet_flags*)pkt.flags)->packet_size = pkt->pkt_sz;
   ((struct limeade_packet_flags*)pkt.flags)->ts_s = sendts.tv_sec;
   ((struct limeade_packet_flags*)pkt.flags)->ts_ms = sendts.tv_nsec / 100;
 
   limeade_montonic(&compr_ts[1]);
-  CHECK();
+  LIMEADE_CHECK();
 
   limeade_monotonic(&latent_ts[0]);
-  CHECK();
+  LIMEADE_CHECK();
 
   limeade_base_send(ctx, &pkt);
-  CHECK();
+  LIMEADE_CHECK();
 
   recv_ack.in = ctx->recv;
   pthread_mutex_init(&recv_ack.mtx);
@@ -563,14 +571,19 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   recvwait.tv_sec  = 0;
   recvwait.tv_nsec = 1000000; // 1ms
 
-  uint64_t iters = 0, retries_iter = 0;
+  iters = 0;
+
+  pthread_mutex_lock(ctx->mtx_pub);
+  iter_giveup = ctx->ack_wait_time_ms;
+  retry_iter = retry_inc = ctx->retry_interval;
+  pthread_mutex_unlock(ctx->mtx_pub);
 
   // please note that I currently don't care if this is an accurate timer or not
   do
   {
     nanosleep(&recvwait, &sleeprem);
     iters++;
-    if(iters >= ctx->ack_wait_time_ms)
+    if(iters >= iter_giveup)
     {
       limeade_inserr(LIMEADE_REJECTED);
       pthread_cancel(recv_ack_tid);
@@ -578,7 +591,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
     } else if(iters >= retries_iter)
     {
       limeade_base_send(ctx, &pkt);
-      retries_iter += ctx->retry_interval;
+      retries_iter += retry_inc;
     }
   } while(pthread_mutex_trylock(&recv_ack.mtx) != EBUSY);
 
@@ -607,4 +620,3 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 #undef WRU
 #undef WRI
 #undef WRD
-#undef CHECK

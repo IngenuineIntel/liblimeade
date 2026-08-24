@@ -23,8 +23,9 @@
 
 #include<liblimeade/liblimeade-internal.h>
 
-void th_recv_client_eth(struct limeade_context *ctx)
+void th_recv_client_eth(void *arg)
 {
+  struct limeade_context *ctx = (struct limeade_context*)arg;
   struct limeade_recv_data *r = &ctx->recv;
   struct limeade_indiv_recv *d;
   uint16_t wr_idx;
@@ -124,4 +125,6 @@ void th_recv_client_eth(struct limeade_context *ctx)
   err:
 
   free(interim);
+
+  return NULL;
 }

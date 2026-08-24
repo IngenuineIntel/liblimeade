@@ -20,32 +20,23 @@
 
 #include<liblimeade/liblimeade-internal.h>
 
-#define CHECK(expr, err) \
-if(expr)                 \
-{                        \
-  limeade_inserr(err);   \
-  goto err;              \
-}
-#define CHILDCHECK(expr)\
-if(expr)exit(-1);
-struct limeade_context *limeade_init(uint8_t flags, ...)
+int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
 {
+  int ret;
   va_list arg;
   va_start(arg, flags);
 
-  struct limeade_context *ret = (struct limeade_context*)malloc(sizeof(struct limeade_context));
-
-  ret->mode       = flags & 0b00001111;
-  ret->compr_mode = flags & 0b11110000;
+  ctx->mode       = flags & 0b00001111;
+  ctx->compr_mode = flags & 0b11110000;
 
   uint8_t allow_compr = 1;
 
-  switch(ret->mode)
+  switch(ctx->mode)
   {
     case LIMEADE_MODE_HOST_SSH:
     {
-      ret->rfd = STDIN_FILENO;
-      ret->sfd = STDOUT_FILENO;
+      ctx->rfd = STDIN_FILENO;
+      ctx->sfd = STDOUT_FILENO;
       allow_compr = 0;
     }
 
@@ -58,19 +49,29 @@ struct limeade_context *limeade_init(uint8_t flags, ...)
       int to_ssh[2];
       int fr_ssh[2];
 
-      CHECK(pipe(to_ssh) == -1, LIMEADE_ERROR_OTHER);
-      CHECK(pipe(fr_ssh) == -1, LIMEADE_ERROR_OTHER);
+      if(pipe(to_ssh) == -1)
+      {
+        ret = LIMEADE_ERROR_OTHER;
+        goto err;
+      }
+
+      if(pipe(fr_ssh) == -1)
+      {
+        ret = LIMEADE_ERROR_OTHER;
+        goto err;
+      }
 
       ctx->ssh_pid = fork();
 
       switch(ctx->ssh_pid)
       {
         case -1:
-          CHECK(1 == 1, LIMEADE_ERROR_OTHER);
+          ret = LIMEADE_ERROR_SSH;
+          goto err;
         case 0:
         {
-          CHILDCHECK(dup2(fr_ssh[1], STDOUT_FILENO) != 0);
-          CHILDCHECK(dup2(to_ssh[0], STDIN_FILENO)  != 0);
+          dup2(fr_ssh[1]);
+          dup2(to_ssh[0]);
 
           close(fr_ssh[0]);
           close(fr_ssh[1]);
@@ -80,52 +81,80 @@ struct limeade_context *limeade_init(uint8_t flags, ...)
           execlp("ssh", "ssh", "-s",
                  LIMEADE_SUBSYSTEM_NAME, dest, (char*)NULL);
           exit(-1);
-
         }
         default:
-          CHECK(close(fr_ssh[1]) == -1, LIMEADE_ERROR_OTHER);
-          CHECK(close(to_ssh[0]) == -1, LIMEADE_ERROR_OTHER);
-          ret->rfd = fr_ssh[0];
-          ret->sfd = to_ssh[1];
-
+          close(fr_ssh[1]);
+          close(to_ssh[0]);
+          ctx->rfd = fr_ssh[0];
+          ctx->sfd = to_ssh[1];
       }
     }
     case LIMEADE_MODE_CLIENT_ETH:
     {
       const char *dest = va_arg(arg, const char*);
       ctx->dest        = malloc(strlen(dest) + 1);
+      if(ctx->dest == NULL)
+      {
+        ret = LIMEADE_ERROR_MEMORY;
+        goto err;
+      }
       ctx->port        = va_arg(arg, int);
       strcpy(ctx->dest, dest);
 
-      ret->sfd = socket(AF_INET, SOCK_DGRAM, 0);
-      CHECK(ret->sfd < 0, LIMEADE_ERROR_NETWORK);
-      ret->rfd = ret->sfd;
+      ctx->sfd = socket(AF_INET, SOCK_DGRAM, 0);
+      if(ctx->sfd < 0)
+      {
+        ret = LIMEADE_ERROR_MEMORY;
+        goto ret;
+      }
+      ctx->rfd = ctx->sfd;
 
-      memset(&ret->saddr, 0, sizeof(struct sockaddr_in));
+      ctx->saddr = malloc(sizeof(struct sockaddr_in));
+      if(ctx->saddr == NULL)
+      {
+        ret = LIMEADE_ERROR_MEMORY;
+        goto ret;
+      }
 
-      ret->saddr.sin_family      = AF_INET;
-      ret->saddr.sin_port        = ctx->port;
-      ret->saddr.sin_addr.s_addr = inet_addr(dest);
+      memset(&ctx->saddr, 0, sizeof(struct sockaddr_in));
 
-      ret->saddr_len = sizeof(ret->saddr);
+      ctx->saddr.sin_family      = AF_INET;
+      ctx->saddr.sin_port        = ctx->port;
+      ctx->saddr.sin_addr.s_addr = inet_addr(dest);
+
+      ctx->saddr_len = sizeof(ctx->saddr);
     }
     case LIMEADE_MODE_HOST_ETH:
     {
-      ctx->saddr = malloc(sizeof(struct sockaddr_in));
-      CHECK(ctx->saddr == NULL, LIMEADE_ERROR_MEMORY);
+      // TODO handlers for client list buffer
+      ctx->saddr   = malloc(sizeof(struct sockaddr_in));
+      if(ctx->saddr == NULL)
+      {
+        ret = LIMEADE_ERROR_MEMORY;
+        goto err;
+      }
+
       ctx->cliaddr = malloc(sizeof(struct sockaddr_in));
-      CHECK(ctx->saddr == NULL, LIMEADE_ERROR_MEMORY);
+      if(ctx->cliaddr == NULL)
+      {
+        ret = LIMEADE_ERROR_MEMORY;
+        goto err;
+      }
 
       ctx->port = va_arg(arg, int);
 
-      ret->rfd = socket(AF_INET, SOCK_DGRAM, 0);
-      CHECK(ret->rfd < 0, LIMEADE_ERROR_NETWORK);
-      ret->sfd = ret->rfd;
+      ctx->rfd = socket(AF_INET, SOCK_DGRAM, 0);
+      ctx->sfd = ctx->rfd;
+
+      if(ctx->rfd < 0)
+      {
+        ret = LIMEADE_ERROR_NETWORK;
+        goto err;
+      }
 
       ctx->saddr->sin_adr.s_addr = htonl(INADDR_ANY);
       ctx->saddr->sin_port = htons(ctx->port);
       ctx->saddr->sin_family = AF_INET;
-
 
       allow_compr = 0;
     }
@@ -133,36 +162,37 @@ struct limeade_context *limeade_init(uint8_t flags, ...)
 
   if(allow_compr != 0)
   {
-    switch(ret->compr_mode)
+    switch(ctx->compr_mode)
     {
       case LIMEADE_MODE_NO_COMPRESSION:
-        ret->compr_lvl = 0;
+        ctx->compr_lvl = 0;
       case LIMEADE_MODE_LOW_COMPRESSION:
-        ret->compr_lvl = 1;
+        ctx->compr_lvl = 1;
       case LIMEADE_MODE_MED_COMPRESSION:
-        ret->compr_lvl = 4;
+        ctx->compr_lvl = 4;
       case LIMEADE_MODE_HIGH_COMPRESSION:
-        ret->compr_lvl = 7;
+        ctx->compr_lvl = 7;
       default:
-        ret->csm = (struct limeade_csm_data*)malloc(sizeof(limeade_csm_data));
-        ret->csm->hist_compr_sz = LIMEADE_CSM_BENCH_BUFFER_SIZE;
-        ret->csm->hist_bandw_sz = LIMEADE_CSM_BENCH_BUFFER_SIZE;
-        ret->csm->freq_s        = LIMEADE_CSM_FREQ_S;
+        ctx->csm = (struct limeade_csm_data*)malloc(sizeof(limeade_csm_data));
+        ctx->csm->hist_compr_sz = LIMEADE_CSM_BENCH_BUFFER_SIZE;
+        ctx->csm->hist_bandw_sz = LIMEADE_CSM_BENCH_BUFFER_SIZE;
+        ctx->csm->freq_s        = LIMEADE_CSM_FREQ_S;
     }
   }
 
   ctx->mtx_sfd        = malloc(sizeof(pthread_mutex_t));
-  CHECK(ctx->mtx_sfd == NULL, LIMEADE_ERROR_MEMORY);
   ctx->mtx_rfd        = malloc(sizeof(pthread_mutex_t));
-  CHECK(ctx->mtx_rfd == NULL, LIMEADE_ERROR_MEMORY);
   ctx->mtx_mode_union = malloc(sizeof(pthread_mutex_t));
-  CHECK(ctx->mtx_mode_union == NULL, LIMEADE_ERROR_MEMORY);
   ctx->mtx_comp       = malloc(sizeof(pthread_mutex_t));
-  CHECK(ctx->mtx_comp == NULL, LIMEADE_ERROR_MEMORY);
   ctx->mtx_th_csm     = malloc(sizeof(pthread_mutex_t));
-  CHECK(ctx->mtx_th_csm == NULL, LIMEADE_ERROR_MEMORY);
   ctx->mtx_pub        = malloc(sizeof(pthreaD_mutex_t));
-  CHECK(ctx->mtx_pub == NULL, LIMEADE_ERROR_MEMORY);
+
+  if(ctx->mtx_sfd == NULL  || ctx->mtx_rfd == NULL    || ctx->mtx_mode_union == NULL\
+  || ctx->mtx_comp == NULL || ctx->mtx_th_csm == NULL || ctx->mtx_pub == NULL)
+  {
+    ret = LIMEADE_ERROR_MEMORY;
+    goto ret;
+  }
 
   pthread_mutex_init(ctx->mtx_sfd, NULL);
   pthread_mutex_init(ctx->mtx_rfd, NULL);
@@ -171,13 +201,35 @@ struct limeade_context *limeade_init(uint8_t flags, ...)
   pthread_mutex_init(ctx->mtx_th_csm, NULL);
   pthread_mutex_init(ctx->mtx_pub, NULL);
 
-  limeade_inserr(LIMEADE_SUCCESS);
-  return ret;
+  return LIMEADE_SUCCESS;
 
   err:
-  free(ret);
-  // TODO real error handling
-  return NULL;
+  // note: these `free`s are safe becasue `free` does a NULL check before
+  // attempting to unmap
+
+  free(ctx->mtx_sfd);
+  free(ctx->mtx_rfd);
+  free(ctx->mtx_mode_union);
+  free(ctx->mtx_comp);
+  free(ctx->mtx_th_csm);
+  free(ctx->mtx_pub);
+
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_CLIENT_SSH:
+      free(ctx->dest);
+      kill(ctx->ssh_pid, SIGKILL); // don't care about failure
+    case LIMEADE_MODE_CLIENT_ETH:
+      free(ctx->dest);
+      free(ctx->saddr);
+    case LIMEADE_MODE_HOST_ETH:
+      free(ctx->saddr);
+      free(ctx->cliaddr); // to be changed
+  }
+
+  free(ctx->csm);
+
+  return ret;
 }
 
 int limeade_connect(struct limeade_context *ctx)
@@ -196,22 +248,23 @@ int limeade_connect(struct limeade_context *ctx)
       // TODO
   }
 
-  if(ret->csm != NULL)
+  if(ctx->csm != NULL)
   {
-    ret->csm->hist_compr_benches = malloc(sizeof(uint32_t) * LIMEADE_CSM_BENCH_BUFFER_SIZE);
-    ret->csm->hist_bandw_benches = malloc(sizeof(uint32_t) * LIMEADE_CSM_BENCH_BUFFER_SIZE);
+    // TODO eliminate CHECK
+    ctx->csm->hist_compr_benches = malloc(sizeof(uint32_t) * LIMEADE_CSM_BENCH_BUFFER_SIZE);
+    ctx->csm->hist_bandw_benches = malloc(sizeof(uint32_t) * LIMEADE_CSM_BENCH_BUFFER_SIZE);
 
-    CHECK(ret->csm->hist_compr_benches == NULL, LIMEADE_ERROR_MEMORY);
-    CHECK(ret->csm->hist_bandw_benches == NULL, LIMEADE_ERROR_MEMORY);
+    CHECK(ctx->csm->hist_compr_benches == NULL, LIMEADE_ERROR_MEMORY);
+    CHECK(ctx->csm->hist_bandw_benches == NULL, LIMEADE_ERROR_MEMORY);
 
-    ret->csm->hist_compr_idx = 0;
-    ret->csm->hist_bandw_idx = 0;
+    ctx->csm->hist_compr_idx = 0;
+    ctx->csm->hist_bandw_idx = 0;
 
-    ret->csm->id = malloc(sizeof(pthread_t));
-    CHECK(ret->csm->id == NULL, LIMEADE_ERROR_MEMORY);
+    ctx->csm->id = malloc(sizeof(pthread_t));
+    CHECK(ctx->csm->id == NULL, LIMEADE_ERROR_MEMORY);
 
     CHECK(
-      pthread_create(ret->csm->id, NULL, limeade_csm, (void*)ret) != 0,
+      pthread_create(ctx->csm->id, NULL, limeade_csm, (void*)ctx) != 0,
       LIMEADE_ERROR_CSM);
   }
 
