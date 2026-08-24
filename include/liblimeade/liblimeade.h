@@ -54,6 +54,27 @@ enum limeade_error
   LIMEADE_ERROR_OTHER,           // unspecified & probably assumed impossible
 };
 
+// textual equivalents of errors
+static const char LIMEADE_ERROR_REPRS[][] = {
+  "Success/No error",
+  "Garbage data supplied",
+  "Compression failure",
+  "libssh failure",
+  "SSH failure",
+  "Monotonic benchmark failure",
+  "Network failure",
+  "CSM failure",
+  "No data on port",
+  "Bad magic",
+  "Bad format",
+  "Bad data",
+  "Bad compression",
+  "No acknowledgement from recipient",
+  "Invalid context",
+  "Allocation failure",
+  "Unknown"
+};
+
 /*** *** INIT *** ***/
 // this library can operate in various different modes, one of which must be
 // selected
