@@ -23,7 +23,7 @@
 
 #include<liblimeade/liblimeade-internal.h>
 
-void th_recv_client_eth(void *arg)
+void *th_recv_client_eth(void *arg)
 {
   struct limeade_context *ctx = (struct limeade_context*)arg;
   struct limeade_recv_data *r = &ctx->recv;
@@ -128,3 +128,14 @@ void th_recv_client_eth(void *arg)
 
   return NULL;
 }
+
+void *th_recv_client_libssh(void *arg)
+{
+#ifdef LIMEADE_HAS_LIBSSH2
+  // TODO
+#else
+  return NULL;
+#endif
+}
+
+

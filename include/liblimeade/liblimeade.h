@@ -21,6 +21,13 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#if defined(__has_include)
+#  if __has_include(<libssh2.h>)
+#    include <libssh2.h>
+#    define LIMEADE_HAS_LIBSSH2 1
+#  endif
+#endif
+
 /*** *** ERROR MANAGEMENT *** ***/
 // the various errors liblimeade functions can return
 enum limeade_error
@@ -51,6 +58,7 @@ enum limeade_error
   LIMEADE_ERROR_REJECTED,        // no acknowledgement from ricipient
   LIMEADE_ERROR_INVALID_CONTEXT, // bad limeade_context* passed
   LIMEADE_ERROR_MEMORY,          // failure to allocate memory
+  LIMEADE_ERROR_NOT_SUPPORTED,   // feature not supported
   LIMEADE_ERROR_OTHER,           // unspecified & probably assumed impossible
 };
 
@@ -72,6 +80,7 @@ static const char LIMEADE_ERROR_REPRS[][] = {
   "No acknowledgement from recipient",
   "Invalid context",
   "Allocation failure",
+  "Not supported",
   "Unknown"
 };
 
@@ -263,8 +272,9 @@ struct limeade_context
   union
   {
     pid_t ssh_pid;  // LIMEADE_MODE_CLIENT_SSH
+#ifdef LIMEADE_HAS_LIBSSH2
     void *ssh_data; // LIMEADE_MODE_CLIENT_LIBSSH
-
+#endif
     struct          // LIMEADE_MODE_*_ETH
     {
       struct sockaddr_in *saddr;
@@ -568,14 +578,15 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 // received data before parsing
 typedef struct limeade_packet_data struct limeade_recvd;
 
-// limeade_recv: receives a packet & sends an acknowledgement, but returns NULL if there are no packets to receive
+// limeade_recv: receives a packet & sends an acknowledgement, but all the data will be NULL if there are no packets
 // limeade_recv_wait: receives a packet & sends an acknowledgement, but waits if there are no packets to receive
-// limeade_recv_noreply: receives a packet without acknowledgement, or returns NULL if there are no packets
+// limeade_recv_noreply: receives a packet without acknowledgement, but all data will be NULL if there are no packets
 // limeade_recv_wait_noreply: receives a packet without acknowledgement, but waits for a packet to arrive
-struct limeade_recvd limeade_recv(struct limeade_context *ctx);
-struct limeade_recvd limeade_recv_wait(struct limeade_context *ctx, int wait_ms);
-struct limeade_recvd limeade_recv_noreply(struct limeade_context *ctx);
-struct limeade_recvd limeade_recv_wait_noreply(struct limeade_context *ctx, int wait_ms);
+int limeade_recv(struct limeade_context *ctx, struct limeade_recvd out);
+int limeade_recv_wait(struct limeade_context *ctx, struct limeade_recvd out, int wait_ms);
+int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd out);
+int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd out, int wait_ms);
+
 // note: wait_ms <= 0 will wait forever
 
 // flags can be extracted as so:

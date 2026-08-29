@@ -124,6 +124,14 @@ int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
 
       ctx->saddr_len = sizeof(ctx->saddr);
     }
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+    {
+#ifdef LIMEADE_HAS_LIBSSH2
+      // TODO
+#else
+      return LIMEADE_ERROR_NOT_SUPPORTED;
+#endif /* LIMEADE_HAS_LIBSSH2 */
+    }
     case LIMEADE_MODE_HOST_ETH:
     {
       // TODO handlers for client list buffer
@@ -241,7 +249,11 @@ int limeade_connect(struct limeade_context *ctx)
     case LIMEADE_MODE_CLIENT_ETH:
       // TODO
     case LIMEADE_MODE_CLIENT_LIBSSH:
+#ifdef LIMEADE_HAS_LIBSSH2
       // TODO
+#else
+      return LIMEADE_ERROR_NOT_SUPPORTED;
+#endif /* LIMEADE_HAS_LIBSSH2 */
     case LIMEADE_MODE_HOST_SSH:
       // TODO
     case LIMEADE_MODE_CLIENT_SSH:
