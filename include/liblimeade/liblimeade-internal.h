@@ -47,4 +47,37 @@ void limeade_csm_add_compr_entry(struct limeade_context *ctx,
 void limeade_csm_add_latency_entry(struct limeade_context *ctx,
                                    struct limeade_csm_latency_entry *entry);
 
+/* limeade_get_rows_in_packet
+ *
+ * returns the number of rows in `in` (rows being separated by LIMEADE_ROW_DELIM)
+ */
+int limeade_get_rows_in_packet(struct limeade_recvd in);
+
+// the following macros are for creating functions used for parsing data from
+// packets
+#define LIMEADE_TYPECHECK_UINT(x) if(x != 0b00100000)
+#define LIMEADE_TYPECHECK_INT(x)  if(x != 0b01000000)
+#define LIMEADE_TYPECHECK_FLT(x)  if(x != 0b01100000)
+#define LIMEADE_TYPECHECK_ZERO(x) if(x != 0b00000000)
+#define LIMEADE_SIZECHECK(x, y)   if(*(uint8_t*)x & 0b00011111 > y)
+#define LIMEADE_CAST_FUNC(name, type, typecheck) \
+static int name(void *src, void *dst)          \
+{                                                \
+  uint8_t datatype = *(uint8_t*)src & 0b11100000; \
+  typecheck(datatype)                          \
+  {                                              \
+    if(datatype != 0b00000000)                   \
+      return -1;                                 \
+    else                                         \
+    {                                            \
+      *(type*)dst = 0;                         \
+      return 1;                                  \
+    }                                            \
+  }                                              \
+  LIMEADE_SIZECHECK(src, sizeof(type))         \
+    return -1;                                   \
+  *(type*)dst = *(type*)(src + 1);           \
+  return 1 + sizeof(type);                     \
+}
+
 #endif /* _LIBLIMEADE_INTERNAL_H_ */

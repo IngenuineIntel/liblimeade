@@ -63,7 +63,7 @@ enum limeade_error
 };
 
 // textual equivalents of errors
-static const char LIMEADE_ERROR_REPRS[][] = {
+static const char *LIMEADE_ERROR_REPRS[] = {
   "Success/No error",
   "Garbage data supplied",
   "Compression failure",
@@ -244,9 +244,8 @@ struct limeade_recv_data
   // almost always locked; one must already be waiting
   void *mtx_ack;
 
-
   void *mtx_idx;
-  void *mtx_kys;
+  void *mtx_kys; // kill switch indicator to the thread
   void *mtx_lost;
 };
 #define LIMEADE_NR_PKTS_DEFAULT 5
@@ -307,7 +306,7 @@ struct limeade_context
   void *mtx_compr;      // compr_*
   void *mtx_th_csm;     // csm
   void *mtx_pub;        // pub attrs
-}
+};
 
 /* limeade_init
  *
@@ -576,7 +575,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
 // struct limeade_recv
 // received data before parsing
-typedef struct limeade_packet_data struct limeade_recvd;
+#define limeade_recvd limeade_packet_data
 
 // limeade_recv: receives a packet & sends an acknowledgement, but all the data will be NULL if there are no packets
 // limeade_recv_wait: receives a packet & sends an acknowledgement, but waits if there are no packets to receive

@@ -180,7 +180,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
   struct limeade_pkt_wr_data d = {
     .pkt = in,
     .wr_idx = sizeof(struct limeade_packet_flags),
-    .realloc_increment = 2048 // arbitrary value btw
+    .realloc_increment = 2048 // arbitrary value btw (FIXME increase?)
   };
 
   in->pkt = malloc(d.realloc_increment * 2); // *2 is arbitrary coefficient
@@ -394,14 +394,15 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       RDELIM();
     }
   }
+
+  in->data = in->pkt + sizeof(struct limeade_packet_flags);
 }
 
 int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
 {
   if(compr_lvl <= 0)
   {
-    limeade_inserr(LIMEADE_SUCCESS);
-    return;
+    return LIMEADE_SUCCESS;
   }
 
   void *compressed = malloc(pkt->pkt_sz);

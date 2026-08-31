@@ -25,15 +25,19 @@
 
 void *th_recv_client_eth(void *arg)
 {
-  struct limeade_context *ctx = (struct limeade_context*)arg;
-  struct limeade_recv_data *r = &ctx->recv;
+  struct limeade_context *ctx;
+  struct limeade_recv_data *r;
   struct limeade_indiv_recv *d;
   uint16_t wr_idx;
   // lock?
-  struct timespec rmtp, rqtp = {0, 1000000000/r->hz};
-
-  void *mag1, *mag2, *end, *interim = malloc(65535);
+  struct timespec rmtp, rqtp;
+  void *mag1, *mag2, *end, *interim;
   int a, b;
+
+  ctx = arg;
+  r = ctx->recv;
+  rqtp = {0, 1000000000/r->hz};
+  interim = malloc(65535);
 
   while(pthread_mutex_trylock(r->mtx_kys) == EBUSY)
   {

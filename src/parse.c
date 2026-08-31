@@ -139,25 +139,43 @@ int limeade_recv_wait(struct limeade_context *ctx, struct limeade_recvd out, int
     return limeade_send_acknowledge(out);
   return e;
 }
-
-struct limeade_packet_flags limeade_parse_flags(struct limeade_recv data)
+flags(struct limeade_recvd data)
 {
   struct limeade_packet_flags ret;
-  int len = memcpy(&ret, data.flags, sizeof(limeade_packet_flags));
-  if(len != sizeof(limeade_packet_flags))
-  {
-    limeade_inserr(LIMEADE_ERROR_BAD_DATA);
-  } else
-  {
-    limeade_inserr(LIMEADE_SUCCESS);
-  }
+  memcpy(&ret, data.flags, sizeof(ret));
   return ret;
 }
 
-int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd pkt)
-{
-  // TODO
-}
+// parsing system design (v2.1) (I've gone through a lot of shit ones in my head)
+// 0. return gracefully if packet type is wrong
+// 1. count number of rows and columns
+// 3. confirm row/column data matches what's expected for packet type
+// 4. note locations of strings
+// 5. create buffer for all strings, and copy all string data into that
+// buffer
+
+LIMEADE_CAST_FUNC(limeade_cast_u8, uint8_t, LIMEADE_TYPECHECK_UINT);
+LIMEADE_CAST_FUNC(limeade_cast_u16, uint16_t, LIMEADE_TYPECHECK_UINT);
+LIMEADE_CAST_FUNC(limeade_cast_u32, uint32_t, LIMEADE_TYPECHECK_UINT);
+LIMEADE_CAST_FUNC(limeade_cast_u64, uint64_t, LIMEADE_TYPECHECK_UINT);
+LIMEADE_CAST_FUNC(limeade_cast_i8, int8_t, LIMEADE_TYPECHECK_INT);
+LIMEADE_CASE_FUNC(limeade_cast_i16, int16_t, LIMEADE_TYPECHECK_INT);
+LIMEADE_CAST_FUNC(limeade_cast_i32, int32_t, LIMEADE_TYPECHECK_INT);
+LIMEADE_CAST_FUNC(limeade_cast_i64, int64_t, LIMEADE_TYPECHECK_INT);
+LIMEADE_CAST_FUNC(limeade_cast_flt, float, LIMEADE_TYPECHECK_FLT);
+LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
+#define limeade_cast(x) _Generic((x), \
+    uint8_t:  limeade_cast_u8,        \
+    uint16_t: limeade_cast_u16,       \
+    uint32_t: limeade_cast_u32,       \
+    uint64_t: limeade_cast_u64,       \
+    int8_t:   limeade_cast_i8,        \
+    int16_t:  limeade_cast_i16,       \
+    int32_t:  limeade_cast_i32,       \
+    int64_t:  limeade_cast_i64,       \
+    float:    limeade_cast_flt,       \
+    double:   limeade_cast_double     \
+)(x)
 
 int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd pkt)
 {
@@ -187,6 +205,13 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
 int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd pkt)
 {
   // TODO
+
+  void *counter;
+
+  counter = pkt.data;
+
+  // TODO
+
 }
 
 int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt)
