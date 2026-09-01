@@ -164,18 +164,26 @@ LIMEADE_CAST_FUNC(limeade_cast_i32, int32_t, LIMEADE_TYPECHECK_INT);
 LIMEADE_CAST_FUNC(limeade_cast_i64, int64_t, LIMEADE_TYPECHECK_INT);
 LIMEADE_CAST_FUNC(limeade_cast_flt, float, LIMEADE_TYPECHECK_FLT);
 LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
-#define limeade_cast(x) _Generic((x), \
-    uint8_t:  limeade_cast_u8,        \
-    uint16_t: limeade_cast_u16,       \
-    uint32_t: limeade_cast_u32,       \
-    uint64_t: limeade_cast_u64,       \
-    int8_t:   limeade_cast_i8,        \
-    int16_t:  limeade_cast_i16,       \
-    int32_t:  limeade_cast_i32,       \
-    int64_t:  limeade_cast_i64,       \
-    float:    limeade_cast_flt,       \
-    double:   limeade_cast_double     \
-)(x)
+#define _limeade_cast(src, dst, rem) _Generic((x), \
+  uint8_t*:  limeade_cast_u8,    \
+  uint16_t*: limeade_cast_u16,   \
+  uint32_t*: limeade_cast_u32,   \
+  uint64_t*: limeade_cast_u64,   \
+  int8_t*:   limeade_cast_i8,    \
+  int16_t*:  limeade_cast_i16,   \
+  int32_t*:  limeade_cast_i32,   \
+  int64_t*:  limeade_cast_i64,   \
+  float*:    limeade_cast_flt,   \
+  double*:   limeade_cast_double \
+)(src, x, rem)
+
+#define limeade_cast(dst)\
+ret = _limeade_cast(cur, &dst, rem);\
+if(ret == 0) goto pkt_ran_out;\
+if(ret > 0)  goto invalid_value;\
+cur += ret;\
+idx += ret;\
+rem -= ret;
 
 int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd pkt)
 {
@@ -206,9 +214,19 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
 {
   // TODO
 
-  void *counter;
+  register uint16_t idx, rem;
+  register void *cur;
+  register int ret;
 
-  counter = pkt.data;
+  idx = 0;
+  rem = pkt.pkt_sz;
+  cur = pkt.data;
+
+  limeade_cast(out->total_died);
+  limeade_cast(out->total_altered);
+
+  if(limeade_get_rows_in_packet(pkt) != out->total_altered + 2)
+    goto invalid_value;
 
   // TODO
 
@@ -234,20 +252,4 @@ int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt)
   // TODO
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#undef limeade_cast

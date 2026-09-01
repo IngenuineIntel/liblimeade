@@ -53,31 +53,79 @@ void limeade_csm_add_latency_entry(struct limeade_context *ctx,
  */
 int limeade_get_rows_in_packet(struct limeade_recvd in);
 
+struct limeade_fragged_row
+{
+  uint16_t nr; // number of the row
+  void **; //
+}
+
+struct limeade_fragged_pkt
+{
+  uint16_t nr_cols;
+  uint16_t *nr_rows; // uint16_t nr_rows[nr_columns];
+  void **cols;       // void *cols[nr_cols]
+  void *data;        // start of contiguous data that *cols[] utilizes
+  // TODO excuse my 2D pointer array
+}
+
+// the following structures represent a datatype used internally to parse
+// packets. It is, more or less, a 2D array of pointers to delimeters in
+// the packet, but has the following caveats:
+// 1. columns aren't fixed-width
+// 2. the datatype exists within a single buffer
+
+struct limeade_frag_row
+{
+  uint8_t nr_col;
+  void **col;
+};
+
+struct limeade_frag_pkt
+{
+  uint16_t nr_row;
+  struct limeade_frag_row *row;
+};
+
+// retreives the pointer to data stored at coordinate [x, y]
+#define LIMEADE_FRAG_COOR(f, x, y) f.row[y].col[x]
+
+/* limeade_frag
+ *
+ * processes packet data & returns a grid datatype of pointers to data within
+ * the packet
+ */
+struct limeade_frag_pkt limeade_frag(struct limeade_recvd *pkt);
+
+/* limeade_release_frag
+ *
+ * releases data returned by limeade_frag
+ */
+inline void limeade_release_frag(struct limeade_frag_pkt);
+
 // the following macros are for creating functions used for parsing data from
 // packets
 #define LIMEADE_TYPECHECK_UINT(x) if(x != 0b00100000)
 #define LIMEADE_TYPECHECK_INT(x)  if(x != 0b01000000)
 #define LIMEADE_TYPECHECK_FLT(x)  if(x != 0b01100000)
-#define LIMEADE_TYPECHECK_ZERO(x) if(x != 0b00000000)
-#define LIMEADE_SIZECHECK(x, y)   if(*(uint8_t*)x & 0b00011111 > y)
-#define LIMEADE_CAST_FUNC(name, type, typecheck) \
-static int name(void *src, void *dst)          \
-{                                                \
-  uint8_t datatype = *(uint8_t*)src & 0b11100000; \
-  typecheck(datatype)                          \
-  {                                              \
-    if(datatype != 0b00000000)                   \
-      return -1;                                 \
-    else                                         \
-    {                                            \
-      *(type*)dst = 0;                         \
-      return 1;                                  \
-    }                                            \
-  }                                              \
-  LIMEADE_SIZECHECK(src, sizeof(type))         \
-    return -1;                                   \
-  *(type*)dst = *(type*)(src + 1);           \
-  return 1 + sizeof(type);                     \
+#define LIMEADE_CAST_FUNC(name, type, typecheck)     \
+static int name(void *src, type *dst, uint16_t rem)  \
+{                                                    \
+  register uint8_t databyte = *(uint8_t*)src;        \
+  register uint8_t datatype = databyte & 0b11100000; \
+  register uint8_t datasize = databyte & 0b00011111; \
+  if(datasize > rem) return 0;                       \
+  typecheck(datatype)                                \
+  {                                                  \
+    if(data_byte != 0b00000000 || datasize > y)      \
+      return -1;                                     \
+    else                                             \
+    {                                                \
+      *dst = 0;                                      \
+      return 1;                                      \
+    }                                                \
+  }                                                  \
+  *dst = *(type*)(src + 1);                          \
+  return 1 + sizeof(type);                           \
 }
 
 #endif /* _LIBLIMEADE_INTERNAL_H_ */
