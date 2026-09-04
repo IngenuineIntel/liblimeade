@@ -3,30 +3,6 @@
 
 #include <liblimeade-internal.h>
 
-int limeade_get_rows_in_packet(struct limeade_recvd in)
-{
-  int ret;
-  void *next, *prev;
-  uint32_t rem;
-  uint64_t diff;
-
-  ret  = 0;
-  prev = in.data;
-  rem  = in.pkt_sz;
-
-  do
-  {
-    next = memmem(prev, rem, &LIMEADE_ROW_DELIM, 1);
-    if(next == NULL)
-      return ret;
-    ret++;
-
-    diff = next - prev;
-    rem  = rem - diff - 1;
-    prev = next + 1;
-  }
-}
-
 struct limeade_frag_pkt limeade_frag(struct limeade_recvd *pkt)
 {
   struct limeadr_frag_pkt f;
@@ -38,17 +14,15 @@ struct limeade_frag_pkt limeade_frag(struct limeade_recvd *pkt)
   // counter1, next1, prev1, & rem1 are used for parsing rows, &
   // counter2, next2, prev2, & rem2 are used for parsing fields
 
-  limit1 = limit2 = (1 << 16) / 2;
-
-  counter1 = f.row = malloc(1 << 16);
-  counter2 = f.row + limit1;
+  counter1 = f.row = malloc(LIMEADE_FRAG_TOTAL_ALLOCATION);
+  counter2 = f.row + LIMEADE_FRAG_COL_START;
 
   prev1 = pkt.data + 1;
   rem1  = pkt.pkt_sz - sizeof(struct limeade_packet_flags) - 1;
 
   f.nr_row = break_indicator = 0;
 
-  // TODO memory checks
+  // TODO memory limit checks
   do
   {
     next1 = memmem(prev1, rem1, LIMEADE_ROW_DELIM, 1);

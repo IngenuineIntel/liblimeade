@@ -249,6 +249,12 @@ struct limeade_recv_data
   void *mtx_lost;
 };
 #define LIMEADE_NR_PKTS_DEFAULT 5
+// the size of the buffer kept by the recv thread to write packets into
+// 66240 == small multiple of 1472 that is more than 65535
+// 65535 == maximum packet size == (1 << 16) - 1
+// 1472  == the maximum size of a UDP packet (excluding the UDP flags and
+//          routing information)
+#define LIMEADE_RECV_TMP_SZ 66240
 
 // individual client
 struct limeade_eth_host_indiv_client
@@ -381,7 +387,7 @@ struct limeade_packet_data
 
 // every packet starts with a magic
 #define LIMEADE_MAGIC_RAW "\xFF\xFFLIME^0^\xFF\xFF"
-static char LIMEADE_MAGIC[sizeof(LIMEADE_MAGIC_RAW)];
+static const char LIMEADE_MAGIC[] = LIMEADE_MAGIC_RAW;
 
 // every client is given a session ID with which to distinguish itself
 // as a type:

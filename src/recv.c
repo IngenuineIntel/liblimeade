@@ -23,123 +23,164 @@
 
 #include<liblimeade/liblimeade-internal.h>
 
-void *th_recv_client_eth(void *arg)
+#define MAGSZ sizeof(LIMEADE_MAGIC)
+
+void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt, uint16_t sz)
+{
+  if(((struct limeade_packet_flags*)pkt).type != LIMEADE_ACKNOWLEDGE)
+  {
+    pthread_mutex_lock(r->mtx_idx);
+    
+    // for context, r->wr_idx is a counter for a ring buffer
+    r->wr_idx++;
+    if(r->wr_idx == r->nr_pkts)
+    {
+      r->wr_idx = 0;
+    }
+    
+    struct limeade_indiv_recv *d = r->pkts[r->wr_idx];
+    pthread_mutex_unlock(r->mtx_idx);
+
+    pthread_mutex_lock(d->mtx);
+    memcpy(d->data, pkt, sz);
+    d->flags = 0;
+    pthread_mutex_unlock(d->mtx);
+  } else
+  {
+    memcpy(r->ack, pkt, sz);
+
+    // recvs are waited for by attempting to lock r->mtx_ack. If the main
+    // thread doesn't wait, it never knows the peer send an ACK
+    pthread_mutex_unlock(r->mtx_ack);
+    pthread_mutex_lock(r->mtx_ack);
+  }
+}
+
+void *limeade_th_recv_client_eth(void *arg)
 {
   struct limeade_context *ctx;
   struct limeade_recv_data *r;
   struct limeade_indiv_recv *d;
-  uint16_t wr_idx;
-  // lock?
-  struct timespec rmtp, rqtp;
-  void *mag1, *mag2, *end, *interim;
-  int a, b;
+  struct timespec recv_wait, iter_wait, rmtp;
+  void *buffer, *next, *prev;
+  int amt_recv, t_amt_recv, rfd, hit_end;
 
   ctx = arg;
   r = ctx->recv;
-  rqtp = {0, 1000000000/r->hz};
-  interim = malloc(65535);
+
+  pthread_mutex_lock(r->mtx_ack);
+
+  // struct timespec {
+  //   time_t    tv_sec;
+  //   /* ... */ tv_nsec;
+  // };
+  recv_wait = {0, 1000}; // 1µs
+  iter_wait = {0, 1000000000/r->hz}; // (r->hz)hz
+  // rmtp is simply because calls to `nanosleep` require an additional struct
+  // for capturing the remaining unslept time in the event that the sleep must
+  // end prematurely
+
+  buffer = malloc(LIMEADE_RECV_TMP_SZ);
+
+  pthread_mutex_lock(ctx->mtx_rfd);
+  rfd = ctx->rfd;
 
   while(pthread_mutex_trylock(r->mtx_kys) == EBUSY)
   {
-    b = 0;
-    pthread_mutex_lock(ctx->mtx_rfd);
-    pthread_mutex_lock(ctx->mtx_mode_union);
+    if(nanosleep(&iter_wait, &rmtp) == -1)
+      if(nanosleep(&rmtp, &rmtp) == -1)
+        break;
+    // TODO reevaluate how errors are handled outside the main thread
+
+    t_amt_recv = amt_recv = 0;
+
     do
     {
-      a = recvfrom(ctx->rfd, interim + b, 1472, MSG_DONTWAIT, ctx->saddr, ctx->saddr_len);
-      if(a <= 0)
+      amt_recv = recvfrom(ctx->rfd, buffer + t_amt_recv, MSG_DONTWAIT, ctx->saddr, ctx->saddr_len);
+      if(amt_recv <= 0)
       {
-        if(errno == EAGAIN || errno == EWOULDBLOCK || a == 0)
-        {
-          // no more data
-          break;
-        }
+
+        if(errno == EAGAIN || errno == EWOULDBLOCK || amt_recv != 0)
+          break; // out of data
+
         pthread_mutex_unlock(ctx->mtx_rfd);
         pthread_mutex_unlock(ctx->mtx_mode_union);
         goto err;
       }
-      b += a;
+
+      t_amt_recv += amt_recv;
     }
     pthread_mutex_unlock(ctx->mtx_rfd);
     pthread_mutex_unlock(ctx->mtx_mode_union);
 
-    mag1 = interim;
-    end  = interim + b;
-
-    if(pthread_mutex_trylock(r->mtx_kys) != EBUSY)
-    {
+    if(pthread_mutex_trylock(r->mtx_kts) != EBUSY)
       break;
-    }
+
+    if(!t_amt_recv)
+      continue;
+
+    hit_end = 0;
+
+    prev = memmem(buffer, t_amt_recv, &LIMEADE_MAGIC, MAGSZ);
+
+    if(!prev)
+      continue;
+
+    t_amt_recv -= (prev - buffer);
 
     do
     {
-      mag1 = memmem(mag1, end - mag1, &LIMEADE_MAGIC, MAGSZ);
+      next = memmem(prev + MAGSZ, t_amt_recv, &LIMEADE_MAGIC_, MAGSZ);
 
-      if(mag1 == NULL || mag1 == end - MAGSZ)
+      if(!next)
       {
+        next = buffer + t_amt_recv;
+        hit_end = 1;
+      }
+
+      limeade_th_recv_wr_pkt(prev, next - prev);
+
+      if(hit_end)
         break;
-      }
 
-      mag2 = memmem(mag1 + MAGSZ, end - mag1 - MAGSZ, &LIMEADE_MAGIC, MAGSZ);
-
-      if(mag2 == NULL)
-      {
-        mag2 = end;
-      }
-
-      if(((struct limeade_packet_flags*)mag1 + MAGSZ).type == LIMEADE_RECV)
-      {
-        // TODO optimize
-        uint64_t pkt_sz = mag2 - mag1 - MAGSZ;
-        free(r->ack);
-        r->ack = malloc(pkt_sz);
-        memcpy(r->ack, mag1 + MAGSZ, pkt_sz);
-        pthread_mutex_unlock(r->mtx_ack);
-        // if you forgot to wait, clearly it wasn't that important in the first
-        // place
-        pthread_mutex_lock(r->mtx_ack);
-      } else
-      {
-        pthread_mutex_lock(r->mtx_idx);
-        r->wr_idx++;
-        if(r->wr_idx == r->nr_pkts)
-        {
-          r->wr_idx = 0;
-        }
-        d = r->pkts[r->wr_idx];
-        pthread_mutex_unlock(r->mtx_idx);
-
-        pthread_mutex_lock(d->mtx);
-        d->sz = mag2 - mag1 - MAGSZ;
-        memcpy(d->data, mag1 + MAGSZ, d->sz);
-        d->flags = 0;
-        pthread_mutex_unlock(d->mtx);
-      }
-
-      if(mag2 == end)
-      {
-        break;
-      }
-
-      mag1 = mag2 + MAGSZ;
+      t_amt_recv -= (next - prev);
+      prev = next;
     }
-    nanosleep(&rqtp, &rmtp);
   }
 
-  err:
+err:
+  pthread_mutex_unlock(r->mtx_ack);
 
-  free(interim);
-
+  free(buffer);
   return NULL;
+
 }
 
-void *th_recv_client_libssh(void *arg)
+void *limeade_th_recv_client_ssh(void *arg)
 {
-#ifdef LIMEADE_HAS_LIBSSH2
-  // TODO
-#else
-  return NULL;
-#endif
-}
+  struct limeade_context *ctx;
+  struct limeade_recv_data *r;
+  struct limeade_indiv_recv *d;
+  struct timespec recv_wait, iter_wait, rmtp;
+  void *buffer, *next, *prev;
+  int amt_recv, t_amt_recv, rfd, hit_end;
 
+  ctx = arg;
+  r = ctx->recv;
+
+  pthread_mutex_lock(r->mtx_ack);
+
+  recv_wait = {0, 1000};
+  iter_wait = {0, 1000000000/r->hz};
+
+  buffer = malloc(LIMEADE_RECV_TMP_SZ);
+  pthread_mutex_lock(ctx->mtx_rfd);
+  rfd = ctx->rfd;
+
+  while(pthread_mutex_trylock(r->mtx_kys) == EBUSY)
+  {
+    nanosleep(&iter_wait, &rmtp)
+  }
+  
+}
 

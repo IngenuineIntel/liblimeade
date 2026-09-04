@@ -212,23 +212,9 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
 
 int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd pkt)
 {
-  // TODO
-
-  register uint16_t idx, rem;
-  register void *cur;
-  register int ret;
-
-  idx = 0;
-  rem = pkt.pkt_sz;
-  cur = pkt.data;
-
-  limeade_cast(out->total_died);
-  limeade_cast(out->total_altered);
-
-  if(limeade_get_rows_in_packet(pkt) != out->total_altered + 2)
-    goto invalid_value;
-
-  // TODO
+  struct limeade_frag_pkt f;
+  
+  f = limeade_frag(&pkt);
 
 }
 

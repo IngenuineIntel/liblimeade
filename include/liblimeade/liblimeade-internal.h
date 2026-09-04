@@ -47,33 +47,11 @@ void limeade_csm_add_compr_entry(struct limeade_context *ctx,
 void limeade_csm_add_latency_entry(struct limeade_context *ctx,
                                    struct limeade_csm_latency_entry *entry);
 
-/* limeade_get_rows_in_packet
- *
- * returns the number of rows in `in` (rows being separated by LIMEADE_ROW_DELIM)
- */
-int limeade_get_rows_in_packet(struct limeade_recvd in);
-
-struct limeade_fragged_row
-{
-  uint16_t nr; // number of the row
-  void **; //
-}
-
-struct limeade_fragged_pkt
-{
-  uint16_t nr_cols;
-  uint16_t *nr_rows; // uint16_t nr_rows[nr_columns];
-  void **cols;       // void *cols[nr_cols]
-  void *data;        // start of contiguous data that *cols[] utilizes
-  // TODO excuse my 2D pointer array
-}
-
 // the following structures represent a datatype used internally to parse
 // packets. It is, more or less, a 2D array of pointers to delimeters in
 // the packet, but has the following caveats:
 // 1. columns aren't fixed-width
 // 2. the datatype exists within a single buffer
-
 struct limeade_frag_row
 {
   uint8_t nr_col;
@@ -86,8 +64,9 @@ struct limeade_frag_pkt
   struct limeade_frag_row *row;
 };
 
-// retreives the pointer to data stored at coordinate [x, y]
-#define LIMEADE_FRAG_COOR(f, x, y) f.row[y].col[x]
+// constants for `limeade_frag`
+#define LIMEADE_FRAG_TOTAL_ALLOCATION 1 << 16
+#define LIMEADE_FRAG_COL_START       (1 << 16) / 2
 
 /* limeade_frag
  *
@@ -110,9 +89,9 @@ inline void limeade_release_frag(struct limeade_frag_pkt);
 #define LIMEADE_CAST_FUNC(name, type, typecheck)     \
 static int name(void *src, type *dst, uint16_t rem)  \
 {                                                    \
-  register uint8_t databyte = *(uint8_t*)src;        \
-  register uint8_t datatype = databyte & 0b11100000; \
-  register uint8_t datasize = databyte & 0b00011111; \
+  register uint8_t datatype = *(uint8_t*)src;        \
+  register uint8_t datasize = datatype & 0b00011111; \
+  datatype &= 0b11100000;                            \
   if(datasize > rem) return 0;                       \
   typecheck(datatype)                                \
   {                                                  \

@@ -2,11 +2,11 @@
 
 // AGPL
 
-#include<liblimeade/liblimeade-internal.h>
+#include<liblimeade/liblimeade-diag.h>
 
 void limeade_diag_repr_error(enum limeade_error e)
 {
   printf("error: %s\n", LIMEADE_ERROR_REPR[e]);
 }
 
-
+// TODO a lot
