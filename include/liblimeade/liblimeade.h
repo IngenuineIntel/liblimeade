@@ -178,8 +178,8 @@ struct limeade_csm_latency_entry
 
 struct limeade_csm_data
 {
-  struct limeade_csm_compression_entry **hist_compr;  // compression benchmarks
-  struct limeade_csm_latency_entry     **hist_latent; // latency benchmarks
+  struct limeade_csm_compression_entry *hist_compr;  // compression benchmarks
+  struct limeade_csm_latency_entry     *hist_latent; // latency benchmarks
 
   uint32_t hist_compr_sz;   // size of compression benchmark ring buffer
   uint32_t hist_latent_sz;  // size of latency benchmark ring buffer
@@ -200,7 +200,7 @@ struct limeade_csm_data
 //
 // likewise, this can be used for any component of ctx->csm
 //
-#define LIMEAE_CSM_FREQ_S 2 // every 2 seconds
+#define LIMEAE_CSM_FREQ_S 2.0 // every 2 seconds
 
 // on a host machine (particularly LIMEADE_MODE_HOST_ETH), a list of clients has to be
 // stored
@@ -228,13 +228,13 @@ struct limeade_indiv_recv
 
 struct limeade_recv_data
 {
-  tid_t tid;
+  void *tid; // pthread_t
   uint16_t nr_pkts;
   uint16_t read_idx;
   uint16_t wr_idx;
   uint16_t pkts_lost;
   uint16_t hz;
-  struct limeade_indiv_recv **pkts;
+  struct limeade_indiv_recv *pkts;
 
   // if a packet is LIMEADE_ACK, it is put elsewhere
   // not a ring buffer, because it shouldn't have to be
@@ -250,11 +250,13 @@ struct limeade_recv_data
 };
 #define LIMEADE_NR_PKTS_DEFAULT 5
 // the size of the buffer kept by the recv thread to write packets into
-// 66240 == small multiple of 1472 that is more than 65535
+// 66240 == smallest multiple of 1472 that is more than 65535
 // 65535 == maximum packet size == (1 << 16) - 1
 // 1472  == the maximum size of a UDP packet (excluding the UDP flags and
 //          routing information)
 #define LIMEADE_RECV_TMP_SZ 66240
+// default value for `limeade_recv_data.hz`
+#define LIMEADE_RECV_DEFAULT_HZ 4
 
 // individual client
 struct limeade_eth_host_indiv_client
@@ -305,7 +307,7 @@ struct limeade_context
   uint32_t ack_wait_time_ms; // amount of time to try to send data before giving up
   uint32_t retry_interval;   // time between resends (in milliseconds)
 
-  // mutexes
+  // mutexes (all pthread_mutex_t)
   void *mtx_sfd;        // sfd
   void *mtx_rfd;        // rfd
   void *mtx_mode_union; // anything in the union
