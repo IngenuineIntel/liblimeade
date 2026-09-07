@@ -2,8 +2,8 @@
 // diagnostic functions for liblimeade
 // AGPL
 
-#ifndef _LIBLIMEADE_DIAG_H
-#define _LIBLIMEADE_DIAG_H
+#ifndef _LIBLIMEADE_DIAG_C
+#define _LIBLIMEADE_DIAG_C
 
 #include<stdio.h>
 
@@ -41,6 +41,10 @@ void limeade_diag_close(struct limeade_close x);
 // this than give them nothing
 void limeade_diag_enum(int x);
 
+#endif /* _LIBLIMEADE_DIAG_C */
+
+#ifdef ENABLE_LIBLIMEADE_DIAGNOSTICS
+
 #define limeade_diag(x) _Generic((x),\
   struct limeade_csm_compression_entry: limeade_diag_csm_compression_entry,\
   struct limeade_csm_latency_entry:     limeade_diag_csm_latency_entry,    \
@@ -67,4 +71,8 @@ void limeade_diag_enum(int x);
   int:                                  limeade_diag_enum,                 \
 )(x)
 
-#endif /* _LIBLIMEADE_DIAG_H */
+#else
+
+#define limeade_diag(x) do{} while(0)
+
+#endif /* ENABLE_LIBLIMEADE_DIAGNOSTICS */
