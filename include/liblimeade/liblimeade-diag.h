@@ -12,6 +12,7 @@
 void limeade_diag_error(enum limeade_error x);
 void limeade_diag_csm_compression_entry(struct limeade_csm_compression_entry x);
 void limeade_diag_csm_latency_entry(struct limeade_csm_latency_entry x);
+void limeade_diag_csm_data(struct limeade_csm_data x);
 void limeade_diag_indiv_recv(struct limeade_indiv_recv x);
 void limeade_diag_recv_data(struct limeade_recv_data x);
 void limeade_diag_eth_host_indiv_client(struct limeade_teh_host_indiv_client x);
@@ -41,6 +42,10 @@ void limeade_diag_close(struct limeade_close x);
 // this than give them nothing
 void limeade_diag_enum(int x);
 
+
+// a `perror`-style error representation for liblimeade errors
+void limeade_perror(const char *s, enum limeade_error e);
+
 #endif /* _LIBLIMEADE_DIAG_C */
 
 #ifdef ENABLE_LIBLIMEADE_DIAGNOSTICS
@@ -48,6 +53,7 @@ void limeade_diag_enum(int x);
 #define limeade_diag(x) _Generic((x),\
   struct limeade_csm_compression_entry: limeade_diag_csm_compression_entry,\
   struct limeade_csm_latency_entry:     limeade_diag_csm_latency_entry,    \
+  struct limeade_csm_data:              limeade_diag_csm_data,             \
   struct limeade_indiv_recv:            limeade_diag_indiv_recv,           \
   struct limeade_recv_data:             limeade_diag_recv_data,            \
   struct limeade_eth_host_indiv_client: limeade_diag_eth_host_indiv_client,\

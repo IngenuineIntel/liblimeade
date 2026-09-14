@@ -107,4 +107,25 @@ static int name(void *src, type *dst, uint16_t rem)  \
   return 1 + sizeof(type);                           \
 }
 
+/* limeade_th_recv_wr_pkt
+ *
+ * takes a verified packet and places it into the context-wide
+ * packet queue
+ */
+void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt, uint16_t sz);
+
+/* limeade_host_eth_recv
+ *
+ * receives next UDP packet for UDP server mode
+ */
+inline int limeade_host_eth_recv(const struct limeade_context *ctx,
+                                 const void *buffer, const unsigned int sz,
+                                 struct sockaddr *cliaddr, socklen_t &cli_len);
+
+/* limeade_prelim_confirm
+ *
+ * does preliminary checks on a packet to make sure it is valid
+ */
+int limeade_prelim_confirm(const void *buffer, const int sz);
+
 #endif /* _LIBLIMEADE_INTERNAL_H_ */

@@ -41,13 +41,14 @@ int limeade_send_acknowledge(struct limeade_context *ctx, struct limeade_recvd p
   return limeade_send(ctx, LIMEADE_ACKNOWLEDGE, out);
 }
 
+// TODO make all recv functions use ctx->recv. instead of ctx->recv->
 int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd out)
 {
   struct limeade_indiv_recv *r;
   struct limeade_packet_flags *f;
 
   pthread_mutex_lock(ctx->recv->mtx_idx);
-  r = ctx->recv->pkts[ctx->recv->read_idx];
+  r = ctx->recv.pkts[ctx->recv->read_idx];
   pthread_mutex_unlock(ctx->recv->mtx_idx);
 
   pthread_mutex_lock(r->mtx);

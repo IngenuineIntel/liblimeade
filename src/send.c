@@ -177,6 +177,11 @@ static void limeade_wr_at_idx(struct limeade_pkt_wr_data d, void *data, int len)
 void limeade_populate_packet(struct limeade_packet_data *in,
                              struct limeade_packet_flags *flags, va_list arg)
 {
+  /* TODO:
+   * 1. forgot the magic lmao
+   * 2. must increment in significantly larger increments if at all
+   * perhaps will instead keep to a single 65kb buffer
+   * 3. actually just rewrite the whole thing to depend on `memcpy` in `wr_at_idx` less
   struct limeade_pkt_wr_data d = {
     .pkt = in,
     .wr_idx = sizeof(struct limeade_packet_flags),

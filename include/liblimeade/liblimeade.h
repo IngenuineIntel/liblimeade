@@ -59,7 +59,10 @@ enum limeade_error
   LIMEADE_ERROR_INVALID_CONTEXT, // bad limeade_context* passed
   LIMEADE_ERROR_MEMORY,          // failure to allocate memory
   LIMEADE_ERROR_NOT_SUPPORTED,   // feature not supported
+  LIMEADE_ERROR_TH_RECV_DIED,    // receiving thread died
   LIMEADE_ERROR_OTHER,           // unspecified & probably assumed impossible
+  
+  LIMEADE_MAXIMUM_ERROR
 };
 
 // textual equivalents of errors
@@ -80,6 +83,7 @@ static const char *LIMEADE_ERROR_REPRS[] = {
   "No acknowledgement from recipient",
   "Invalid context",
   "Allocation failure",
+  "Receiving thread died",
   "Not supported",
   "Unknown"
 };
@@ -217,6 +221,11 @@ struct limeade_indiv_recv
   void *mtx;
   union
   {
+    struct sockaddr_in addr;
+    socklen_t addr_len;
+  }
+  union
+  {
     uint8_t flags;
     struct
     {
@@ -240,6 +249,9 @@ struct limeade_recv_data
   // not a ring buffer, because it shouldn't have to be
   uint16_t ack_sz;
   void *ack;
+  // `ack_addr` & `ack_add_len` are only used when working with UDP
+  struct sockaddr_in ack_addr;
+  socklen_t ack_addr_len;
   // mutex for waiting for ACKs
   // almost always locked; one must already be waiting
   void *mtx_ack;
@@ -258,12 +270,18 @@ struct limeade_recv_data
 // default value for `limeade_recv_data.hz`
 #define LIMEADE_RECV_DEFAULT_HZ 4
 
-// individual client
-struct limeade_eth_host_indiv_client
+// node-based data type for managing clients when operating as an ethernet host
+struct limeade_eth_client
 {
-  uint64_t session;
-  void *addr; //(struct sockaddr*)
-};
+  uint8_t idx;      // index within the series of nodes
+  uint16_t pkts_to; // packets sent to this client
+  uint16_t pkts_fr; // packets received from this client
+  uint64_t session; // session ID of the client
+  struct sockaddr_in cliaddr;
+  socklen_t cliaddr_len;
+  struct limeade_eth_client *prev; // previous node (or NULL if it's the first)
+  struct limeade_eth_client *next; // next node (or NULL if it's the last)
+}
 
 // limeade_context
 // serves as the state/instance holder for the functions in this library
@@ -284,18 +302,13 @@ struct limeade_context
 #endif
     struct          // LIMEADE_MODE_*_ETH
     {
-      struct sockaddr_in *saddr;
+      struct sockaddr_in saddr;
       socklen_t saddr_len;
-
-      // LIMEADE_MODE_HOST_ETH
-      struct sockaddr_in *cliaddr;
-      uint32_t nr_clients;
-      struct limeade_eth_host_indiv_client **clients;
     };
   };
 
   // recv thread
-  struct limeade_recv_data *recv;
+  struct limeade_recv_data recv;
 
   // csm thread
   struct limeade_csm_data *csm;

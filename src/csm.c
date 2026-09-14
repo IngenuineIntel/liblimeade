@@ -27,7 +27,7 @@ void limeade_csm_add_compr_entry(struct limeade_context *ctx,
 {
   struct limeade_csm_data *csm = ctx->csm;
 
-  if(csm == NULL)
+  if(!csm)
   {
     return;
   }
@@ -52,7 +52,7 @@ void limeade_csm_add_latency_entry(struct limeade_context *ctx,
 {
   struct limeade_csm_data *csm = ctx->csm;
 
-  if(csm == NULL)
+  if(!csm)
   {
     return;
   }

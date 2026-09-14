@@ -27,6 +27,7 @@
 
 void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt, uint16_t sz)
 {
+  /* Writes packet information into the process-wide cache */
   if(((struct limeade_packet_flags*)pkt).type != LIMEADE_ACKNOWLEDGE)
   {
     pthread_mutex_lock(r->mtx_idx);
@@ -62,40 +63,38 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt, uint16_t sz)
   }
 }
 
-inline void limeade_th_recv_parse_pkt(struct limeade_data *r, const void *buffer, int t_amt_recv)
+inline void limeade_th_recv_parse_pkt(struct limeade_recv_data *r,
+                                      const void *buffer, int t_amt_recv)
 {
-  register unsigned int hit_end = 0;
-  register void *next, *prev;
+  unsigned int hit_end = 0;
+  void *next, *prev;
+  struct limeade_packet_flags *flags;
   prev = buffer;
-
-  prev = memmem(buffer, t_amt_recv, &LIMEADE_MAGIC, MAGSZ);
-
-  if(!prev)
-    continue;
-
-  prev += MAGSZ;
-
-  t_amt_recv -= (prev - buffer);
 
   do
   {
     next = memmem(prev, t_amt_recv, &LIMEADE_MAGIC, MAGSZ);
 
     if(!next)
-    {
-      next = buffer + t_amt_recv;
-      hit_end = 1;
-    }
+      return;
 
-    limeade_th_recv_wr_pkt(r, prev, next - prev);
+    next += MAGSZ;
 
-    if(hit_end)
-      break;
+    // note: my understanding of this (I haven't checked the assembly yet) is that
+    // the pointer subtraction is done in a 64-bit register and likewise doesn't
+    // create an unexpected number in t_amt_recv.
+    t_amt_recv -= (next - buffer);
 
-    t_amt_recv -= (next - prev);
-    prev = next + MAGSZ;
+    flags = (struct limeade_packet_flags*)next;
+
+    if(flags.pkt_sz > t_amt_recv || flags.type >= LIMEADE_PACKET_MAX)
+      return;
+
+    limeade_th_recv_wr_pkt(r, next, flags.pkt_sz);
+
+    prev = next + flags.pkt_sz;
+    t_amt_recv -= flags.pkt_sz;
   }
-
 }
 
 #define TH_NOT_KILLED pthread_mutex_trylock(r->mtx_kys) == EBUSY
@@ -171,5 +170,106 @@ err:
   free(buffer);
   return NULL;
 
+}
+
+void *limeade_th_recv_host_eth(void *arg)
+{
+  struct limeade_context *ctx;
+  struct limeade_recv_data *r;
+  struct limeade_eth_client *c;
+  struct limeade_packet_flags *f;
+  struct timespec recv_wait, iter_wait, rmtp;
+  struct sockaddr_in tmp_cliaddr;
+  socklen_t tmp_len;
+  void *buffer, *next;
+  unsigned int amt_recv;
+
+  ctx = arg;
+  ctx->clients = malloc(sizeof(*c));
+  c = ctx->clients;
+  r = ctx->recv;
+  if(!c)
+    return NULL;
+  memset(c, 0, sizeof(*c));
+  
+
+  pthread_mutex_lock(r->mtx_ack);
+
+  recv_wait = {0, 500}; // 0.5µs
+  iter_wait = {0, 999999999/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ)};
+
+  buffer = malloc(LIMEADE_RECV_TMP_SZ);
+  if(!buffer)
+  {
+    free(ctx->clients);
+    return NULL;
+  }
+
+  while(TH_NOT_KILLED)
+  {
+
+    pthread_mutex_lock(ctx->mtx_rfd);
+    pthread_mutex_lock(ctx->mtx_mode_union);
+
+    amt_recv = recvfrom(ctx->rfd, buffer, LIMEADE_RECV_TMP_SZ, 0,
+                        (struct sockaddr*)&cliaddr, &client_len);
+
+    pthread_mutex_unlock(ctx->mtx_rfd);
+    pthread_mutex_unlock(ctx->mtx_mode_union);
+
+    if(!amt_recv)
+    {
+      nanosleep(&iter_wait, &rmtp);
+      continue;
+    }
+    
+
+    next = memmem(buffer, amt_recv, &LIMEADE_MAGIC, MAGSZ);
+    if(!next)
+      continue;
+
+    next += MAGSZ;
+    if(next + sizeof(*f) > buffer + amt_recv)
+      continue;
+
+    f = next;
+    if(f->type >= LIMEADE_PACKET_MAX)
+      continue;
+
+    if(f->pkt_sz >= (buffer + amt_recv - next))
+      continue;
+
+    if(f->session == 0)
+    {
+      if(f->type != LIMEADE_PACKET_KNOCK)
+        continue;
+      
+      struct limeade_packet_data pkt;
+      struct limeade_knock contents;
+
+      pkt.pkt    = buffer;
+      pkt.pkt_sz = f->pkt_sz;
+      pkt.type   = f->type;
+      pkt.data   = pkt.pkt + sizeof(*f);
+
+      if(limeade_parse_knock(&contents, &pkt) != LIMEADE_SUCCESS)
+        continue;
+
+      // TODO limeade_client_check_session & limeade_client_register require
+      // the client list to be iterated over twice, which is unecessary
+      LIMEADE_SESSION pref_session =
+        contents.prev_session ? contents.prev_session != 0
+                             && limeade_client_check_session(c, contents.prev_session) == 0
+                              : limeade_client_gen_session();
+
+      limeade_client_register(c, cliaddr, cliaddr_len, pref_session);
+    }
+
+    if(limeade_confirm_preexisting(c, &cliaddr, session) != 0)
+      continue;
+
+    limeade_th_recv_wr_pkt(r, buffer, amt_recv);
+
+  }
 }
 

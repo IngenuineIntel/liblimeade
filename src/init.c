@@ -91,7 +91,7 @@ int limeade_init_th_recv_step_1(struct limeade_context *ctx)
 
 int limeade_init_th_recv_step_2(struct limeade_context *ctx)
 {
-  /* 0 on success, -1 for memory error -2 for pthread error */
+  /* populates ctx->recv (step 2) */
   struct limeade_indiv_recv *d;
   struct limeade_recv_data  *r = ctx->recv;
 
@@ -335,7 +335,7 @@ inline int limeade_init_start_eth_client_step_1(struct limeade_context *ctx, va_
 inline void limeade_init_start_eth_client_step_2(struct limeade_context *ctx)
 {
   ctx->saddr->sin_port = ctx->port;
-}
+
 
 inline void limeade_destruct_eth_client(struct limeade_context *ctx)
 {
