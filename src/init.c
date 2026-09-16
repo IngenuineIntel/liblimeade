@@ -1,11 +1,30 @@
 // init.c
-//
 
 #include<pthread.h>
 #include<stdarg.h>
 #include<stdlib.h>
 
 #include<liblimeade/liblimeade.h>
+
+// guide to reading this file:
+// Each other function is either a constructor or a destructor, &
+// constructors can sometimes be a `step_1` or a `step_2`. Step 1
+// constructors (or constructors that aren't multiple steps) are
+// called within limeade_init, and step 2 constructors are called
+// within limeade_connect. This way, any/all default settings from
+// limeade_init can be customized by the user before limeade_connect,
+// in which case such is not always possible. All *_destruct_*
+// functions (deconstructors) are called in limeade_release. 
+// Destructors can also be in two steps. This is because, theoretically,
+// the second step can fail, in which case the first step can be
+// destructed cleanly.
+// limeade_init, limeade_connect, & limeade_release are all at the
+// bottom of this file.
+
+// note to editors of this file: make constructors inline, don't make
+// deconstructors inline, because they are called in more logic
+// keep constructors inlined, since (& make sure of this, too) they are only
+// called once, as they only exist to move logic away from high-level functions
 
 inline int limeade_init_mutexes(struct limeade_context *ctx)
 {
@@ -26,32 +45,28 @@ inline int limeade_init_mutexes(struct limeade_context *ctx)
   ctx->mtx_th_csm     = &mutexes[4];
   ctx->mtx_pub        = &mutexes[5];
 
-  return LIMEADE_ERROR_MEMORY;
+  return LIMEADE_ERROR_SUCCESS;
 }
 
-inline void limeade_destruct_mutexes(struct limeade_context *ctx)
+void limeade_destruct_mutexes(struct limeade_context *ctx)
 {
   /* releases mtx_sfd, mtx_rfd, mtx_mode_union, mtx_compr,
    * mtx_th_csm, & mtx_pub */
 
+  // this looks janky; however, `ctx->mtx_sfd` is _technically_ of
+  // type `pthread_mutex_t[6]`
   for(int i = 0; i < 6; i++)
     pthread_mutex_destroy(&ctx->mtx_sfd[i]);
 
   free(ctx->mtx_sfd);
 }
 
-// limeade_init_th_recv_step_1 is called within limeade_init;
-// limeade_init_th_recv_step_2 is called within limeade_connect
-// this is to allow users to hack some of the settings before the
-// thread starts
-
-int limeade_init_th_recv_step_1(struct limeade_context *ctx)
+inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
 {
   /* populates ctx->recv (step 1) */
 
-
   struct limeade_recv_data *r;
-  pthread_mutex_t mutexes;
+  pththread_mutex_t *mutexes;
   struct limeade_indiv_recv *d;
 
   r = malloc(sizeof(struct limeade_recv_data));
@@ -61,6 +76,7 @@ int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   ctx->recv = r;
 
   // mutexes
+  // this allocator is 4 mutexes, then a pthread_t at the end
   mutexes = malloc(sizeof(pthread_mutex_t) * 4 + sizeof(pthread_t));
   if(!mutexes)
   {
@@ -75,8 +91,7 @@ int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   r->mtx_idx  = &mutexes[1];
   r->mtx_kys  = &mutexes[2];
   r->mtx_lost = &mutexes[3];
-
-  r->tid      = &mutexes[4];
+  r->tid      = (pthread_t*)&mutexes[4];
 
   r->nr_pkts   = LIMEADE_NR_PKTS_DEFAULT;
   r->read_idx  = 0;
@@ -84,16 +99,36 @@ int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   r->pkts_lost = 0;
   r->hz        = LIMEADE_RECV_DEFAULT_HZ;
   r->ack_sz    = 65535; // max packet size (though a proper LIMEADE_ACK could
-                        // never be more than 1KB)
+                        // never be morethan 1KB)
 
   return LIMEADE_SUCCESS;
 }
 
-int limeade_init_th_recv_step_2(struct limeade_context *ctx)
+inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
 {
-  /* populates ctx->recv (step 2) */
+  /* ctx->recv (step 2) */
   struct limeade_indiv_recv *d;
   struct limeade_recv_data  *r = ctx->recv;
+
+  void*(*th_recv_f)(void*);
+
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_CLIENT_SSH:
+      th_recv_f = &limeade_th_recv_client_ssh;
+    case LIMEADE_MODE_HOST_SSH:
+      th_recv_f = &limeade_th_recv_host_ssh;
+    case LIMEADE_MODE_LIBSSH:
+#ifdef LIMEADE_HAS_SSH
+      th_recv_f = &limeade_th_recv_libssh;
+#else
+      return LIMEADE_ERROR_NOT_SUPPORTED;
+#endif
+    case LIMEADE_MODE_CLIENT_ETH:
+      th_recv_f = &limeade_th_recv_client_eth;
+    case LIMEADE_MODE_HOST_ETH:
+      th_recv_f = &limeade_th_recv_host_eth;
+  }
 
   r->pkts = malloc(sizeof(struct limeade_indiv_recv) * r->nr_pkts);
   if(!r->pkts)
@@ -112,28 +147,27 @@ int limeade_init_th_recv_step_2(struct limeade_context *ctx)
 
     d->sz    = 0;
     d->flags = 0;
-    d->mtx   = malloc(sizeof(pthread_mutex_t) + 65535);
+    d->mtx   = malloc(sizeof(pthread_mutex_t) + 65536);
+    d->data  = d->mtx + sizeof(pthread_mutex_t);
     if(!d->mtx)
     {
-      for(int j = i - 1; j > -1; j--)
+      for(int j = i; i - 1; j > -1; j--)
         free(r->pkts[j].mtx);
       free(r->ack);
       free(r->pkts);
       return LIMEADE_ERROR_MEMORY;
     }
-
-    d->data  = d->mtx + sizeof(pthread_mutex_t);
   }
 
-  if(pthread_create(r->tid, NULL, limeade_th_recv, ctx) != 0)
+  if(pthread_create(&r->tid, NULL, *th_recv_f, ctx) != 0)
   {
     for(int i = 0; i < r->nr_pkts; i++)
-      free(r->pkts[i].mtx);
+      free(r->pkts[j].mtx);
     free(r->ack);
     free(r->pkts);
-    return LIMEADE_ERROR_MEMORY;
+    return LIMEADE_ERROR_OTHER;
   }
-  return LIMEADE_ERROR_SUCCESS;
+  return LIMEADE_SUCCESS;
 }
 
 void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
@@ -144,30 +178,26 @@ void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
 
 void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
 {
-  pthread_cancel(*ctx->recv->tid);
-
-  for(int i = 0; i < r->nr_pkts; i++)
-    free(r->pkts[i].mtx);
-  free(r->ack);
-  free(r->pkts);
+  //pthread_cancel(*ctx->recv->tid);
+  pthread_mutex_lock(ctx->recv->mtx_kys);
+  // TODO pthread_mutex_destroy everything
+   for(int i = 0; i < r->nt_pkts; i++)
+     free(r->pkts[i].mtx);
+   free(r->ack);
+   free(r->pkts);
 }
 
-inline void limeade_destruct_recv(struct limeade_context *ctx)
+inline void limeade_destruct_th_recv(struct limeade_context *ctx)
 {
-  /* releases ctx->recv */
-
   limeade_destruct_th_recv_step_2(ctx);
   limeade_destruct_th_recv_step_1(ctx);
 }
 
-
-// limeade_init_th_csm_step_1 is called in limeade_init;
-// limeade_init_th_csm_step_2 is called in limeade_connect
-// this allows users to hack the default settings before the CSM thread starts
-
-int limeade_init_th_csm_step_1(struct limeade_context *ctx)
+inline int limeade_init_th_csm_step_1(struct limeade_context *ctx)
 {
-  struct limeade_csm_data *c = malloc(sizeof(struct limeade_csm_data) + sizeof(pthread_t));
+  struct limeade_csm_data *c = malloc(sizeof(struct limeade_csm_data)
+                                    + sizeof(pthread_t)
+                                    + sizeof(pthread_mutex_t));
   if(!c)
     return LIMEADE_ERROR_MEMORY;
 
@@ -175,83 +205,75 @@ int limeade_init_th_csm_step_1(struct limeade_context *ctx)
   c->hist_latent = NULL;
 
   ctx->csm = c;
-
+  
   c->hist_compr_sz  = LIMEADE_CSM_BENCH_BUFFER_SIZE;
   c->hist_latent_sz = LIMEADE_CSM_BENCH_BUFFER_SIZE;
 
   c->hist_compr_idx  = 0;
   c->hist_latent_idx = 0;
 
-  c->freq_s LIMEADE_CSM_FREQ_S;
+  c->freq_s = LIMEADE_CSM_FREQ_S;
 
-  c->id = c + sizeof(*c);
+  c->tid     = (pthread_t*)(c + sizeof(*c));
+  c->mtx_kys = (pthread_mutex_t*)(&c->tid + sizeof(pthread_t*));
+
+  pthread_mutex_init(c->mtx_kys);
 
   return LIMEADE_SUCCESS;
 }
 
-int limeade_init_th_csm_step_2(struct limeade_context *ctx)
+inline int limeade_init_th_csm_step_2(struct limeade_context *ctx)
 {
   struct limeade_csm_data *c = ctx->csm;
 
-  c->hist_compr = malloc(sizeof(struct limeade_csm_compression_entry) * c->hist_compr_sz);
+  {
+    uint32_t q_compr_sz  = sizeof(struct limeade_csm_compression_entry) * c->hist_compr_sz;
+    uint32_t q_latent_sz = sizeof(struct limeade_csm_latency_entry)     * c->hist_latent_sz;
+  
+    c->hist_compr  = malloc(q_compr_sz + q_latent_sz);
+    c->hist_latent = c->hist_compr + q_compr_sz;
+  }
   if(!c->hist_compr)
     return LIMEADE_ERROR_MEMORY;
-  c->hist_latent = malloc(sizeof(struct limeade_csm_latency_entry) * c->hist_latent_sz);
-  if(!c->hist_latent)
-  {
-    free(c->hist_compr);
-    return LIMEADE_ERROR_MEMORY;
-  }
 
-  if(pthread_create(c->id, NULL, limeade_th_csm, ctx) != 0)
+  if(pthread_create(&c->id, NULL, limeade_th_csm, ctx) != 0)
   {
-    free(c->hist_latent);
     free(c->hist_compr);
     return LIMEADE_ERROR_OTHER;
   }
-  return LIMEADE_ERROR_MEMORY;
+  return LIMEADE_SUCCESS;
 }
 
 void limeade_destruct_th_csm_step_1(struct limeade_context *ctx)
-{
   free(ctx->csm);
-}
 
 void limeade_destruct_th_csm_step_2(struct limeade_context *ctx)
 {
   struct limeade_csm_data *c = ctx->csm;
-  pthread_cancel(*c->id);
-  free(c->hist_latent);
+  //pthread_cancel(c->tid);
+  pthread_mutex_lock(c->mtx_kys);
+  // TODO await the thread's death
   free(c->hist_compr);
 }
 
-inline void limeade_destruct_csm(struct limeade_context *ctx)
+inline void limeade_destruct_th_csm(struct limeade_context *ctx)
 {
   limeade_destruct_th_csm_step_2(ctx);
   limeade_destruct_th_csm_step_1(ctx);
 }
 
-inline int limeade_init_start_ssh_child(struct limeade_context *ctx, va_list arg)
+inline int limeade_init_ssh_client_step_1(struct limeade_context *ctx, const char *dest)
 {
-  /* manages pipe/dup/execve for LIMEADE_MODE_CLIENT_SSH
-   * 0 on success, LIMEADE_ERROR_ on error */
-  const char *dest = va_arg(arg, const char*);
-  ctx->dest = malloc(strlen(dest) + 1);
-  if(!ctx->dest)
-    return LIMEADE_ERROR_MEMORY;
-  strcpy(ctx->dest, dest);
+  /* manages pipe/dup/execve for LIMEADE_MODE_CLIENT_SSH */
 
   int to_ssh[2];
   int fr_ssh[2];
 
   if(pipe(to_ssh) != 0)
-  {
-    free(ctx->dest);
     return LIMEADE_ERROR_OTHER;
-  }
+
   if(pipe(fr_ssh) != 0)
   {
-    free(ctx->dest);
     close(to_ssh[0]);
     close(to_ssh[1]);
     return LIMEADE_ERROR_OTHER;
@@ -261,13 +283,12 @@ inline int limeade_init_start_ssh_child(struct limeade_context *ctx, va_list arg
 
   switch(ctx->ssh_pid)
   {
-    case -1;
-      free(ctx->dest);
+    case -1:
       close(to_ssh[0]);
       close(to_ssh[1]);
       close(fr_ssh[0]);
       close(fr_ssh[1]);
-      return LIMEADE_ERROR_SSH;
+      return LIMEADE_ERROR_OTHER;
     case 0:
       dup2(fr_ssh[1], STDOUT_FILENO);
       dup2(to_ssh[0], STDIN_FILENO);
@@ -278,19 +299,25 @@ inline int limeade_init_start_ssh_child(struct limeade_context *ctx, va_list arg
       close(to_ssh[1]);
 
       // ssh -s limeade user@host
-      execlp("ssh", "ssh", "-s", LIMEADE_SUBSYSTEM_NAME, dest, (char*)NULL);
+      execlp("ssh", "ssh", "-s", LIMEADE_SUBSYSTEM_NAME, dest, NULL);
 
       exit(-1);
+      
     default:
       close(fr_ssh[1]);
       close(to_ssh[0]);
       ctx->rfd = fr_ssh[0];
-      ctx->sfd = to_ssh[0];
+      ctx->sfd = to_ssh[1];
       return LIMEADE_SUCCESS;
   }
 }
 
-inline int limeade_destruct_ssh_child(struct limeade_context *ctx)
+inline int limeade_init_ssh_client_step_2(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+int limeade_destruct_ssh_child_step_1(struct limeade_context *ctx)
 {
   kill(ctx->ssh_pid, SIGKILL);
   free(ctx->dest);
@@ -298,54 +325,106 @@ inline int limeade_destruct_ssh_child(struct limeade_context *ctx)
   close(ctx->sfd);
 }
 
-inline int limeade_init_start_eth_client_step_1(struct limeade_context *ctx, va_list arg)
+inline int limeade_init_eth_client_step_1(struct limeade_context *ctx,
+                                          const char *dest, const int port)
 {
-  const char *dest = va_arg(arg, const char*);
-  ctx->port        = va_arg(arg, int);
-  ctx->dest        = malloc(strlen(dest) + 1);
-  if(!ctx->dest)
-    return LIMEADE_ERROR_MEMORY;
-  strcpy(ctx->dest, dest);
-
   ctx->sfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if(ctx->sfd < 0)
-  {
-    free(ctx->dest);
-    return LIMEADE_ERROR_NETWORK;
-  }
   ctx->rfd = ctx->sfd;
 
-  ctx->saddr = malloc(sizeof(struct sockaddr_in));
-  if(!ctx->saddr)
-  {
-    free(ctx->dest);
-    return LIMEADE_ERROR_MEMORY;
-  }
-  memset(&ctx->saddr, 0, sizeof(struct sockaddr_in));
+  if(ctx->sfd < 0)
+    return LIMEADE_ERROR_NETWORKING;
 
-  ctx->saddr->sin_family      = AF_INET;
-  //ctx->saddr->sin_port      = ctx->port; // do this in limeade_connect
-  ctx->saddr->sin_addr.s_addr = inet_addr(dest);
+  memset(&ctx->saddr, 0, sizeof(ctx->saddr));
 
+  ctx->saddr.sin_family      = AF_INET;
+  ctx->saddr.sin_port        = port;
+  ctx->saddr.sin_addr.s_addr = inet_addr(dest);
   ctx->saddr_len = sizeof(ctx->saddr);
+
+  if(!ctx->saddr.sin_addr.s_addr)
+    return LIMEADE_ERROR_GARBAGE;
 
   return LIMEADE_SUCCESS;
 }
 
-inline void limeade_init_start_eth_client_step_2(struct limeade_context *ctx)
+inline int limeade_init_eth_client_step_2 (struct limeade_context *ctx)
 {
-  ctx->saddr->sin_port = ctx->port;
+  ctx->saddr.sin_port = ctx->port;
+  // TODO bind/connect
+  return LIMEADE_SUCCESS;
+}
 
+void limeade_destruct_eth_client_step_1(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+void limeade_destruct_eth_client_step_2(struct limeade_context *ctx)
+{
+  // TODO
+}
 
 inline void limeade_destruct_eth_client(struct limeade_context *ctx)
 {
-  free(ctx->saddr);
-  free(ctx->dest);
+  limeade_destruct_eth_client_step_2(ctx);
+  limeade_destruct_eth_client_step_1(ctx);
 }
 
+inline int limeade_init_eth_host_step_1(struct limeade_context *ctx,
+                                        const char *dest, const int port)
+{
+  // TODO
+}
 
-/*** LIMEADE_INIT ***/
-#define ERR_LBL(r, label) if(r != LIMEADE_SUCCESS) goto label;
+inline int limeade_init_start_eth_host_step_2(struct limeade_context *ctx,
+                                              const char *dest, const int port)
+{
+  // TODO
+}
+
+void limeade_destruct_eth_host_step_1(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+void limeade_destruct_eth_host_step_2(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+inline void limeade_destruct_eth_host(struct limeade_context *ctx)
+{
+  limeade_destruct_eth_host_step_2(ctx);
+  limeade_destruct_eth_host_step_1(ctx);
+}
+
+inline int limeade_init_libssh_client_step_1(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+inline int limeade_init_libssh_client_step_2(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+void limeade_destruct_libssh_client_step_1(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+void limeade_destruct_libssh_client_step_2(struct limeade_context *ctx)
+{
+  // TODO
+}
+
+inline void limeade_destruct_libssh_client(struct limeade_context *ctx)
+{
+  limeade_destruct_libssh_client_step_2(ctx);
+  limeade_destruct_libssh_client_step_1(ctx);
+}
+
+#define ERR_LBL(r, label) if(r != LIMEADE_SUCCESS) goto label
 int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
 {
   register int r;
@@ -370,89 +449,72 @@ int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
 
     case LIMEADE_MODE_CLIENT_SSH:
     {
-      r = limeade_init_start_ssh_child(ctx, arg);
-      ERR_LBL(r, err_1);
+      const char *dest = va_arg(arg, const char*);
+      
+      ctx->dest = malloc(++strlen(dest));
+      if(!ctx->dest)
+        return LIMEADE_ERROR_MEMORY;
+      strcpy(ctx->dest, dest);
+      
+      r = limeade_init_ssh_client_step_1(ctx, dest);
+      ERR_LBL(x, y); // FIXME
+    }
+
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+    {
+#ifdef LIMEADE_HAS_SSH
+      // TODO
+#else
+      return LIMEADE_ERROR_NOT_SUPPORTED;
+#endif
+    } 
+    
+    case LIMEADE_MODE_HOST_ETH:
+    {
+      const char *dest = va_arg(arg, const char*);
+
+      ctx->dest = malloc(++strlen(dest));
+      ctx->port = va_arg(arg, int);
+
+      if(!ctx->dest)
+        return LIMEADE_ERROR_MEMORY;
+      strcpy(ctx->dest, dest);
+
+      r = limeade_init_host_eth_step_1(ctx, dest, port);
+      ERR_LBL(x, y); // TODO FIXME
     }
 
     case LIMEADE_MODE_CLIENT_ETH:
     {
-      r = limeade_init_start_eth_client_step_1(ctx, arg);
-      ERR_LBL(r, err_2);
+      const char *dest = va_arg(arg, const char*);
+
+      ctx->dest = malloc(++strlen(dest));
+      ctx->port = va_arg(arg, int);
+
+      if(!ctx->dest)
+        return LIMEADE_ERROR_MEMORY;
+      strcpy(ctx->dest, dest);
+
+      r = limeade_init_client_eth_step_1(ctx, dest, port);
+      ERR_LBL(x, y); // FIXME
     }
+
+    default:
+      return LIMEADE_ERROR_GARBAGE;
   }
 
-  r = limeade_init_th_recv_step_1(ctx);
-  ERR_LBL(r, err_3);
-
-  r = limeade_init_mutexes(ctx);
-  ERR_LBL(r, err_3);
-
-  ctx->sessionid = 0;
-  ctx->ack_wait_time_ms = 5000;
-  ctx->retry_interval   = 20;
-
-  
-  if(allow_compr)
-  {
-    switch(ctx->compr_mode)
-    {
-      case LIMEADE_MODE_NO_COMPRESSION:
-        ctx->compr_lvl = 0;
-      case LIMEADE_MODE_LOW_COMPRESSION:
-        ctx->compr_lvl = 1;
-      case LIMEADE_MODE_MED_COMPRESSION:
-        ctx->compr_lvl = 4;
-      case LIMEADE_MODE_HIGH_COMPRESSION:
-        ctx->compr_lvl = 7;
-      default:
-        r = limeade_init_th_csm_step_1(ctx);
-        ERR_LBL(r, err_4);
-    }
-  }
-
-  return LIMEADE_SUCCESS;
-
-err_4:
-  limeade_destruct_mutexes(ctx);
-
-err_3:
-  limeade_destruct_th_recv_step_1(ctx);
-
-err_2:
-  switch(ctx->mode)
-  {
-    case LIMEADE_MODE_CLIENT_SSH: limeade_destruct_ssh_child(ctx);
-    case LIMEADE_MODE_CLIENT_ETH: limeade_destruct_eth_client(ctx);
-  }
-
-err_1:
-  return r;
+  // TODO
 }
 
 int limeade_connect(struct limeade_context *ctx)
 {
-  register int r;
-
-  switch(ctx->mode)
-  {
-    case LIMEADE_MODE_HOST_SSH:
-      // TODO
-    case LIMEADE_MODE_CLIENT_SSH:
-      // TODO
-    case LIMEADE_MODE_CLIENT_LIBSSH:
-#ifndef LIMEADE_HAS_LIBSSH2
-      return LIMEADE_ERROR_NOT_SUPPORTED;
-#else
-      // TODO
-    case LIMEADE_MODE_HOST_ETH:
-      // TODO
-    case LIMEADE_MODE_CLIENT_ETH:
-      limeade_init_start_eth_client_step_2(ctx);
-  }
-
-  r = limeade_init_start_csm_step_2(ctx);
   // TODO
-    
+}
+
+void limeade_release(struct limeade_context *ctx)
+{
+  // TODO
 }
 
 #undef ERR_LBL
+

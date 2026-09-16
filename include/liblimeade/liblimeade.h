@@ -21,19 +21,17 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-#if defined(__has_include)
-#  if __has_include(<libssh2.h>)
-#    include <libssh2.h>
-#    define LIMEADE_HAS_LIBSSH2 1
-#  endif
+#if __has_include(<libssh2.h>)
+#  include <libssh2.h>
+#  define LIMEADE_HAS_LIBSSH2 1
 #endif
 
 /*** *** ERROR MANAGEMENT *** ***/
 // the various errors liblimeade functions can return
 enum limeade_error
 {
-  LIMEADE_SUCCESS     = 0,
-  LIMEADE_OK          = 0,
+  LIMEADE_SUCCESS = 0,
+  LIMEADE_OK      = 0,
 
   // errors while sending
   LIMEADE_ERROR_GARBAGE, // user supplied useless data to the library
@@ -189,8 +187,9 @@ struct limeade_csm_data
   uint32_t hist_latent_sz;  // size of latency benchmark ring buffer
   uint32_t hist_compr_idx;  // current index in compression benchmarks
   uint32_t hist_latent_idx; // current index in latency benchmarks
-  float freq_s; // frequency that CSM operates at (iter/sec)
-  void *id;     // thread ID (*pthread_t)
+  float freq_s;  // frequency that CSM operates at (iter/sec)
+  void *tid;     // thread ID (*pthread_t)
+  void *mtx_kys; // kill signal mutex (*pthread_mutex_t)
 };
 
 // size of hist_* ring buffers
@@ -321,8 +320,8 @@ struct limeade_context
   uint32_t retry_interval;   // time between resends (in milliseconds)
 
   // mutexes (all pthread_mutex_t)
-  void *mtx_sfd;        // sfd
-  void *mtx_rfd;        // rfd
+  void *mtx_sfd;        // sfd (for using the file descriptor, not reading the memory)
+  void *mtx_rfd;        // rfd (for using the file descriptor, not reading the memory)
   void *mtx_mode_union; // anything in the union
   void *mtx_compr;      // compr_*
   void *mtx_th_csm;     // csm
