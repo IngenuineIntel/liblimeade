@@ -4,7 +4,7 @@
 #include<stdarg.h>
 #include<stdlib.h>
 
-#include<liblimeade/liblimeade.h>
+#include<liblimeade/liblimeade-internal.h>
 
 // guide to reading this file:
 // Each other function is either a constructor or a destructor, &
@@ -45,7 +45,7 @@ inline int limeade_init_mutexes(struct limeade_context *ctx)
   ctx->mtx_th_csm     = &mutexes[4];
   ctx->mtx_pub        = &mutexes[5];
 
-  return LIMEADE_ERROR_SUCCESS;
+  return LIMEADE_SUCCESS;
 }
 
 void limeade_destruct_mutexes(struct limeade_context *ctx)
@@ -65,40 +65,33 @@ inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
 {
   /* populates ctx->recv (step 1) */
 
-  struct limeade_recv_data *r;
-  pththread_mutex_t *mutexes;
+  struct limeade_recv_data r;
+  pthread_mutex_t *mutexes;
   struct limeade_indiv_recv *d;
 
-  r = malloc(sizeof(struct limeade_recv_data));
-  if(!r)
-    return LIMEADE_ERROR_MEMORY;
-
-  ctx->recv = r;
+  r = ctx->recv;
 
   // mutexes
   // this allocator is 4 mutexes, then a pthread_t at the end
   mutexes = malloc(sizeof(pthread_mutex_t) * 4 + sizeof(pthread_t));
   if(!mutexes)
-  {
-    free(r);
     return LIMEADE_ERROR_MEMORY;
-  }
 
   for(int i = 0; i < 4; i++)
-    pthread_mutex_init(&mutexes[i]);
+    pthread_mutex_init(&mutexes[i], NULL);
 
-  r->mtx_ack  = &mutexes[0];
-  r->mtx_idx  = &mutexes[1];
-  r->mtx_kys  = &mutexes[2];
-  r->mtx_lost = &mutexes[3];
-  r->tid      = (pthread_t*)&mutexes[4];
+  r.mtx_ack  = &mutexes[0];
+  r.mtx_idx  = &mutexes[1];
+  r.mtx_kys  = &mutexes[2];
+  r.mtx_lost = &mutexes[3];
+  r.tid      = (pthread_t*)&mutexes[4];
 
-  r->nr_pkts   = LIMEADE_NR_PKTS_DEFAULT;
-  r->read_idx  = 0;
-  r->wr_idx    = 0;
-  r->pkts_lost = 0;
-  r->hz        = LIMEADE_RECV_DEFAULT_HZ;
-  r->ack_sz    = 65535; // max packet size (though a proper LIMEADE_ACK could
+  r.nr_pkts   = LIMEADE_NR_PKTS_DEFAULT;
+  r.read_idx  = 0;
+  r.wr_idx    = 0;
+  r.pkts_lost = 0;
+  r.hz        = LIMEADE_RECV_DEFAULT_HZ;
+  r.ack_sz    = 65535; // max packet size (though a proper LIMEADE_ACK could
                         // never be morethan 1KB)
 
   return LIMEADE_SUCCESS;
@@ -108,7 +101,7 @@ inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
 {
   /* ctx->recv (step 2) */
   struct limeade_indiv_recv *d;
-  struct limeade_recv_data  *r = ctx->recv;
+  struct limeade_recv_data  r = ctx->recv;
 
   void*(*th_recv_f)(void*);
 
@@ -130,20 +123,20 @@ inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
       th_recv_f = &limeade_th_recv_host_eth;
   }
 
-  r->pkts = malloc(sizeof(struct limeade_indiv_recv) * r->nr_pkts);
-  if(!r->pkts)
+  r.pkts = malloc(sizeof(struct limeade_indiv_recv) * r.nr_pkts);
+  if(!r.pkts)
     return LIMEADE_ERROR_MEMORY;
 
-  r->ack = malloc(r->ack_sz);
-  if(!r->ack)
+  r.ack = malloc(r.ack_sz);
+  if(!r.ack)
   {
-    free(r->pkts);
+    free(r.pkts);
     return LIMEADE_ERROR_MEMORY;
   }
 
-  for(int i = 0; i < r->nr_pkts; i++)
+  for(int i = 0; i < r.nr_pkts; i++)
   {
-    d = &r->pkts[i];
+    d = &r.pkts[i];
 
     d->sz    = 0;
     d->flags = 0;
@@ -151,20 +144,20 @@ inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
     d->data  = d->mtx + sizeof(pthread_mutex_t);
     if(!d->mtx)
     {
-      for(int j = i; i - 1; j > -1; j--)
-        free(r->pkts[j].mtx);
-      free(r->ack);
-      free(r->pkts);
+      for(int j = i - 1; j > -1; j--)
+        free(r.pkts[j].mtx);
+      free(r.ack);
+      free(r.pkts);
       return LIMEADE_ERROR_MEMORY;
     }
   }
 
-  if(pthread_create(&r->tid, NULL, *th_recv_f, ctx) != 0)
+  if(pthread_create(r.tid, NULL, *th_recv_f, ctx) != 0)
   {
-    for(int i = 0; i < r->nr_pkts; i++)
-      free(r->pkts[j].mtx);
-    free(r->ack);
-    free(r->pkts);
+    for(int i = 0; i < r.nr_pkts; i++)
+      free(r.pkts[i].mtx);
+    free(r.ack);
+    free(r.pkts);
     return LIMEADE_ERROR_OTHER;
   }
   return LIMEADE_SUCCESS;
@@ -172,19 +165,24 @@ inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
 
 void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
 {
-  free(r->mtx_ack);
-  free(ctx->recv);
+  free(ctx->recv.mtx_ack);
 }
 
 void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
 {
+  struct limeade_recv_data r = ctx->recv;
   //pthread_cancel(*ctx->recv->tid);
-  pthread_mutex_lock(ctx->recv->mtx_kys);
+  pthread_mutex_lock(r.mtx_kys);
   // TODO pthread_mutex_destroy everything
-   for(int i = 0; i < r->nt_pkts; i++)
-     free(r->pkts[i].mtx);
-   free(r->ack);
-   free(r->pkts);
+  pthread_mutex_t *m;
+  for(int i = 0; i < r.nr_pkts; i++)
+  {
+    m = r.pkts[i].mtx;
+    pthread_mutex_destroy(m);
+    free(m);
+  }
+  free(r.ack);
+  free(r.pkts);
 }
 
 inline void limeade_destruct_th_recv(struct limeade_context *ctx)

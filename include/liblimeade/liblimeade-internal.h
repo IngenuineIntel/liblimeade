@@ -112,20 +112,37 @@ static int name(void *src, type *dst, uint16_t rem)  \
  * takes a verified packet and places it into the context-wide
  * packet queue
  */
-void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt, uint16_t sz);
+void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
+                            unsigned int sz, struct sockaddr_in *addr,
+                            socklen_t len);
 
-/* limeade_host_eth_recv
+/* limeade_eth_recv
  *
- * receives next UDP packet for UDP server mode
+ * receives next UDP packet for UDP mode
  */
-inline int limeade_host_eth_recv(const struct limeade_context *ctx,
-                                 const void *buffer, const unsigned int sz,
-                                 struct sockaddr *cliaddr, socklen_t &cli_len);
+int limeade_eth_recv(const struct limeade_context *ctx,
+                            const void *buffer, const unsigned int sz,
+                            struct sockaddr *cliaddr, socklen_t *cli_len);
+
+/* limeade_ssh_recv
+ *
+ * receives next SSH chunk for SSH mode
+ * FIXME queue management algorithm from before
+ */
+inline int limeade_ssh_recv(const struct limeade_context *ctx,
+                            const void *buffer, const unsigned int sz);
 
 /* limeade_prelim_confirm
  *
  * does preliminary checks on a packet to make sure it is valid
  */
 int limeade_prelim_confirm(const void *buffer, const int sz);
+
+/*** th_recv functions ***/
+void *limeade_th_recv_client_eth(void *arg);
+void *limeade_th_recv_host_eth(void *arg);
+void *limeade_th_recv_client_ssh(void *arg);
+void *limeade_th_recv_client_libssh(void *arg);
+void *limeade_th_recv_host_ssh(void *arg);
 
 #endif /* _LIBLIMEADE_INTERNAL_H_ */

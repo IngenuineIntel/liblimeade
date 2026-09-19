@@ -2,9 +2,11 @@
 //
 // AGPL
 
-#include<liblimeade/liblimeade-interna.h>
+#include<pthread.h>
 
-#define MAGSZ sizeof(LIMEADE_PACKET_MAGIC)
+#include<liblimeade/liblimeade-internal.h>
+
+#define MAGSZ sizeof(LIMEADE_MAGIC)
 
 void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
                             unsigned int sz, struct sockaddr_in *addr,
@@ -12,7 +14,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 {
   /* the most incredible docstirng you've ever read */
 
-  if(((struct limeade_packet_flags*)pkt)->type == LIMEADE_ACKNOWLEDGE)
+  if(((struct limeade_packet_flags*)pkt)->type == LIMEADE_PACKET_ACKNOWLEDGE)
   {
     memcpy(r->ack, pkt, sz);
 
@@ -31,7 +33,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
     pthread_mutex_lock(r->mtx_idx);
     
     r->wr_idx++;
-    if(r->wr_idx >= r->nt_pkts)
+    if(r->wr_idx >= r->nr_pkts)
       r->wr_idx = 0;
 
     register struct limeade_indiv_recv *d = &r->pkts[r->wr_idx];
@@ -59,31 +61,20 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 
 }
 
-
-inline int limeade_eth_recv(const struct limeade_context *ctx,
-                                 const void *buffer, const unsigned int sz,
-                                 struct sockaddr *cliaddr, socklen_t *cli_len)
+int limeade_eth_recv(const struct limeade_context *ctx,
+                     const void *buffer, const unsigned int sz,
+                     struct sockaddr *cliaddr, socklen_t *cli_len)
 {
   pthread_mutex_lock(ctx->mtx_rfd);
   pthread_mutex_lock(ctx->mtx_mode_union);
 
-  int ret = recvfrom(ctx->rfd, buffer, sz, 0, cliaddr, cli_len);
+  int ret = recvfrom(ctx->rfd, (void*)buffer, sz, 0, cliaddr, cli_len);
 
   pthread_mutex_unlock(ctx->mtx_rfd);
   pthread_mutex_unlock(ctx->mtx_mode_union);
 
   return ret;
 }
-
-inline int limeade_client_ssh_recv(const struct limeade_context *ctx,
-                                   const void *buffer, const unsigned int sz)
-{
-  pthread_mutex_lock(ctx->mtx_rfd);
-  int ret = read(ctx->rfd, buffer, sz);
-  pthread_mutex_unlock(ctx->mtx_rfd);
-  return ret;
-}
-
 
 int limeade_prelim_confirm(const void *buffer, const int sz)
 {
@@ -93,18 +84,18 @@ int limeade_prelim_confirm(const void *buffer, const int sz)
   // note: `return -1` is replaced with `goto f` because the assembly will look
   // nicer
 
-  struct limeade_packet_flags *f = buffer + MAGSZ;
+  struct limeade_packet_flags *f = (struct limeade_packet_flags*)(buffer + MAGSZ);
 
   if(sz <= MAGSZ + sizeof(*f) + 2)
     goto f;
   
-  if(memcmp(buffer, &LIMEADE_MAGIC, MAGSZ) != 0)
+  if(memcmp(buffer, LIMEADE_MAGIC, MAGSZ) != 0)
     goto f;
   
   if(f->type >= LIMEADE_PACKET_MAX)
     goto f;
 
-  if(f->pkt_sz > sz - MAGSZ)
+  if(f->packet_size > sz - MAGSZ)
     goto f;  
 
   return 0;

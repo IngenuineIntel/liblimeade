@@ -18,6 +18,7 @@
 #ifndef _LIBLIMEADE_H_
 #define _LIBLIMEADE_H_
 
+#include <netinet/in.h>
 #include <stdint.h>
 #include <sys/socket.h>
 
@@ -222,7 +223,7 @@ struct limeade_indiv_recv
   {
     struct sockaddr_in addr;
     socklen_t addr_len;
-  }
+  };
   union
   {
     uint8_t flags;
@@ -280,7 +281,7 @@ struct limeade_eth_client
   socklen_t cliaddr_len;
   struct limeade_eth_client *prev; // previous node (or NULL if it's the first)
   struct limeade_eth_client *next; // next node (or NULL if it's the last)
-}
+};
 
 // limeade_context
 // serves as the state/instance holder for the functions in this library
@@ -643,8 +644,8 @@ int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd pkt);
 int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd pkt);
 #define limeade_parse_acknowledge limeade_parse_ack
 int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt);
-int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recv pkt);
-int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recv pkt);
+int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recvd pkt);
+int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd pkt);
 int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt);
 int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recvd pkt);
 int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt);
