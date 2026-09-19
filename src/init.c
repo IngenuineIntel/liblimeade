@@ -1,8 +1,13 @@
 // init.c
 
+#include<arpa/inet.h>
+#include<netinet/in.h>
 #include<pthread.h>
+#include<signal.h>
 #include<stdarg.h>
 #include<stdlib.h>
+#include<sys/socket.h>
+#include<unistd.h>
 
 #include<liblimeade/liblimeade-internal.h>
 
@@ -36,7 +41,7 @@ inline int limeade_init_mutexes(struct limeade_context *ctx)
     return LIMEADE_ERROR_MEMORY;
 
   for(int i = 0; i < 6; i++)
-    pthread_mutex_init(&mutexes[i]);
+    pthread_mutex_init(&mutexes[i]); // FIXME
 
   ctx->mtx_sfd        = &mutexes[0];
   ctx->mtx_rfd        = &mutexes[1];
@@ -111,7 +116,7 @@ inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
       th_recv_f = &limeade_th_recv_client_ssh;
     case LIMEADE_MODE_HOST_SSH:
       th_recv_f = &limeade_th_recv_host_ssh;
-    case LIMEADE_MODE_LIBSSH:
+    case LIMEADE_MODE_CLIENT_LIBSSH:
 #ifdef LIMEADE_HAS_SSH
       th_recv_f = &limeade_th_recv_libssh;
 #else
@@ -215,7 +220,7 @@ inline int limeade_init_th_csm_step_1(struct limeade_context *ctx)
   c->tid     = (pthread_t*)(c + sizeof(*c));
   c->mtx_kys = (pthread_mutex_t*)(&c->tid + sizeof(pthread_t*));
 
-  pthread_mutex_init(c->mtx_kys);
+  pthread_mutex_init(c->mtx_kys); // FIXME
 
   return LIMEADE_SUCCESS;
 }
@@ -229,12 +234,12 @@ inline int limeade_init_th_csm_step_2(struct limeade_context *ctx)
     uint32_t q_latent_sz = sizeof(struct limeade_csm_latency_entry)     * c->hist_latent_sz;
   
     c->hist_compr  = malloc(q_compr_sz + q_latent_sz);
-    c->hist_latent = c->hist_compr + q_compr_sz;
+    c->hist_latent = (struct limeade_csm_latency_entry*)(c->hist_compr + q_compr_sz);
   }
   if(!c->hist_compr)
     return LIMEADE_ERROR_MEMORY;
 
-  if(pthread_create(&c->id, NULL, limeade_th_csm, ctx) != 0)
+  if(pthread_create(c->tid, NULL, limeade_th_csm, ctx) != 0)
   {
     free(c->hist_compr);
     return LIMEADE_ERROR_OTHER;
@@ -243,7 +248,9 @@ inline int limeade_init_th_csm_step_2(struct limeade_context *ctx)
 }
 
 void limeade_destruct_th_csm_step_1(struct limeade_context *ctx)
+{
   free(ctx->csm);
+}
 
 void limeade_destruct_th_csm_step_2(struct limeade_context *ctx)
 {
@@ -297,7 +304,7 @@ inline int limeade_init_ssh_client_step_1(struct limeade_context *ctx, const cha
       close(to_ssh[1]);
 
       // ssh -s limeade user@host
-      execlp("ssh", "ssh", "-s", LIMEADE_SUBSYSTEM_NAME, dest, NULL);
+      execlp("ssh", "ssh", "-s", LIMEADE_SUBSYSTEM, dest, NULL);
 
       exit(-1);
       
@@ -330,7 +337,7 @@ inline int limeade_init_eth_client_step_1(struct limeade_context *ctx,
   ctx->rfd = ctx->sfd;
 
   if(ctx->sfd < 0)
-    return LIMEADE_ERROR_NETWORKING;
+    return LIMEADE_ERROR_NETWORK;
 
   memset(&ctx->saddr, 0, sizeof(ctx->saddr));
 
@@ -374,7 +381,7 @@ inline int limeade_init_eth_host_step_1(struct limeade_context *ctx,
   // TODO
 }
 
-inline int limeade_init_start_eth_host_step_2(struct limeade_context *ctx,
+inline int limeade_init_eth_host_step_2(struct limeade_context *ctx,
                                               const char *dest, const int port)
 {
   // TODO
@@ -427,7 +434,7 @@ int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
 {
   register int r;
   va_list arg;
-  va_start(arg, flags);
+  va_start(arg, flags); // FIXME 'default promotion to va_start is undefined'
 
   ctx->mode       = flags & 0b00001111;
   ctx->compr_mode = flags & 0b11110000;
@@ -449,7 +456,7 @@ int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
     {
       const char *dest = va_arg(arg, const char*);
       
-      ctx->dest = malloc(++strlen(dest));
+      ctx->dest = malloc(strlen(dest) + 1);
       if(!ctx->dest)
         return LIMEADE_ERROR_MEMORY;
       strcpy(ctx->dest, dest);
@@ -471,14 +478,14 @@ int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
     {
       const char *dest = va_arg(arg, const char*);
 
-      ctx->dest = malloc(++strlen(dest));
+      ctx->dest = malloc(strlen(dest) + 1);
       ctx->port = va_arg(arg, int);
 
       if(!ctx->dest)
         return LIMEADE_ERROR_MEMORY;
       strcpy(ctx->dest, dest);
 
-      r = limeade_init_host_eth_step_1(ctx, dest, port);
+      r = limeade_init_eth_host_step_1(ctx, dest, ctx->port);
       ERR_LBL(x, y); // TODO FIXME
     }
 
@@ -486,14 +493,14 @@ int limeade_init(struct limeade_context *ctx, uint8_t flags, ...)
     {
       const char *dest = va_arg(arg, const char*);
 
-      ctx->dest = malloc(++strlen(dest));
+      ctx->dest = malloc(strlen(dest) + 1);
       ctx->port = va_arg(arg, int);
 
       if(!ctx->dest)
         return LIMEADE_ERROR_MEMORY;
       strcpy(ctx->dest, dest);
 
-      r = limeade_init_client_eth_step_1(ctx, dest, port);
+      r = limeade_init_eth_client_step_1(ctx, dest, ctx->port);
       ERR_LBL(x, y); // FIXME
     }
 

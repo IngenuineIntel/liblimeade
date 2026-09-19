@@ -145,4 +145,7 @@ void *limeade_th_recv_client_ssh(void *arg);
 void *limeade_th_recv_client_libssh(void *arg);
 void *limeade_th_recv_host_ssh(void *arg);
 
+/*** th_csm ***/
+void *limeade_th_csm(void *arg);
+
 #endif /* _LIBLIMEADE_INTERNAL_H_ */

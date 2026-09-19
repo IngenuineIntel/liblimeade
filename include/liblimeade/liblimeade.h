@@ -204,7 +204,7 @@ struct limeade_csm_data
 //
 // likewise, this can be used for any component of ctx->csm
 //
-#define LIMEAE_CSM_FREQ_S 2.0 // every 2 seconds
+#define LIMEADE_CSM_FREQ_S 2.0 // every 2 seconds
 
 // on a host machine (particularly LIMEADE_MODE_HOST_ETH), a list of clients has to be
 // stored
@@ -314,7 +314,7 @@ struct limeade_context
   struct limeade_csm_data *csm;
 
   // "public attributes"
-  char *destination;
+  char *dest;
   int port;
   uint64_t sessionid;
   uint32_t ack_wait_time_ms; // amount of time to try to send data before giving up
