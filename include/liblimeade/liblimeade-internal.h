@@ -66,40 +66,6 @@ void limeade_csm_add_compr_entry(struct limeade_context *ctx,
 void limeade_csm_add_latency_entry(struct limeade_context *ctx,
                                    struct limeade_csm_latency_entry *entry);
 
-// the following structures represent a datatype used internally to parse
-// packets. It is, more or less, a 2D array of pointers to delimeters in
-// the packet, but has the following caveats:
-// 1. columns aren't fixed-width
-// 2. the datatype exists within a single buffer
-struct limeade_frag_row
-{
-  uint8_t nr_col;
-  void **col;
-};
-
-struct limeade_frag_pkt
-{
-  uint16_t nr_row;
-  struct limeade_frag_row *row;
-};
-
-// constants for `limeade_frag`
-#define LIMEADE_FRAG_TOTAL_ALLOCATION 1 << 16
-#define LIMEADE_FRAG_COL_START       (1 << 16) / 2
-
-/* limeade_frag
- *
- * processes packet data & returns a grid datatype of pointers to data within
- * the packet
- */
-struct limeade_frag_pkt limeade_frag(struct limeade_recvd *pkt);
-
-/* limeade_release_frag
- *
- * releases data returned by limeade_frag
- */
-inline void limeade_release_frag(struct limeade_frag_pkt);
-
 // the following macros are for creating functions used for parsing data from
 // packets
 #define LIMEADE_TYPECHECK_UINT(x) if(x != 0b00100000)
@@ -126,6 +92,18 @@ static int name(void *src, type *dst, int rem)       \
   *dst = *(type*)(src + 1);                          \
   return 2 + sizeof(type);                           \
 }
+
+/* limeade_decompress_packet
+ *
+ * decompresses data section of packet
+ *
+ * 0 on success, -1 on error
+ */
+int limeade_decompress_packet(struct limeade_recvd pkt);
+
+// strlen reimplementation that uses LIMEADE_FIELD_DELLIM or LIMEADE_ROW_DELIM
+// instead of 0x00
+uint32_t limeade_pkt_strlen(const char *s);
 
 /* limeade_th_recv_wr_pkt
  *

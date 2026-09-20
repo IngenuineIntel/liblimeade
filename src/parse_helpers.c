@@ -1,90 +1,30 @@
 // parse_helpers.c
-// AGPL
+//
+// Copyright (C) 2026 Roan Rothrock
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#include<stdlib.h>
+
+#include<emmintrin.h>
+#include<stddef.h>
 #include<string.h>
+
+#include<zlib.h>
 
 #include <liblimeade/liblimeade-internal.h>
 
-struct limeade_frag_pkt limeade_frag(struct limeade_recvd *pkt)
-{
-  struct limeade_frag_pkt f;
-  void *counter1, *counter2, *next1, *next2, *prev1, *prev2;
-  uint64_t rem1, rem2;
-  uint16_t limit1, limit2, break_indicator;
-  struct limeade_frag_row *r;
-
-  // counter1, next1, prev1, & rem1 are used for parsing rows, &
-  // counter2, next2, prev2, & rem2 are used for parsing fields
-
-  counter1 = f.row = malloc(LIMEADE_FRAG_TOTAL_ALLOCATION);
-  counter2 = f.row + LIMEADE_FRAG_COL_START;
-
-  prev1 = pkt->data + 1;
-  rem1  = pkt->pkt_sz - sizeof(struct limeade_packet_flags) - 1;
-
-  f.nr_row = break_indicator = 0;
-
-  // TODO memory limit checks
-  for(;;)
-  {
-    next1 = memmem(prev1, rem1, (void*)LIMEADE_ROW_DELIM, 1);
-
-    if(!next1)
-    {
-      next1 = prev1 + rem1;
-      break_indicator = 1;
-    }
-
-    r = &(f.row[f.nr_row]);
-
-    rem2     = next1 - prev1;
-    prev2    = prev1;
-
-    r->nr_col = 1;
-    r->col    = counter2;
-    r->col[0] = prev2 + 1;
-    counter2 += sizeof(void*);
-
-    for(;;)
-    {
-      next2 = memmem(prev2, rem2, (void*)LIMEADE_FIELD_DELIM, 1);
-
-      if(!next2 || next2 > next1)
-        break;
-
-      r->col[r->nr_col] = next2 + 1;
-      counter2 += sizeof(void*);
-      r->nr_col++;
-
-      prev2 = next2;
-      rem2 = next1 - next2;
-    }
-
-    if(break_indicator)
-      break;
-
-    f.nr_row++;
-
-    counter1 += sizeof(*r);
-    rem1 -= (next1 - prev1) + 1;
-    prev1 = next1 + 1;
-  }
-
-  return f;
-
-  err:
-
-  f.nr_row = 0;
-  free(f.row);
-  return f;
-}
-
-inline void limeade_release_frag(struct limeade_frag_pkt pkt)
-{
-  free(pkt.row);
-}
-
+/*
 int limeade_get_nr_rows(struct limeade_recvd *pkt)
 {
   int ret = 0, rem  = pkt->pkt_sz - sizeof(struct limeade_packet_flags);
@@ -100,5 +40,85 @@ int limeade_get_nr_rows(struct limeade_recvd *pkt)
     rem -= (next - prev + 1);
     prev = next + 1;
   }
+}
+*/
+
+int limeade_decompress_packet(struct limeade_recvd pkt)
+{
+  uLongf new_l = 1 << 16;
+  void *new = malloc((int)new_l);
+
+  if(!new)
+    return -1;
+  struct limeade_packet_flags *f = pkt.flags;
+
+
+  if(!f->compr_lvl)
+    return 0;
+
+  int data_sz = ((struct limeade_packet_flags*)pkt.flags)->packet_size;
+
+  if(uncompress(new, &new_l, pkt.data, f->packet_size) != Z_OK)
+  {
+    free(new);
+    return -1;
+  }
+
+  pkt.pkt_sz = sizeof(LIMEADE_MAGIC) + sizeof(*f) + new_l;
+  pkt.pkt = realloc(pkt.pkt, pkt.pkt_sz);
+  if(!pkt.pkt)
+  {
+    free(new);
+    return -1;
+  }
+
+  pkt.flags = pkt.pkt   + sizeof(LIMEADE_MAGIC);
+  pkt.data  = pkt.flags + sizeof(*f);
+  memcpy(pkt.data, new, new_l);
+
+  free(new);
+
+  return 0;
+}
+
+// note: implementing this without SIMD would feel pretty gross, it's
+// unconventional but improves performance relatively quickly
+// also note that this uses SSE2 (16 byte) instead of AVX2 (32 byte) because I
+// forsee the strings being passed into this function not being very long
+uint32_t limeade_pkt_strlen(const char *s)
+{
+  __m128i fd, rd, chunk, m1, m2, mask;
+  int match;
+  uint32_t len = 0;
+
+  fd = _mm_set1_epi8(LIMEADE_FIELD_DELIM);
+  rd = _mm_set1_epi8(LIMEADE_ROW_DELIM);
+  len = 0;
+
+  // aligning to memory page boundary
+  while(((uintptr_t)s & 15) && *s != LIMEADE_FIELD_DELIM
+                            && *s != LIMEADE_ROW_DELIM)
+  {
+    s++;
+    len++;
+  }
+
+  for(;;)
+  {
+    chunk = _mm_load_si128((const __m128i*)s);
+    m1    = _mm_cmpeq_epi8(chunk, fd);
+    m2    = _mm_cmpeq_epi8(chunk, rd);
+    mask  = _mm_or_si128(m1, m2);
+    match = _mm_movemask_epi8(mask);
+
+    if(match)
+    {
+      len += __builtin_ctz(match);
+      break;
+    }
+    s   += 16;
+    len += 16;
+  }
+  return len;
 }
 

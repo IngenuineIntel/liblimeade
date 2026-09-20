@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#include<errno.h>
+#include<errno.h> // IWYU pragma: keep
 #include<pthread.h>
 #include<stdlib.h>
 #include<string.h>
@@ -148,6 +148,16 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data)
   return ret;
 }
 
+static int limeade_cast_str(void *src, char **dst, int rem)
+{
+  register uint32_t l = limeade_pkt_strlen(src);
+  *dst = malloc(l + 1);
+  if(!*dst) return -1;
+  memcpy(*dst, src, l);
+  *(*dst + l) = '\x00';
+  return l + 1;
+}
+
 LIMEADE_CAST_FUNC(limeade_cast_u8, uint8_t, LIMEADE_TYPECHECK_UINT);
 LIMEADE_CAST_FUNC(limeade_cast_u16, uint16_t, LIMEADE_TYPECHECK_UINT);
 LIMEADE_CAST_FUNC(limeade_cast_u32, uint32_t, LIMEADE_TYPECHECK_UINT);
@@ -168,7 +178,8 @@ LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
   int32_t*:  limeade_cast_i32, \
   int64_t*:  limeade_cast_i64, \
   float*:    limeade_cast_flt, \
-  double*:   limeade_cast_dbl  \
+  double*:   limeade_cast_dbl, \
+  char**:    limeade_cast_str  \
 )(dst, src, rem)
 
 #define CAST(dst)\
@@ -209,10 +220,11 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   pid_t *died_start;
   struct limeade_indiv_proc **altered_p_start;
   struct limeade_indiv_proc *altered_s_start;
-  int rem;
+  int t_sz, rem;
   register int _;
 
-  // TODO decompress
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
   
   idx = pkt.data;
   rem = pkt.pkt_sz - sizeof(struct limeade_packet_flags*);
@@ -222,8 +234,11 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   CAST(&out->total_died);
   CAST(&out->total_altered);
 
-  alloc = malloc(out->total_died    * sizeof(pid_t)
-               + out->total_altered * (sizeof(**out->altered) + sizeof(void*)));
+  t_sz = out->total_died * sizeof(pid_t)
+       + out->total_altered * (sizeof(*out->altered) + sizeof(void*));
+
+  alloc = malloc(t_sz);
+  memset(alloc, 0, t_sz); // makes exit algorithm easier
 
   if(!alloc)
     return LIMEADE_ERROR_MEMORY;
@@ -244,20 +259,21 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
 
   for(int i = 0; i < out->total_altered; i++)
   {
-    j = out->altered[i];
+    j = &out->altered[i];
     CAST(&j->pid);
     CAST(&j->ppid);
     CAST(&j->uid);
     CAST(&j->threads);
     CAST(&j->cpu_ticks);
     CAST(&j->vm_rss_kb);
-
-    // TODO copy string (j->command)
+    CAST(&j->command);
   }
 
   return LIMEADE_SUCCESS;
 
 err:
+  for(int i = 0; i < out->total_altered && &out->altered[i]; i++)
+    free(out->altered[i].command);
   free(alloc);
   return LIMEADE_ERROR_BAD_DATA;
 }

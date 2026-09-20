@@ -226,7 +226,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
 
       for(i = 0; i < data.total_altered; i++)
       {
-        j = data.altered[i];
+        j = &data.altered[i];
 
         INC(j->pid);
         FDELIM();

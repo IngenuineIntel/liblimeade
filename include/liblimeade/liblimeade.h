@@ -517,7 +517,7 @@ struct limeade_proc_update
   uint16_t total_died;                 // total dead processes
   uint16_t total_altered;              // total altered processes
   pid_t *died;                         // list of dead processes
-  struct limeade_indiv_proc **altered; // data of altered processes
+  struct limeade_indiv_proc *altered; // data of altered processes
 };
 
 // equivalent to LIMEADE_PACKET_PERF
