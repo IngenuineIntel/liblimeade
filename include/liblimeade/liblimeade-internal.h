@@ -21,6 +21,25 @@
 
 #include<liblimeade/liblimeade.h>
 
+// function generator for writing data into packets before sending
+#define LIMEADE_UINT_INDICATOR 0b00100000
+#define LIMEADE_SINT_INDICATOR 0b01000000
+#define LIMEADE_FLT_INDICATOR 0b01100000
+#define LIMEADE_GEN_PREP_FN(name, type, indicator)\
+static int name(type in, void *out, int max)\
+{\
+  if(!out) return 0;\
+  if(sizeof(in) + 1 > max) return -1;\
+  if(in == 0)\
+  {\
+    *(uint8_t*)out = '\x00';\
+    return 1;\
+  }\
+  *(uint8_t*)out = indicator & sizeof(in);\
+  *((type*)out + 1) = in;\
+  return sizeof(in) + 1;\
+}
+
 /* limeade_monotonic
  *
  * wrapper for monotonic timestamps
@@ -87,24 +106,25 @@ inline void limeade_release_frag(struct limeade_frag_pkt);
 #define LIMEADE_TYPECHECK_INT(x)  if(x != 0b01000000)
 #define LIMEADE_TYPECHECK_FLT(x)  if(x != 0b01100000)
 #define LIMEADE_CAST_FUNC(name, type, typecheck)     \
-static int name(void *src, type *dst, uint16_t rem)  \
+static int name(void *src, type *dst, int rem)       \
 {                                                    \
-  register uint8_t datatype = *(uint8_t*)src;        \
+  register uint8_t databyte = *(uint8_t*)src;        \
+  register uint8_t datatype = databyte & 0b11100000; \
   register uint8_t datasize = datatype & 0b00011111; \
   datatype &= 0b11100000;                            \
-  if(datasize > rem) return 0;                       \
+  if(datasize + 1 > rem) return 0;                   \
   typecheck(datatype)                                \
   {                                                  \
-    if(data_byte != 0b00000000 || datasize > y)      \
+    if(databyte != 0b00000000)                       \
       return -1;                                     \
     else                                             \
     {                                                \
-      *dst = 0;                                      \
+      *(type*)dst = 0;                               \
       return 1;                                      \
     }                                                \
   }                                                  \
   *dst = *(type*)(src + 1);                          \
-  return 1 + sizeof(type);                           \
+  return 2 + sizeof(type);                           \
 }
 
 /* limeade_th_recv_wr_pkt
@@ -127,7 +147,6 @@ int limeade_eth_recv(const struct limeade_context *ctx,
 /* limeade_ssh_recv
  *
  * receives next SSH chunk for SSH mode
- * FIXME queue management algorithm from before
  */
 inline int limeade_ssh_recv(const struct limeade_context *ctx,
                             const void *buffer, const unsigned int sz);

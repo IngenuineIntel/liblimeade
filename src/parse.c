@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include<errno.h>
 #include<pthread.h>
 #include<stdlib.h>
 #include<string.h>
@@ -38,7 +39,7 @@ int limeade_send_acknowledge(struct limeade_context *ctx, struct limeade_recvd p
   out.recv_ts_s  = t_recv.tv_sec;
   out.recv_ts_ms = t_recv.tv_nsec / 1000000;
 
-  return limeade_send(ctx, LIMEADE_ACKNOWLEDGE, out);
+  return limeade_send(ctx, LIMEADE_PACKET_ACKNOWLEDGE, out);
 }
 
 // TODO make all recv functions use ctx->recv. instead of ctx->recv->
@@ -47,9 +48,9 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd out)
   struct limeade_indiv_recv *r;
   struct limeade_packet_flags *f;
 
-  pthread_mutex_lock(ctx->recv->mtx_idx);
-  r = ctx->recv.pkts[ctx->recv->read_idx];
-  pthread_mutex_unlock(ctx->recv->mtx_idx);
+  pthread_mutex_lock(ctx->recv.mtx_idx);
+  r = &ctx->recv.pkts[ctx->recv.read_idx];
+  pthread_mutex_unlock(ctx->recv.mtx_idx);
 
   pthread_mutex_lock(r->mtx);
 
@@ -93,14 +94,14 @@ struct limeade_recv_waiter_data
   struct timespec wait_t;
   pthread_mutex_t mtx;
   pthread_t tid;
-}
+};
 
 void *limeade_recv_waiter(void *arg)
 {
-  struct limeade_recv_wait_data *d = arg;
-  pthread_mutex_lock(&d->indicator_mtx);
+  struct limeade_recv_waiter_data *d = arg;
+  pthread_mutex_lock(&d->mtx);
   nanosleep(&d->wait_t, &d->wait_t);
-  pthread_mutex_unlock(&d->indicator_mtx);
+  pthread_mutex_unlock(&d->mtx);
   return NULL;
 }
 
@@ -114,7 +115,7 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
   wait_inc.tv_sec  = 0;
   wait_inc.tv_nsec = 100000000; // 10hz
 
-  pthread_mutex_init(&d.mtx);
+  pthread_mutex_init(&d.mtx, NULL);
   pthread_create(&d.tid, NULL, limeade_recv_waiter, &d);
 
   do
@@ -137,54 +138,45 @@ int limeade_recv_wait(struct limeade_context *ctx, struct limeade_recvd out, int
 {
   int e = limeade_recv_wait_noreply(ctx, out, wait_ms);
   if(e == LIMEADE_SUCCESS)
-    return limeade_send_acknowledge(out);
+    return limeade_send_acknowledge(ctx, out);
   return e;
 }
-flags(struct limeade_recvd data)
+struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data)
 {
   struct limeade_packet_flags ret;
   memcpy(&ret, data.flags, sizeof(ret));
   return ret;
 }
 
-// parsing system design (v2.1) (I've gone through a lot of shit ones in my head)
-// 0. return gracefully if packet type is wrong
-// 1. count number of rows and columns
-// 3. confirm row/column data matches what's expected for packet type
-// 4. note locations of strings
-// 5. create buffer for all strings, and copy all string data into that
-// buffer
-
 LIMEADE_CAST_FUNC(limeade_cast_u8, uint8_t, LIMEADE_TYPECHECK_UINT);
 LIMEADE_CAST_FUNC(limeade_cast_u16, uint16_t, LIMEADE_TYPECHECK_UINT);
 LIMEADE_CAST_FUNC(limeade_cast_u32, uint32_t, LIMEADE_TYPECHECK_UINT);
 LIMEADE_CAST_FUNC(limeade_cast_u64, uint64_t, LIMEADE_TYPECHECK_UINT);
 LIMEADE_CAST_FUNC(limeade_cast_i8, int8_t, LIMEADE_TYPECHECK_INT);
-LIMEADE_CASE_FUNC(limeade_cast_i16, int16_t, LIMEADE_TYPECHECK_INT);
+LIMEADE_CAST_FUNC(limeade_cast_i16, int16_t, LIMEADE_TYPECHECK_INT);
 LIMEADE_CAST_FUNC(limeade_cast_i32, int32_t, LIMEADE_TYPECHECK_INT);
 LIMEADE_CAST_FUNC(limeade_cast_i64, int64_t, LIMEADE_TYPECHECK_INT);
 LIMEADE_CAST_FUNC(limeade_cast_flt, float, LIMEADE_TYPECHECK_FLT);
 LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
-#define _limeade_cast(src, dst, rem) _Generic((x), \
-  uint8_t*:  limeade_cast_u8,    \
-  uint16_t*: limeade_cast_u16,   \
-  uint32_t*: limeade_cast_u32,   \
-  uint64_t*: limeade_cast_u64,   \
-  int8_t*:   limeade_cast_i8,    \
-  int16_t*:  limeade_cast_i16,   \
-  int32_t*:  limeade_cast_i32,   \
-  int64_t*:  limeade_cast_i64,   \
-  float*:    limeade_cast_flt,   \
-  double*:   limeade_cast_double \
-)(src, x, rem)
+#define _limeade_cast(dst, src, rem) _Generic((dst), \
+  uint8_t*:  limeade_cast_u8,  \
+  uint16_t*: limeade_cast_u16, \
+  uint32_t*: limeade_cast_u32, \
+  uint64_t*: limeade_cast_u64, \
+  int8_t*:   limeade_cast_i8,  \
+  int16_t*:  limeade_cast_i16, \
+  int32_t*:  limeade_cast_i32, \
+  int64_t*:  limeade_cast_i64, \
+  float*:    limeade_cast_flt, \
+  double*:   limeade_cast_dbl  \
+)(dst, src, rem)
 
-#define limeade_cast(dst)\
-ret = _limeade_cast(cur, &dst, rem);\
-if(ret == 0) goto pkt_ran_out;\
-if(ret > 0)  goto invalid_value;\
-cur += ret;\
-idx += ret;\
-rem -= ret;
+#define CAST(dst)\
+_ = _limeade_cast(dst, idx, rem);\
+if(_ < 0) goto err;\
+rem -= _;\
+idx += _;
+  
 
 int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd pkt)
 {
@@ -213,10 +205,61 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
 
 int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd pkt)
 {
-  struct limeade_frag_pkt f;
-  
-  f = limeade_frag(&pkt);
+  void *idx, *alloc;
+  pid_t *died_start;
+  struct limeade_indiv_proc **altered_p_start;
+  struct limeade_indiv_proc *altered_s_start;
+  int rem;
+  register int _;
 
+  // TODO decompress
+  
+  idx = pkt.data;
+  rem = pkt.pkt_sz - sizeof(struct limeade_packet_flags*);
+
+  //if(!limeade_parse_prelim_check(&pkt)) return LIMEADE_ERROR_BAD_DATA;
+
+  CAST(&out->total_died);
+  CAST(&out->total_altered);
+
+  alloc = malloc(out->total_died    * sizeof(pid_t)
+               + out->total_altered * (sizeof(**out->altered) + sizeof(void*)));
+
+  if(!alloc)
+    return LIMEADE_ERROR_MEMORY;
+
+  died_start = alloc;
+  altered_p_start = (void*)died_start      + out->total_died * sizeof(pid_t);
+  altered_s_start = (void*)altered_p_start + out->total_altered * sizeof(void*);
+
+  for(int i = 0; i < out->total_altered; i++)
+    altered_p_start[i] = &altered_s_start[i];
+
+  for(int i = 0; i < out->total_died; i++)
+  {
+    CAST(&out->died[i]);
+  }
+
+  struct limeade_indiv_proc *j;
+
+  for(int i = 0; i < out->total_altered; i++)
+  {
+    j = out->altered[i];
+    CAST(&j->pid);
+    CAST(&j->ppid);
+    CAST(&j->uid);
+    CAST(&j->threads);
+    CAST(&j->cpu_ticks);
+    CAST(&j->vm_rss_kb);
+
+    // TODO copy string (j->command)
+  }
+
+  return LIMEADE_SUCCESS;
+
+err:
+  free(alloc);
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt)
@@ -239,4 +282,4 @@ int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt)
   // TODO
 }
 
-#undef limeade_cast
+#undef CAST

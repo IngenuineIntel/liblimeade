@@ -50,9 +50,9 @@ void limeade_diag_error(enum limeade_error x)
     case LIMEADE_ERROR_NOT_SUPPORTED:
       printf("LIMEADE_ERROR_NOT_SUPPORTED;\n");
     case LIMEADE_ERROR_OTHER:
-      print("LIMEADE_ERROR_OTHER;\n");
+      printf("LIMEADE_ERROR_OTHER;\n");
     case LIMEADE_MAXIMUM_ERROR:
-      print("LIMEADE_MAXIMUM_ERROR;\n");
+      printf("LIMEADE_MAXIMUM_ERROR;\n");
     default:
       printf("%i; // unknown\n", x);
   }

@@ -392,12 +392,9 @@ struct limeade_packet_data
   uint8_t type;    // type of packet
   uint8_t compr;   // current compression level
   uint32_t pkt_sz; // size of packet in memory
-  union
-  {
-    void *pkt;   // pointer to beginning of packet
-    void *flags; // pointer to thing that is also the beginning of the packet
-  };
-  void *data; // where the flags stop and the fields begin
+  void *pkt;   // pointer to beginning of packet
+  void *flags; // .pkt   + sizeof(LIMEADE_MAGIC)
+  void *data;  // .flags + sizeof(struct limeade_packet_flags);
 };
 
 // every packet starts with a magic
@@ -549,9 +546,9 @@ struct limeade_commandeer
 // flags options for struct limeade_commandeer
 enum limeade_commandeer_flags
 {
-  LIMEADE_COMMANDEER_WO_JAIL = 1,   // otherwise, executed in jail
+  LIMEADE_COMMANDEER_WO_JAIL   = 1, // otherwise, executed in jail
   LIMEADE_COMMANDEER_HIGH_PRIV = 2, // otherwise, executed with normal privledges
-  LIMEADE_COMMANDEER_TTY = 4,       // otherwise, executed without TTY environment
+  LIMEADE_COMMANDEER_TTY       = 4, // otherwise, executed without TTY environment
 };
 // for example, LIMEADE_COMMANDEER_WO_JAIL|LIMEADE_COMMANDEER_HIGH_PRIV would
 // be a value `flags` value
