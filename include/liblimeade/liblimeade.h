@@ -481,7 +481,7 @@ struct limeade_indiv_event
 struct limeade_events
 {
   uint16_t nr_events;
-  struct limeade_indiv_event **events;
+  struct limeade_indiv_event *events;
 };
 
 // each process individually
@@ -508,7 +508,7 @@ struct limeade_indiv_proc
 struct limeade_proc_generic
 {
   uint16_t total;
-  struct limeade_indiv_proc **procs;
+  struct limeade_indiv_proc *procs;
 };
 
 // equivalent to LIMEADE_PACKET_PROC_UPDATe

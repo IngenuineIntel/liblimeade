@@ -42,7 +42,6 @@ int limeade_send_acknowledge(struct limeade_context *ctx, struct limeade_recvd p
   return limeade_send(ctx, LIMEADE_PACKET_ACKNOWLEDGE, out);
 }
 
-// TODO make all recv functions use ctx->recv. instead of ctx->recv->
 int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd out)
 {
   struct limeade_indiv_recv *r;
@@ -182,80 +181,230 @@ LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
   char**:    limeade_cast_str  \
 )(dst, src, rem)
 
+#define CAST_INIT()                                         \
+register int _;                                             \
+void *idx = pkt.data;                                       \
+int rem = pkt.pkt_sz - sizeof(struct limeade_packet_flags); \
+char last_delim;
+
 #define CAST(dst)\
-_ = _limeade_cast(dst, idx, rem);\
-if(_ < 0) goto err;\
-rem -= _;\
-idx += _;
-  
+_ = _limeade_cast(dst, idx, rem); \
+rem -= _;                         \
+if(rem <= 0 || _ < 0) goto err;   \
+idx += _;                         \
+last_delim = *(char*)(idx - 1);
+
+#define IF_NOT_ROW_END()\
+if(last_delim != LIMEADE_ROW_DELIM)
+
+int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd pkt)
+{
+  // these packet should never really be compressed anyway, but...
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  CAST_INIT();
+  CAST(&out->prev_connected);
+  CAST(&out->prev_session);
+
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
+}
 
 int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd pkt)
 {
-  // TODO
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  if(limeade_get_nr_rows(&pkt) != 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  CAST_INIT();
+  CAST(&out->accepted);
+  CAST(&out->new_session);
+
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd pkt)
 {
-  // TODO
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  if(limeade_get_nr_rows(&pkt) != 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  CAST_INIT();
+  CAST(&out->hostname);
+  CAST(&out->kernelver);
+  CAST(&out->distro);
+  CAST(&out->origin_user);
+  CAST(&out->processor);
+  CAST(&out->vendor);
+  CAST(&out->ram_mbs);
+  CAST(&out->swap_mbs);
+
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd pkt)
 {
-  // TODO
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  if(limeade_get_nr_rows(&pkt) != 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  CAST_INIT();
+  CAST(&out->send_ts_s);
+  CAST(&out->send_ts_ms);
+  CAST(&out->recv_ts_s);
+  CAST(&out->recv_ts_ms);
+  
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
 {
-  // TODO
+  void *alloc;
+  struct limeade_indiv_event *j;
+
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  CAST_INIT();
+  CAST(&out->nr_events);
+  IF_NOT_ROW_END()
+    return LIMEADE_ERROR_BAD_DATA;
+
+  if(limeade_get_nr_rows(&pkt) != out->nr_events + 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  alloc = malloc(sizeof(*j) * out->nr_events);
+  if(!alloc)
+    return LIMEADE_ERROR_MEMORY;
+
+  for(int i = 0; i < out->nr_events; i++)
+  {
+    j = &out->events[i];
+    CAST(&j->ts_s);
+    CAST(&j->ts_ms);
+    CAST(&j->pid);
+    CAST(&j->syscall);
+    CAST(&j->arg1);
+    CAST(&j->arg2);
+    CAST(&j->retval);
+    IF_NOT_ROW_END()
+      goto err;
+  }
+
+  return LIMEADE_SUCCESS;
+
+err:
+  for(int i = 0; i < out->nr_events && &out->events[i]; i++)
+  {
+    j = &out->events[i];
+    free(j->syscall);
+    free(j->arg1);
+    free(j->arg2);
+  }
+  free(alloc);
+
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recvd pkt)
 {
-  // TODO
+  void *alloc;
+  struct limeade_indiv_proc *j;
+
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  CAST_INIT();
+  CAST(&out->total);
+
+  IF_NOT_ROW_END()
+    return LIMEADE_ERROR_BAD_DATA;
+
+  if(limeade_get_nr_rows(&pkt) != out->total + 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  alloc = malloc(sizeof(*j) * out->total);
+  if(!alloc)
+    return LIMEADE_ERROR_MEMORY;
+  
+  for(int i = 0; i < out->total; i++)
+  {
+    j = &out->procs[i];
+    CAST(&j->pid);
+    CAST(&j->ppid);
+    CAST(&j->uid);
+    CAST(&j->threads);
+    CAST(&j->cpu_ticks);
+    CAST(&j->vm_rss_kb);
+    CAST(&j->command);
+    IF_NOT_ROW_END()
+      goto err;
+  }
+
+  return LIMEADE_SUCCESS;
+
+err:
+  for(int i = 0; i < out->total && &out->procs[i]; i++)
+    free(out->procs[i].command);
+  free(alloc);
+
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd pkt)
 {
-  void *idx, *alloc;
-  pid_t *died_start;
-  struct limeade_indiv_proc **altered_p_start;
-  struct limeade_indiv_proc *altered_s_start;
-  int t_sz, rem;
-  register int _;
+  void *alloc;
+  int t_sz;
+  struct limeade_indiv_proc *j;
 
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
   
-  idx = pkt.data;
-  rem = pkt.pkt_sz - sizeof(struct limeade_packet_flags*);
-
-  //if(!limeade_parse_prelim_check(&pkt)) return LIMEADE_ERROR_BAD_DATA;
+  CAST_INIT();
 
   CAST(&out->total_died);
   CAST(&out->total_altered);
 
-  t_sz = out->total_died * sizeof(pid_t)
-       + out->total_altered * (sizeof(*out->altered) + sizeof(void*));
+  IF_NOT_ROW_END()
+    return LIMEADE_ERROR_BAD_DATA;
+
+  if(limeade_get_nr_rows(&pkt) != out->total_altered + 2)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  t_sz = out->total_died    * sizeof(pid_t)
+       + out->total_altered * sizeof(*out->altered);
 
   alloc = malloc(t_sz);
-  memset(alloc, 0, t_sz); // makes exit algorithm easier
 
   if(!alloc)
     return LIMEADE_ERROR_MEMORY;
 
-  died_start = alloc;
-  altered_p_start = (void*)died_start      + out->total_died * sizeof(pid_t);
-  altered_s_start = (void*)altered_p_start + out->total_altered * sizeof(void*);
-
-  for(int i = 0; i < out->total_altered; i++)
-    altered_p_start[i] = &altered_s_start[i];
+  out->died    = alloc;
+  out->altered = alloc + out->total_died * sizeof(pid_t);
 
   for(int i = 0; i < out->total_died; i++)
-  {
     CAST(&out->died[i]);
-  }
 
-  struct limeade_indiv_proc *j;
+  IF_NOT_ROW_END()
+    goto err;
 
   for(int i = 0; i < out->total_altered; i++)
   {
@@ -267,6 +416,8 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
     CAST(&j->cpu_ticks);
     CAST(&j->vm_rss_kb);
     CAST(&j->command);
+    IF_NOT_ROW_END()
+      goto err;
   }
 
   return LIMEADE_SUCCESS;
@@ -275,27 +426,92 @@ err:
   for(int i = 0; i < out->total_altered && &out->altered[i]; i++)
     free(out->altered[i].command);
   free(alloc);
+
   return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt)
 {
-  // TODO
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  if(limeade_get_nr_rows(&pkt) != 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  CAST_INIT();
+  CAST(&out->cores);
+  CAST(&out->avg_cpu_pct);
+  CAST(&out->mem_total_kb);
+  CAST(&out->mem_free_kb);
+  CAST(&out->mem_available_kb);
+  CAST(&out->mem_cached_kb);
+  CAST(&out->load_1m);
+  CAST(&out->load_5m);
+  CAST(&out->load_15m);
+  CAST(&out->other);
+
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recvd pkt)
 {
-  // TODO
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  if(limeade_get_nr_rows(&pkt) != 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  CAST_INIT();
+  CAST(&out->command);
+  CAST(&out->flags);
+  CAST(&out->id);
+
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt)
 {
-  // TODO
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  if(limeade_get_nr_rows(&pkt) != 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  CAST_INIT();
+  CAST(&out->id);
+  CAST(&out->exitcode);
+
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt)
 {
-  // TODO
+  if(limeade_decompress_packet(pkt))
+    return LIMEADE_ERROR_COMPRESSION;
+
+  if(limeade_get_nr_rows(&pkt) != 1)
+    return LIMEADE_ERROR_BAD_DATA;
+
+  CAST_INIT();
+  CAST(&out->explanation);
+
+  return LIMEADE_SUCCESS;
+
+err:
+  return LIMEADE_ERROR_BAD_DATA;
 }
 
+#undef CAST_INIT
 #undef CAST
+#undef IF_NOT_ROW_END
+#undef _limeade_cast
+

@@ -24,7 +24,6 @@
 
 #include <liblimeade/liblimeade-internal.h>
 
-/*
 int limeade_get_nr_rows(struct limeade_recvd *pkt)
 {
   int ret = 0, rem  = pkt->pkt_sz - sizeof(struct limeade_packet_flags);
@@ -41,7 +40,6 @@ int limeade_get_nr_rows(struct limeade_recvd *pkt)
     prev = next + 1;
   }
 }
-*/
 
 int limeade_decompress_packet(struct limeade_recvd pkt)
 {

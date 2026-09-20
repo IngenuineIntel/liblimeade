@@ -157,7 +157,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
 
       for(int i = 0; i < data.nr_events; i++)
       {
-        j = data.events[i];
+        j = &data.events[i];
 
         INC(j->ts_s);
         FDELIM();
@@ -183,7 +183,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
 
       for(int i = 0; i < data.total; i++)
       {
-        j = data.procs[i];
+        j = &data.procs[i];
 
         INC(j->pid);
         FDELIM();

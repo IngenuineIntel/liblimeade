@@ -101,8 +101,17 @@ static int name(void *src, type *dst, int rem)       \
  */
 int limeade_decompress_packet(struct limeade_recvd pkt);
 
-// strlen reimplementation that uses LIMEADE_FIELD_DELLIM or LIMEADE_ROW_DELIM
-// instead of 0x00
+/* limeade_get_nr_rows
+ *
+ * self-explanatory
+ */
+int limeade_get_nr_rows(struct limeade_recvd *pkt);
+
+/* limeade_pkt_strlen
+ *
+ * reimplementation of strlen that uses LIMEADE_FIELD_DELIM or LIMEADE_ROW_DELIM
+ * instead of 0x00
+ */
 uint32_t limeade_pkt_strlen(const char *s);
 
 /* limeade_th_recv_wr_pkt
