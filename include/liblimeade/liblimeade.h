@@ -650,4 +650,36 @@ int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recv
 int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt);
 int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt);
 
+// the following functions are for releasing the parsed data created by the
+// above functions. They are not meant to be called directly: see below
+void limeade_release_knock(struct limeade_knock *in);
+void limeade_release_recognize(struct limeade_recognize *in);
+void limeade_release_intro(struct limeade_intro *in);
+#define limeade_release_introduction limeade_release_intro
+void limeade_release_ack(struct limeade_ack *in);
+#define limeade_release_acknowledge limeade_release_ack
+void limeade_release_events(struct limeade_events *in);
+void limeade_release_proc_generic(struct limeade_proc_generic *in);
+void limeade_release_proc_update(struct limeade_proc_update *in);
+void limeade_release_perf(struct limeade_perf *in);
+void limeade_release_commandeer(struct limeade_commandeer *in);
+void limeade_release_exited(struct limeade_exited *in);
+void limeade_release_close(struct limeade_close *in);
+
+// for convenience:
+#define limeade_release(in) _Generic((in), \
+  struct limeade_knock*:        limeade_release_knock,\
+  struct limeade_recognize*:    limeade_release_recognize,\
+  struct limeade_intro*:        limeade_release_intro,\
+  struct limeade_ack*:          limeade_release_ack,\
+  struct limeade_events*:       limeade_release_events,\
+  struct limeade_proc_generic*: limeade_release_proc_generic,\
+  struct limeade_proc_update*:  limeade_release_proc_update,\
+  struct limeade_proc_perf*:    limeade_release_perf,\
+  struct limeade_commandeer*:   limeade_release_commandeer,\
+  struct limeade_exited*:       limeade_release_exited,\
+  struct limeade_close*:        limeade_release_close,\
+  struct limeade_context:       limeade_deconstruct\
+)(in)
+
 #endif /* _LIBLIMEADE_H_ */
