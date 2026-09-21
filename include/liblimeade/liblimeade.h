@@ -217,7 +217,7 @@ struct limeade_csm_data
 struct limeade_indiv_recv
 {
   void *data;
-  uint16_t sz;
+  uint32_t sz;
   void *mtx;
   union
   {
@@ -247,7 +247,7 @@ struct limeade_recv_data
 
   // if a packet is LIMEADE_ACK, it is put elsewhere
   // not a ring buffer, because it shouldn't have to be
-  uint16_t ack_sz;
+  uint32_t ack_sz;
   void *ack;
   // `ack_addr` & `ack_add_len` are only used when working with UDP
   struct sockaddr_in ack_addr;
@@ -262,11 +262,7 @@ struct limeade_recv_data
 };
 #define LIMEADE_NR_PKTS_DEFAULT 5
 // the size of the buffer kept by the recv thread to write packets into
-// 66240 == smallest multiple of 1472 that is more than 65535
-// 65535 == maximum packet size == (1 << 16) - 1
-// 1472  == the maximum size of a UDP packet (excluding the UDP flags and
-//          routing information)
-#define LIMEADE_RECV_TMP_SZ 66240
+#define LIMEADE_RECV_TMP_SZ 65536
 // default value for `limeade_recv_data.hz`
 #define LIMEADE_RECV_DEFAULT_HZ 4
 
@@ -304,6 +300,12 @@ struct limeade_context
     {
       struct sockaddr_in saddr;
       socklen_t saddr_len;
+
+      // LIMEADE_MODE_HOST_ETH
+      // must be populated before calls to limeade_send when operating as a UDP
+      // host
+      struct sockaddr_in cliaddr;
+      socklen_t cliaddr_len;
     };
   };
 
@@ -350,7 +352,7 @@ struct limeade_context
  * on success, returns a valid LIMEADE_CONTEXT*
  * on fail,    returns NULL and pushes an error to the error buffer
  */
-int limeade_init(struct limeade_context *ctx, uint8_t flags, ...);
+int limeade_init(struct limeade_context *ctx, int flags, ...);
 // after limeade_init, to make the initial network connection:
 int limeade_connect(struct limeade_context *ctx);
 // this is done in a separate in case the user wants to hack the library for
