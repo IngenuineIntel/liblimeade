@@ -359,19 +359,32 @@ int limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *p
   if(ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH)
     write(ctx->sfd, pkt->pkt, pkt->pkt_sz);
 
-  else if(ctx->mode == LIMEADE_MODE_CLIENT_ETH || ctx->mode == LIMEADE_MODE_HOST_ETH)
+  else if(ctx->mode == LIMEADE_MODE_CLIENT_ETH)
   {
-
     pthread_mutex_lock(ctx->mtx_mode_union);
+
     sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
            (struct sockaddr*)&ctx->saddr, ctx->saddr_len);
+
+    pthread_mutex_unlock(ctx->mtx_mode_union);
+
+  } else if (ctx->mode == LIMEADE_MODE_HOST_ETH)
+  {
+    pthread_mutex_lock(ctx->mtx_mode_union);
+
+    sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
+           (struct sockaddr*)&ctx->cliaddr, ctx->cliaddr_len);
+
     pthread_mutex_unlock(ctx->mtx_mode_union);
 
   } else if(ctx->mode == LIMEADE_MODE_CLIENT_LIBSSH)
+  {
+    pthread_mutex_unlock(ctx->mtx_sfd);
     return LIMEADE_ERROR_NOT_SUPPORTED;
 
-  else
+  } else
   {
+    pthread_mutex_unlock(ctx->mtx_sfd);
     return LIMEADE_ERROR_INVALID_CONTEXT;
   }
 
@@ -452,13 +465,12 @@ struct limeade_ack_recv_th_pass
 void *limeade_th_await(void *arg)
 {
   struct limeade_ack_recv_th_pass *data = arg;
-  pthread_mutex_lock(&data->mtx); // FIXME
+  pthread_mutex_lock(&data->mtx);
   struct limeade_recv_data *r = data->in;
 
   pthread_mutex_lock(r->mtx_ack); // hangs
 
   data->sz = r->ack_sz;
-  data->data = malloc(data->sz); // TODO how does one handle errors here?
   memcpy(data->data, r->ack, data->sz);
 
   pthread_mutex_unlock(r->mtx_ack);
@@ -469,14 +481,15 @@ void *limeade_th_await(void *arg)
 int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ...)
 {
   register int _;
-  struct limeade_packet_data pkt;
+  struct limeade_packet_data pkt, ack;
   struct limeade_packet_flags flags, *f;
   struct limeade_csm_compression_entry c_entry;
   struct limeade_csm_latency_entry l_entry;
   struct limeade_ack_recv_th_pass recv_ack;
+  struct limeade_ack a;
   struct timespec compr_ts[2], latent_ts[2], sendts, recvwait, rmtp;
   pthread_t recv_ack_tid;
-  uint64_t iters, iter_giveup;
+  uint64_t iters, iters_giveup;
   va_list arg;
   va_start(arg, type);
 
@@ -494,6 +507,13 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   limeade_populate_packet(&pkt, &flags, arg);
 
+  recv_ack.data = malloc(1 << 16);
+  if(!recv_ack.data)
+  {
+    free(pkt.pkt);
+    return LIMEADE_ERROR_MEMORY;
+  }
+
   c_entry.precompr_sz = pkt.pkt_sz;
 
   _ = limeade_deflate_packet(&pkt, flags.compr_lvl);
@@ -510,7 +530,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   f = pkt.flags;
   f->packet_size = pkt.pkt_sz;
   f->ts_s        = sendts.tv_sec;
-  f->ts_ms       = sendts.tv_nsec;
+  f->ts_ms       = sendts.tv_nsec / 1000000;
 
   _ = limeade_monotonic(&compr_ts[1]);
   if(_ != LIMEADE_SUCCESS)
@@ -524,27 +544,36 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   if(_ != LIMEADE_SUCCESS)
     goto err;
 
-  if(pthread_create(&recv_ack_tid, NULL, limeade_th_await, &recv_ack) != 0)
-  {
-    _ = LIMEADE_ERROR_OTHER;
-    goto err;
-  }
-
-  pthread_mutex_lock(ctx->mtx_pub);
-  iter_giveup = ctx->ack_wait_time_ms;
-  pthread_mutex_unlock(ctx->mtx_pub);
-  
   iters = 0;
 
   // 0.1s accuracy (excluding time drift from execution time, which idgaf about)
   recvwait.tv_sec  = 0;
   recvwait.tv_nsec = 1000000000;
 
+  pthread_mutex_lock(ctx->mtx_pub);
+
+  iters_giveup  = recvwait.tv_sec * 1000;
+  iters_giveup += recvwait.tv_nsec / 100000;
+
+  pthread_mutex_unlock(ctx->mtx_pub);
+
+  if(pthread_create(&recv_ack_tid, NULL, limeade_th_await, &recv_ack) != 0)
+  {
+    _ = LIMEADE_ERROR_OTHER;
+    goto err;
+  }
+
   do
   {
     nanosleep(&recvwait, &rmtp);
+    if(++iters >= iters_giveup)
+    {
+      pthread_cancel(recv_ack_tid);
+      free(recv_ack.data);
+      _ = LIMEADE_ERROR_REJECTED;
+      goto err;
+    }
   } while(pthread_mutex_trylock(&recv_ack.mtx) == EBUSY);
-
 
   _ = limeade_monotonic(&latent_ts[1]);
   if(_ != LIMEADE_SUCCESS)
@@ -553,14 +582,41 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   c_entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
   l_entry.elapsed_ms = limeade_monotonic_diff_ms(&latent_ts[0], &latent_ts[1]);
 
-  // TODO confirm that the acknowledgement is for this packet
-  free(recv_ack.data);
+  // I currently don't think this is worth doing, but I'll keep it here just in
+  // case.
+  //recv_ack.data = realloc(recv_ack.data, recv_ack.sz);
+  //if(!recv_ack.data)
+  //{
+  //  free(pkt.pkt);
+  //  return LIMEADE_ERROR_MEMORY;
+  //}
+
+  // confirming that the ACK we received is the one for the packet we sent
+  ack.pkt_sz = recv_ack.sz;
+  ack.pkt    = recv_ack.data;
+  ack.flags  = ack.pkt + sizeof(LIMEADE_MAGIC);
+  ack.data   = ack.flags + sizeof(*f);
+  ack.type   = ((typeof(f))ack.flags)->type;
+  ack.compr  = ((typeof(f))ack.flags)->compr_lvl;
+
+  _ = limeade_parse_ack(&a, ack);
+  if(_ != LIMEADE_SUCCESS)
+    goto err;
+  
+  if(a.send_ts_s != sendts.tv_sec || a.send_ts_ms != sendts.tv_nsec * 100000)
+  {
+    // we got an ACK, it's not the one for the packet we sent
+    _ = LIMEADE_ERROR_BAD_DATA;
+    goto err;
+  }
 
   limeade_csm_add_compr_entry(ctx, &c_entry);
   limeade_csm_add_latency_entry(ctx, &l_entry);
 
   _ = LIMEADE_SUCCESS;
+
 err:
+  free(recv_ack.data);
   free(pkt.pkt);
   return _;
 }
