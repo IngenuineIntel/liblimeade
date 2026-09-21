@@ -5,7 +5,6 @@
 #ifndef _LIBLIMEADE_DIAG_C
 #define _LIBLIMEADE_DIAG_C
 
-#include<stdio.h>
 
 #include<liblimeade/liblimeade.h>
 
@@ -15,7 +14,6 @@ void limeade_diag_csm_latency_entry(struct limeade_csm_latency_entry x);
 void limeade_diag_csm_data(struct limeade_csm_data x);
 void limeade_diag_indiv_recv(struct limeade_indiv_recv x);
 void limeade_diag_recv_data(struct limeade_recv_data x);
-void limeade_diag_eth_host_indiv_client(struct limeade_teh_host_indiv_client x);
 void limeade_diag_context(struct limeade_context x);
 void limeade_diag_packet(enum limeade_packet x);
 void limeade_diag_packet_data(struct limeade_packet_data x);
@@ -34,7 +32,7 @@ void limeade_diag_proc_generic(struct limeade_proc_generic x);
 void limeade_diag_proc_update(struct limeade_proc_update x);
 void limeade_diag_perf(struct limeade_perf x);
 void limeade_diag_commandeer(struct limeade_commandeer x);
-void limeade_diag_commandeer_flags(struct limeade_commandeer_flags x);
+void limeade_diag_commandeer_flags(enum limeade_commandeer_flags x);
 void limeade_diag_exited(struct limeade_exited x);
 void limeade_diag_close(struct limeade_close x);
 
@@ -56,7 +54,6 @@ void limeade_perror(const char *s, enum limeade_error e);
   struct limeade_csm_data:              limeade_diag_csm_data,             \
   struct limeade_indiv_recv:            limeade_diag_indiv_recv,           \
   struct limeade_recv_data:             limeade_diag_recv_data,            \
-  struct limeade_eth_host_indiv_client: limeade_diag_eth_host_indiv_client,\
   struct limeade_context:               limeade_diag_context,              \
   struct limeade_packet_data:           limeade_diag_packet_data,          \
   LIMEADE_SESSION:                      limeade_diag_session,              \
