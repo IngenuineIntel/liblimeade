@@ -1,7 +1,7 @@
 #!/usr/bin/make
 
 CC     := clang
-CFLAGS := -fPIC -O1 -Wall -Iinclude -std=gnu11 -lz
+CFLAGS := -fPIC -O1 -Wall -Iinclude -std=gnu11
 SRCS   := $(wildcard src/*.c)
 OBJS   := $(SRCS:.c=.o)
 
@@ -11,7 +11,7 @@ objs: $(OBJS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 so: objs
-	$(CC) -shared -o liblimeade-0.1.so $(OBJS)
+	$(CC) -shared -o liblimeade-0.1.so $(OBJS) -lz
 
 clean:
 	rm -f $(OBJS) liblimeade-0.1.so
