@@ -143,6 +143,7 @@ static inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
       free(r->pkts);
       return LIMEADE_ERROR_MEMORY;
     }
+    pthread_mutex_lock(&d->mtx, NULL);
   }
 
   if(pthread_create(r->tid, NULL, *th_recv_f, ctx) != 0)
@@ -477,6 +478,7 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   
   ctx->mode       = (uint8_t)flags & 0b00001111;
   ctx->compr_mode = (uint8_t)flags & 0b11110000;
+  ctx->csm = NULL;
 
   uint8_t allow_compr = 1;
   

@@ -332,9 +332,11 @@ int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
   if(compr_lvl <= 0)
     return LIMEADE_SUCCESS;
 
-  uLongf compressed_len;
   unsigned int len = pkt->pkt_sz - sizeof(struct limeade_packet_flags) - sizeof(LIMEADE_MAGIC);
-  void *compressed = malloc(compressBound(len));
+  uLongf compressed_len = compressBound(len);
+  void *compressed = malloc(compressed_len);
+  if(!compressed)
+    return LIMEADE_ERROR_MEMORY;
 
   if(compress2(compressed, &compressed_len, pkt->data, len, compr_lvl) != Z_OK)
   {
