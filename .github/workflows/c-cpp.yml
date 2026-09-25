@@ -13,11 +13,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: install zlib
-      run: sudo apt install zlib1g-dev
+
     - name: make install
       run: sudo make install
     - name: make test
       run: gcc tests/test1.c -lz -llimeade -o test
     - name: run test
-      run: ./test
+      run: ./test | hexdump -C
