@@ -621,7 +621,8 @@ err_2:
 
 err_1:
   limeade_destruct_th_recv_step_1(ctx);
-  limeade_destruct_th_csm(ctx);
+  if(ctx->csm)
+    limeade_destruct_th_csm(ctx);
   limeade_destruct_mutexes(ctx);
   switch(ctx->mode)
   {
@@ -645,7 +646,8 @@ err_1:
 void limeade_destruct(struct limeade_context *ctx)
 {
   limeade_destruct_th_recv(ctx);
-  limeade_destruct_th_csm(ctx);
+  if(ctx->csm)
+    limeade_destruct_th_csm(ctx);
   limeade_destruct_mutexes(ctx);
   switch(ctx->mode)
   {
