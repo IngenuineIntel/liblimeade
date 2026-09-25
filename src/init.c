@@ -144,7 +144,7 @@ static inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
       free(r->pkts);
       return LIMEADE_ERROR_MEMORY;
     }
-    pthread_mutex_lock(&d->mtx, NULL);
+    pthread_mutex_init(d->mtx, NULL);
   }
 
   if(pthread_create(r->tid, NULL, *th_recv_f, ctx) != 0)
