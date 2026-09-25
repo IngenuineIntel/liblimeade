@@ -101,14 +101,19 @@ static inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
   {
     case LIMEADE_MODE_CLIENT_SSH:
       th_recv_f = &limeade_th_recv_client_ssh;
+      break;
     case LIMEADE_MODE_HOST_SSH:
       th_recv_f = &limeade_th_recv_host_ssh;
+      break;
     case LIMEADE_MODE_CLIENT_LIBSSH:
       return LIMEADE_ERROR_NOT_SUPPORTED;
+      break;
     case LIMEADE_MODE_CLIENT_ETH:
       th_recv_f = &limeade_th_recv_client_eth;
+      break;
     case LIMEADE_MODE_HOST_ETH:
       th_recv_f = &limeade_th_recv_host_eth;
+      break;
     default:
       return LIMEADE_ERROR_INVALID_CONTEXT;
   }
@@ -391,7 +396,7 @@ static void limeade_destruct_client_eth_step_1(struct limeade_context *ctx)
 #define limeade_destruct_client_eth(ctx) limeade_destruct_client_eth_step_1(ctx)
 
 static inline int limeade_init_host_eth_step_1(struct limeade_context *ctx,
-                                        const char *dest, const int port)
+                                               const char *dest, const int port)
 {
   int s;
 
@@ -425,7 +430,7 @@ static inline int limeade_init_host_eth_step_2(struct limeade_context *ctx)
   return LIMEADE_SUCCESS;
 }
 
-static void limeade_destruct_host_eth_step_1(struct limeade_context *ctx)
+static inline void limeade_destruct_host_eth_step_1(struct limeade_context *ctx)
 {
   close(ctx->rfd);
   free(ctx->dest);
@@ -445,12 +450,12 @@ static inline int limeade_init_client_libssh_step_2(struct limeade_context *ctx)
   return LIMEADE_ERROR_NOT_SUPPORTED;
 }
 
-static void limeade_destruct_client_libssh_step_1(struct limeade_context *ctx)
+static inline void limeade_destruct_client_libssh_step_1(struct limeade_context *ctx)
 {
   return; // LIMEADE_ERROR_NOT_SUPPORTED
 }
 
-static void limeade_destruct_client_libssh_step_2(struct limeade_context *ctx)
+static inline void limeade_destruct_client_libssh_step_2(struct limeade_context *ctx)
 {
   return; // LIMEADE_ERROR_NOT_SUPPORTED
 }
@@ -523,12 +528,12 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
         break;
       default:
         r = limeade_init_th_csm_step_1(ctx);
+
         CHECK(r)
           goto err_2;
         break;
     }
-  } else
-    ctx->compr_lvl = 0;
+  }
 
   r = limeade_init_th_recv_step_1(ctx);
   CHECK(r)
@@ -562,27 +567,30 @@ err_1:
 
 int limeade_connect(struct limeade_context *ctx)
 {
-  register int r = LIMEADE_SUCCESS;
+  register int r;
 
   switch(ctx->mode)
   {
     case LIMEADE_MODE_CLIENT_SSH:
       r = limeade_init_client_ssh_step_2(ctx);
+      CHECK(r) goto err_1;
       break;
 
     case LIMEADE_MODE_CLIENT_LIBSSH:
       r = limeade_init_client_libssh_step_2(ctx);
+      CHECK(r) goto err_1;
       break;
 
     case LIMEADE_MODE_HOST_ETH:
       r = limeade_init_host_eth_step_2(ctx);
+      CHECK(r) goto err_1;
       break;
 
     case LIMEADE_MODE_CLIENT_ETH:
       r = limeade_init_client_eth_step_2(ctx);
+      CHECK(r) goto err_1;
       break;
   }
-  CHECK(r) goto err_1;
 
   r = limeade_init_th_recv_step_2(ctx);
   CHECK(r) goto err_2;
@@ -600,15 +608,12 @@ err_2:
     case LIMEADE_MODE_CLIENT_SSH:
       limeade_destruct_client_ssh_step_2(ctx);
       break;
-
     case LIMEADE_MODE_CLIENT_LIBSSH:
       limeade_destruct_client_libssh_step_2(ctx);
       break;
-
     case LIMEADE_MODE_HOST_ETH:
       limeade_destruct_host_eth_step_2(ctx);
       break;
-
     case LIMEADE_MODE_CLIENT_ETH:
       limeade_destruct_client_eth_step_2(ctx);
       break;
@@ -616,7 +621,7 @@ err_2:
 
 err_1:
   limeade_destruct_th_recv_step_1(ctx);
-  limeade_destruct_th_csm_step_1(ctx);
+  limeade_destruct_th_csm(ctx);
   limeade_destruct_mutexes(ctx);
   switch(ctx->mode)
   {

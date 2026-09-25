@@ -26,7 +26,7 @@ void *limeade_th_recv_host_eth(void *arg)
   ctx = arg;
   r = &ctx->recv;
 
-  pthread_mutex_lock(r->ack);
+  pthread_mutex_lock(r->mtx_ack);
 
   memset(&tmp_cliaddr, 0, sizeof(tmp_cliaddr));
 
@@ -77,7 +77,7 @@ void *limeade_th_recv_client_eth(void *arg)
   ctx = arg;
   r   = &ctx->recv;
 
-  pthread_mutex_lock(r->ack);
+  pthread_mutex_lock(r->mtx_ack);
 
   iter_wait.tv_sec  = 0;
   iter_wait.tv_nsec = 999999999/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
@@ -108,50 +108,7 @@ void *limeade_th_recv_client_eth(void *arg)
   pthread_mutex_unlock(r->ack);
   return NULL;
 }
-/*
-void *limeade_th_recv_client_ssh(void *arg)
-{
-  struct limeade_context *ctx;
-  struct limeade_recv_data *r;
-  struct timespec iter_wait, rmtp;
-  void *buffer;
-  unsigned int amt_recv;
 
-  ctx = arg;
-  r = &ctx->recv;
-  
-  pthread_mutex_lock(r->ack);
-
-  iter_wait.tv_sec  = 0;
-  iter_wait.tv_nsec = 999999999/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
-
-  buffer = malloc(LIMEADE_RECV_TMP_SZ);
-  if(!buffer)
-    return NULL;
-
-  while(pthread_mutex_trylock(r->mtx_kys) == EBUSY)
-  {
-    amt_recv = limeade_ssh_recv(ctx, buffer, LIMEADE_RECV_TMP_SZ);
-
-    if(amt_recv == 0)
-    {
-      nanosleep(&iter_wait, &rmtp);
-      continue;
-    }
-    if(amt_recv < 0)
-      break;
-
-    if(limeade_prelim_confirm(buffer, amt_recv) != 0)
-      continue;
-
-    limeade_th_recv_wr_pkt(r, buffer + MAGSZ, amt_recv, NULL, 0);
-
-  }
-  pthread_mutex_unlock(r->ack);
-  free(buffer);
-  return NULL;
-}
-*/
 void *limeade_th_recv_client_ssh(void *arg)
 {
   struct limeade_context *ctx;
@@ -163,7 +120,7 @@ void *limeade_th_recv_client_ssh(void *arg)
   ctx = arg;
   r   = &ctx->recv;
 
-  pthread_mutex_lock(r->ack);
+  pthread_mutex_lock(r->mtx_ack);
 
   iter_wait.tv_sec  = 0;
   iter_wait.tv_nsec = 999999999/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
