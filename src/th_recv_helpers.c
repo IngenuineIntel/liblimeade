@@ -41,6 +41,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 
     pthread_mutex_lock(d->mtx);
     memcpy(d->data, pkt, sz);
+    d->sz = sz;
 
     if(addr)
     {
@@ -54,7 +55,8 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
       r->pkts_lost++;
       pthread_mutex_unlock(r->mtx_lost);
     }
-    d->flags = 0;
+    d->has_been_read = 0;
+    d->ready = 1;
 
     pthread_mutex_unlock(d->mtx);
   }
@@ -95,7 +97,7 @@ int limeade_prelim_confirm(const void *buffer, const int sz)
   if(f->type >= LIMEADE_PACKET_MAX)
     goto f;
 
-  if(f->packet_size > sz - MAGSZ)
+  if(f->packet_size > sz)
     goto f;  
 
   return 0;

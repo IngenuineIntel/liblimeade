@@ -61,11 +61,10 @@ int main(int argc, char **argv)
 
   struct limeade_recvd r;
   printf("limeade_recv_noreply...\n");
-  e = limeade_recv_noreply(&c, r);
+  e = limeade_recv_wait_noreply(&c, &r, 3000);
+  test(e);
   
   printf("r.pkt_sz = %i\n", r.pkt_sz);
-
-  write(STDOUT_FILENO, r.pkt, r.pkt_sz);
 
   return 0;
 }

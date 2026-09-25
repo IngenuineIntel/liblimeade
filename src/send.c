@@ -507,6 +507,10 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   va_list arg;
   va_start(arg, type);
 
+  _ = limeade_statecheck(ctx);
+  if(_ != LIMEADE_SUCCESS)
+    return _;
+
   _ = limeade_monotonic(&compr_ts[0]);
   if(_ != LIMEADE_SUCCESS)
     return _;
