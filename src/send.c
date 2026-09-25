@@ -39,7 +39,7 @@ static int limeade_prep_double(double in, void *out, int max)
     *(uint8_t*)out = '\x00';
     return 1;
   }
-  *(uint8_t*)out = LIMEADE_FLT_INDICATOR & sizeof(in);
+  *(uint8_t*)out = LIMEADE_FLT_INDICATOR | (sizeof(in) - 1);
   *((double*)((uint8_t*)out + 1)) = in;
   return sizeof(in) + 1;
 }
@@ -51,7 +51,7 @@ static int limeade_prep_str(const char *in, void *out, int max)
   if(r > max) return -1;
   memcpy(out, in, r);
   prep_str(out);
-  return r;
+  return --r;
 }
 
 #define limeade_ins_v(in, out, max) _Generic((in),\
@@ -80,7 +80,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
   b += sizeof(LIMEADE_MAGIC);
   memcpy(b, flags, sizeof(*flags));
   b += sizeof(*flags);
-  s -= sizeof(*flags) + sizeof(LIMEADE_MAGIC) + 1;
+  s -= sizeof(*flags) + sizeof(LIMEADE_MAGIC);
 
 #define INC(in)\
 {\
@@ -332,12 +332,11 @@ int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
   if(compr_lvl <= 0)
     return LIMEADE_SUCCESS;
 
-  void *compressed = malloc(pkt->pkt_sz);
-  unsigned long compressed_len;
+  uLongf compressed_len;
+  unsigned int len = pkt->pkt_sz - sizeof(struct limeade_packet_flags) - sizeof(LIMEADE_MAGIC);
+  void *compressed = malloc(compressBound(len));
 
-  if(compress2(compressed, &compressed_len, pkt->data,
-               pkt->pkt_sz - sizeof(struct limeade_packet_flags),
-               compr_lvl) != Z_OK)
+  if(compress2(compressed, &compressed_len, pkt->data, len, compr_lvl) != Z_OK)
   {
     free(compressed);
     return LIMEADE_ERROR_COMPRESSION;

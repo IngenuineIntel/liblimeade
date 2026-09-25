@@ -527,7 +527,8 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
           goto err_2;
         break;
     }
-  }
+  } else
+    ctx->compr_lvl = 0;
 
   r = limeade_init_th_recv_step_1(ctx);
   CHECK(r)
