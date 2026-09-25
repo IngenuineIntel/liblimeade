@@ -1,9 +1,9 @@
 #!/usr/bin/make
 
-CC := clang
-CFLAGS := -fPIC -O1 -Wall -Iinclude -std=gnu11 -Werror
-SRCS := $(wildcard src/*.c)
-OBJS := $(SRCS:.c=.o)
+CC     := clang
+CFLAGS := -fPIC -O1 -Wall -Iinclude -std=gnu11
+SRCS   := $(wildcard src/*.c)
+OBJS   := $(SRCS:.c=.o)
 
 objs: $(OBJS)
 
