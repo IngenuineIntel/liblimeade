@@ -14,33 +14,23 @@
 int main(int argc, char **argv)
 {
   struct limeade_context c;
-  struct limeade_indiv_event v, ev[3];
+  struct limeade_indiv_event v, ev[6];
   struct limeade_events p;
   int fds[2];
 
-  printf("limeade_init...\n");
+  //printf("limeade_init...\n");
   int e = limeade_init(&c, LIMEADE_MODE_HOST_SSH|LIMEADE_MODE_NO_COMPRESSION);
-  test(e);
+  //test(e);
+
+  c.compr_lvl = 5;
 
   pipe(fds);
   c.sfd = fds[1];
   c.rfd = fds[0];
 
-  printf("limeade_connect...\n");
+  //printf("limeade_connect...\n");
   e = limeade_connect(&c);
-  test(e);
-/*
-  p.hostname = "arch";
-  p.kernelver = "7.2.0-arch";
-  p.distro    = "arch btw";
-  p.origin_user = "roan";
-  p.processor   = "i7-7700";
-  p.vendor      = "IngenuineIntel";
-  p.ram_mbs     = 16 * 1024;
-  p.swap_mbs    = 20 * 1024;
-
-  e = limeade_send(&c, LIMEADE_PACKET_INTRO, p);
-*/
+  //test(e);
 
   v.ts_s = 0x69696969;
   v.ts_ms = 0x6767;
@@ -52,20 +42,30 @@ int main(int argc, char **argv)
 
   ev[0] = ev[1] = ev[2] = v;
 
-  p.nr_events = 3;
+  v.ts_s = 0xDEADBEEF;
+  v.ts_ms = 0xC0DE;
+  v.pid   = 69420;
+  v.syscall = "Syscall? I barely know'er!";
+  v.arg1    = "Remember when he said it was arg time...";
+  v.arg2    = "...and proceeded to arg all over the place?";
+  v.retval  = 0;
+
+  ev[3] = ev[4] = ev[5] = v;
+
+  p.nr_events = 6;
   p.events = ev;
 
-  printf("limeade_send...\n");
+  //printf("limeade_send...\n");
   e = limeade_send(&c, LIMEADE_PACKET_EVENTS, p);
-  test(e);
+  //test(e);
 
   struct limeade_recvd r;
-  printf("limeade_recv_noreply...\n");
-  e = limeade_recv_noreply(&c, r);
+  //printf("limeade_recv_noreply...\n");
+  e = limeade_recv_wait_noreply(&c, &r, 3000);
+  //test(e);
   
-  printf("r.pkt_sz = %i\n", r.pkt_sz);
-
-  write(STDOUT_FILENO, r.pkt, r.pkt_sz);
+  //printf("r.pkt_sz = %i\n", r.pkt_sz);
+  write(STDOUT_FILENO, r.pkt, r.pkt_sz + sizeof(LIMEADE_MAGIC));
 
   return 0;
 }

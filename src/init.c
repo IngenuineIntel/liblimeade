@@ -78,10 +78,11 @@ static inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   r->mtx_kys  = &mutexes[2];
   r->mtx_lost = &mutexes[3];
   r->tid      = (pthread_t*)&mutexes[4];
+  pthread_mutex_lock(r->mtx_kys);
 
   r->nr_pkts = LIMEADE_NR_PKTS_DEFAULT;
   r->read_idx = 0;
-  r->wr_idx   = 0;
+  r->wr_idx   = r->nr_pkts - 1;
   r->pkts_lost = 0;
   r->hz         = LIMEADE_RECV_DEFAULT_HZ;
   r->ack_sz     = 1 << 16;
@@ -132,6 +133,8 @@ static inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
 
     d->sz    = 0;
     d->flags = 0;
+    d->has_been_read = 0;
+    d->ready         = 0;
     d->mtx   = malloc(sizeof(pthread_mutex_t) + (1 << 16));
     d->data  = d->mtx + sizeof(pthread_mutex_t);
     if(!d->mtx)
@@ -141,6 +144,7 @@ static inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
       free(r->pkts);
       return LIMEADE_ERROR_MEMORY;
     }
+    pthread_mutex_lock(&d->mtx, NULL);
   }
 
   if(pthread_create(r->tid, NULL, *th_recv_f, ctx) != 0)
@@ -475,6 +479,7 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   
   ctx->mode       = (uint8_t)flags & 0b00001111;
   ctx->compr_mode = (uint8_t)flags & 0b11110000;
+  ctx->csm = NULL;
 
   uint8_t allow_compr = 1;
   
@@ -596,8 +601,11 @@ int limeade_connect(struct limeade_context *ctx)
   r = limeade_init_th_recv_step_2(ctx);
   CHECK(r) goto err_2;
 
-  r = limeade_init_th_csm_step_2(ctx);
-  CHECK(r) goto err_3;
+  if(ctx->csm)
+  {
+    r = limeade_init_th_csm_step_2(ctx);
+    CHECK(r) goto err_3;
+  }
 
   return LIMEADE_SUCCESS;
 

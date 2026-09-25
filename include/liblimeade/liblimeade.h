@@ -239,7 +239,8 @@ struct limeade_indiv_recv
     struct
     {
       uint8_t has_been_read:1;
-      uint8_t reserved:7;
+      uint8_t ready:1;
+      uint8_t reserved:6;
     };
   };
 };
@@ -610,10 +611,10 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 // limeade_recv_wait: receives a packet & sends an acknowledgement, but waits if there are no packets to receive
 // limeade_recv_noreply: receives a packet without acknowledgement, but all data will be NULL if there are no packets
 // limeade_recv_wait_noreply: receives a packet without acknowledgement, but waits for a packet to arrive
-int limeade_recv(struct limeade_context *ctx, struct limeade_recvd out);
-int limeade_recv_wait(struct limeade_context *ctx, struct limeade_recvd out, int wait_ms);
-int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd out);
-int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd out, int wait_ms);
+int limeade_recv(struct limeade_context *ctx, struct limeade_recvd *out);
+int limeade_recv_wait(struct limeade_context *ctx, struct limeade_recvd *out, int wait_ms);
+int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out);
+int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd *out, int wait_ms);
 
 // note: wait_ms <= 0 will wait forever
 
