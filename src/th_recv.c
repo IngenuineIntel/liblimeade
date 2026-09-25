@@ -133,17 +133,13 @@ void *limeade_th_recv_client_ssh(void *arg)
 
   while(pthread_mutex_trylock(r->mtx_kys) == EBUSY)
   {
-    pthread_mutex_lock(ctx->mtx_rfd);
     recv_poll.fd = ctx->rfd;
 
     if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
-    {
-      pthread_mutex_unlock(ctx->mtx_rfd);
       continue;
-    }
 
+    pthread_mutex_lock(ctx->mtx_rfd);
     amt_recv = read(recv_poll.fd, buffer, LIMEADE_RECV_TMP_SZ);
-
     pthread_mutex_unlock(ctx->mtx_rfd);
     
     if(limeade_prelim_confirm(buffer, amt_recv) != 0)

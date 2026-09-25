@@ -417,7 +417,6 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
     return _;
 
   _ = limeade_monotonic(&compr_ts[0]);
-
   if(_ != LIMEADE_SUCCESS)
     return _;
 
