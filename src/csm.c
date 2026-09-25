@@ -23,6 +23,24 @@
 void *limeade_csm(void *arg)
 {
   struct timespec rqtp, rmtp;
+  /*
+  struct limeade_context *ctx;
+  float b;
+
+  ctx = arg;
+
+  switch(ctx->compr_mode)
+  {
+    case LIMEADE_MODE_CSM_SAVE_CYCLES:
+      b = 0.2;
+    case LIMEADE_MODE_CSM_SAVE_ALL:
+      b = 0.5;
+    case LIMEADE_MODE_CSM_SAVE_THROUGHPUT:
+      b = 0.8;
+    default:
+      return NULL;
+  }
+  */
 
   rqtp.tv_sec = 5;
 
@@ -31,7 +49,9 @@ void *limeade_csm(void *arg)
 
   return NULL;
 }
-
+// The following is the end-goal of this function. It is commented out currently
+// because I do not intend on immediately implementing `limeade_csm`.
+/*
 void limeade_csm_add_compr_entry(struct limeade_context *ctx,
                                  struct limeade_csm_compression_entry *entry)
 {
@@ -52,7 +72,10 @@ void limeade_csm_add_compr_entry(struct limeade_context *ctx,
 
   pthread_mutex_unlock(ctx->mtx_th_csm);
 }
+*/
 
+// Same goes for this function.
+/*
 void limeade_csm_add_latency_entry(struct limeade_context *ctx,
                                    struct limeade_csm_latency_entry *entry)
 {
@@ -73,4 +96,19 @@ void limeade_csm_add_latency_entry(struct limeade_context *ctx,
 
   pthread_mutex_unlock(ctx->mtx_th_csm);
 }
+*/
 
+// Alternatively...
+// In theory the data construction that happens in `limeade_send*` will get
+// optimized out with the functions being nothingburgers like this.
+void limeade_csm_add_compr_entry(struct limeade_context *ctx,
+                                 struct limeade_csm_compression_entry *entry)
+{
+  return;
+}
+
+void limeade_csm_add_latency_entry(struct limeade_context *ctx,
+                                   struct limeade_csm_latency_entry *entry)
+{
+  return;
+}

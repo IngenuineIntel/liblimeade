@@ -184,7 +184,7 @@ void *limeade_th_recv_client_ssh(void *arg)
     t_amt_recv = 0;
     for(;;)
     {
-      amt_recv = read(ctx->rfd, buffer + t_amt_recv, LIMEADE_RECV_TMP_SZ - t_amt_recv);
+      amt_recv = read(rfd, buffer + t_amt_recv, LIMEADE_RECV_TMP_SZ - t_amt_recv);
       if(amt_recv <= 0)
       {
         if(amt_recv != 0 && errno != EAGAIN && errno != EWOULDBLOCK)

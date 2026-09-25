@@ -189,7 +189,7 @@ LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
 register int _;                                             \
 void *idx = pkt.data;                                       \
 int rem = pkt.pkt_sz - sizeof(struct limeade_packet_flags); \
-char last_delim;
+__attribute__((unused)) char last_delim;
 
 #define CAST(dst)\
 _ = _limeade_cast(dst, idx, rem); \

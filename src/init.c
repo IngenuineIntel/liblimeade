@@ -60,7 +60,6 @@ inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
 
   struct limeade_recv_data *r;
   pthread_mutex_t *mutexes;
-  struct limeade_indiv_recv *d;
 
   r = &ctx->recv;
 
@@ -125,7 +124,7 @@ inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
   {
     d = &r->pkts[i];
 
-    d->sz = 0;
+    d->sz    = 0;
     d->flags = 0;
     d->mtx   = malloc(sizeof(pthread_mutex_t) + (1 << 16));
     d->data  = d->mtx + sizeof(pthread_mutex_t);
@@ -329,6 +328,9 @@ void limeade_destruct_client_ssh(struct limeade_context *ctx)
   close(ctx->sfd);
 }
 
+#define limeade_destruct_client_ssh_step_1(ctx) limeade_destruct_client_ssh(ctx)
+#define limeade_destruct_client_ssh_step_2(ctx) do{}while(0);
+
 inline int limeade_init_client_eth_step_1(struct limeade_context *ctx,
                                           const char *dest, const int port)
 {
@@ -385,7 +387,8 @@ void limeade_destruct_client_eth_step_1(struct limeade_context *ctx)
   free(ctx->dest);
 }
 
-#define limeade_destruct_eth_client(ctx) limeade_destruct_eth_client_step_1(ctx)
+#define limeade_destruct_client_eth_step_2(ctx) do{}while(0);
+#define limeade_destruct_client_eth(ctx) limeade_destruct_client_eth_step_1(ctx)
 
 inline int limeade_init_host_eth_step_1(struct limeade_context *ctx,
                                         const char *dest, const int port)
@@ -428,7 +431,8 @@ void limeade_destruct_host_eth_step_1(struct limeade_context *ctx)
   free(ctx->dest);
 }
 
-#define limeade_destruct_eth_host(ctx) limeade_destruct_eth_host_step_1(ctx)
+#define limeade_destruct_host_eth_step_2(ctx) do{} while(0);
+#define limeade_destruct_host_eth(ctx) limeade_destruct_host_eth_step_1(ctx)
 
 inline int limeade_init_client_libssh_step_1(struct limeade_context *ctx,
                                              const char *dest)
@@ -456,6 +460,7 @@ void limeade_destruct_client_libssh_step_2(struct limeade_context *ctx)
   limeade_destruct_client_libssh_step_1(ctx);
 
 
+#define CHECK(r) if(r != LIMEADE_SUCCESS)
 int limeade_init(struct limeade_context *ctx, int flags, ...)
 {
   register int r;
@@ -488,31 +493,134 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
     default:
       return LIMEADE_ERROR_GARBAGE;
   }
-
-  if(r != LIMEADE_SUCCESS)
+  CHECK(r)
     return r;
 
-  // TODO
+  r = limeade_init_mutexes(ctx);
+  CHECK(r)
+    goto err_1;
+
+  if(allow_compr)
+  {
+    switch(ctx->compr_mode)
+    {
+      case LIMEADE_MODE_NO_COMPRESSION:
+        ctx->compr_lvl = 0;
+      case LIMEADE_MODE_LOW_COMPRESSION:
+        ctx->compr_lvl = 1;
+      case LIMEADE_MODE_MED_COMPRESSION:
+        ctx->compr_lvl = 3;
+      case LIMEADE_MODE_HIGH_COMPRESSION:
+        ctx->compr_lvl = 6;
+      default:
+        r = limeade_init_th_csm_step_1(ctx);
+
+        CHECK(r)
+          goto err_2;
+    }
+  }
+
+  r = limeade_init_th_recv_step_1(ctx);
+  CHECK(r)
+    goto err_3;
+
+  return LIMEADE_SUCCESS;
+
+err_3:
+  if(ctx->csm)
+    limeade_destruct_th_csm_step_1(ctx);
+err_2:
+  limeade_destruct_mutexes(ctx);
+err_1:
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_CLIENT_SSH:
+      limeade_destruct_client_ssh_step_1(ctx);
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+      limeade_destruct_client_libssh_step_1(ctx);
+    case LIMEADE_MODE_HOST_ETH:
+      limeade_destruct_host_eth_step_1(ctx);
+    case LIMEADE_MODE_CLIENT_ETH:
+      limeade_destruct_client_eth_step_1(ctx);
+  }
+  return r;
 }
 
+int limeade_connect(struct limeade_context *ctx)
+{
+  register int r;
 
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_CLIENT_SSH:
+      r = limeade_init_client_ssh_step_2(ctx);
+      CHECK(r) goto err_1;
 
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+      r = limeade_init_client_libssh_step_2(ctx);
+      CHECK(r) goto err_1;
 
+    case LIMEADE_MODE_HOST_ETH:
+      r = limeade_init_host_eth_step_2(ctx);
+      CHECK(r) goto err_1;
 
+    case LIMEADE_MODE_CLIENT_ETH:
+      r = limeade_init_client_eth_step_2(ctx);
+      CHECK(r) goto err_1;
+  }
 
+  r = limeade_init_th_recv_step_2(ctx);
+  CHECK(r) goto err_2;
 
+  return LIMEADE_SUCCESS;
 
+err_2:
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_CLIENT_SSH:
+      limeade_destruct_client_ssh_step_2(ctx);
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+      limeade_destruct_client_libssh_step_2(ctx);
+    case LIMEADE_MODE_HOST_ETH:
+      limeade_destruct_host_eth_step_2(ctx);
+    case LIMEADE_MODE_CLIENT_ETH:
+      limeade_destruct_client_eth_step_2(ctx);
+  }
 
+err_1:
+  limeade_destruct_th_recv_step_1(ctx);
+  limeade_destruct_th_csm(ctx);
+  limeade_destruct_mutexes(ctx);
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_CLIENT_SSH:
+      limeade_destruct_client_ssh_step_1(ctx);
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+      limeade_destruct_client_libssh_step_1(ctx);
+    case LIMEADE_MODE_CLIENT_ETH:
+      limeade_destruct_client_eth_step_1(ctx);
+    case LIMEADE_MODE_HOST_ETH:
+      limeade_destruct_host_eth_step_1(ctx);
+  }
 
+  return r;
+}
 
-
-
-
-
-
-
-
-
-
-
+void limeade_destruct(struct limeade_context *ctx)
+{
+  limeade_destruct_th_recv(ctx);
+  limeade_destruct_th_csm(ctx);
+  limeade_destruct_mutexes(ctx);
+  switch(ctx->mode)
+  {
+    case LIMEADE_MODE_CLIENT_SSH:
+      limeade_destruct_client_ssh(ctx);
+    case LIMEADE_MODE_CLIENT_LIBSSH:
+      limeade_destruct_client_libssh(ctx);
+    case LIMEADE_MODE_CLIENT_ETH:
+      limeade_destruct_client_eth(ctx);
+    case LIMEADE_MODE_HOST_ETH:
+      limeade_destruct_host_eth(ctx);
+  }
+}
 

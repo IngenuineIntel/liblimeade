@@ -141,16 +141,16 @@ enum limeade_compression_mode
   // 4. high compression all the time
   LIMEADE_MODE_HIGH_COMPRESSION = 48,
 
-  // 5. start a thread that monitors compression time and bandwidth and
+  // 5. start a thread that monitors compression time & bandwidth and
   // dynamically configures the compression level to maximize all resources,
   // called the Compression Supervisor Module or CSM
-  // 5.1. bias the CSM towards saving bandwidth
-  LIMEADE_MODE_CSM_SAVE_BANDWIDTH = 64,
-  // 5.2. bias the CSM towards saving CPU cycles at the expense of bandwidth
-  LIMEADE_MODE_CSM_SAVE_CYCLES = 80,
-  // 5.3 bias the CSM to maximize throughput at the cost of CPU and bandwidth
-  // indiscriminately
-  LIMEADE_MODE_CSM_MAXIMIZE = 96,
+  //
+  // 5.1: bias the CSM towards saving CPU cycles
+  LIMEADE_MODE_CSM_SAVE_CYCLES = 64,
+  // 5.2: bias the CSM towards maximizing throughput at the detriment of the CPU
+  LIMEADE_MODE_CSM_SAVE_THROUGHPUT = 80,
+  // 5.3: bias in neither direction and attempt to maximize both equally
+  LIMEADE_MODE_CSM_SAVE_ALL = 96,
 };
 // note for CSM users:
 // CSM cannot be used in junction with LIMEADE_MOST_*_SSH options. This is

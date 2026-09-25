@@ -48,13 +48,11 @@ int limeade_decompress_packet(struct limeade_recvd pkt)
 
   if(!new)
     return -1;
-  struct limeade_packet_flags *f = pkt.flags;
 
+  struct limeade_packet_flags *f = pkt.flags;
 
   if(!f->compr_lvl)
     return 0;
-
-  int data_sz = ((struct limeade_packet_flags*)pkt.flags)->packet_size;
 
   if(uncompress(new, &new_l, pkt.data, f->packet_size) != Z_OK)
   {
