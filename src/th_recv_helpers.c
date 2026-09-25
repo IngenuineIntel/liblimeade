@@ -3,6 +3,7 @@
 // AGPL
 
 #include<pthread.h>
+#include<string.h>
 
 #include<liblimeade/liblimeade-internal.h>
 
