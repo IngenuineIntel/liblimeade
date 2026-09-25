@@ -16,3 +16,19 @@ so: objs
 clean:
 	rm -f $(OBJS) liblimeade-0.1.so
 
+install: so uninstall
+	cp liblimeade-0.1.so /usr/local/lib/liblimeade.so.0.1
+	chmod 775 /usr/local/lib/liblimeade.so.0.1
+	ln -s /usr/local/lib/liblimeade.so.0.1 /usr/local/lib/liblimeade.so.0
+	ln -s /usr/local/lib/liblimeade.so.0 /usr/local/lib/liblimeade.so
+	cp -r include/liblimeade/ /usr/local/include/liblimeade
+	cp liblimeade.conf /etc/ld.so.conf.d/
+	ldconfig
+	ldconfig -p | grep liblimeade
+
+uninstall:
+	-rm /usr/local/lib/liblimeade.so*
+	-rm -r /usr/local/include/liblimeade
+	-rm /etc/ld.so.conf.d/liblimeade.conf
+	ldconfig
+

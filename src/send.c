@@ -40,7 +40,7 @@ static int limeade_prep_double(double in, void *out, int max)
     return 1;
   }
   *(uint8_t*)out = LIMEADE_FLT_INDICATOR & sizeof(in);
-  *((double*)out + 1) = in;
+  *((double*)((uint8_t*)out + 1)) = in;
   return sizeof(in) + 1;
 }
 
@@ -90,7 +90,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
   s -= ret;\
 }
 #define FDELIM() *(char*)b = LIMEADE_FIELD_DELIM; b++; s--
-#define RDELIM() *(char*)b = LIMEADE_FIELD_DELIM; b++; s--
+#define RDELIM() *(char*)b = LIMEADE_ROW_DELIM; b++; s--
 
   switch(in->type)
   {
@@ -102,6 +102,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.prev_session);
       RDELIM();
+      break;
     }
 
     case LIMEADE_PACKET_RECOGNIZE:
@@ -112,6 +113,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.new_session);
       RDELIM();
+      break;
     }
 
     case LIMEADE_PACKET_INTRODUCTION:
@@ -134,6 +136,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.swap_mbs);
       RDELIM();
+      break;
     }
 
     case LIMEADE_PACKET_ACKNOWLEDGE:
@@ -148,6 +151,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.recv_ts_ms);
       RDELIM();
+      break;
     }
 
     case LIMEADE_PACKET_EVENTS:
@@ -174,6 +178,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         INC(j->retval);
         RDELIM();
       }
+      break;
     }
 
     case LIMEADE_PACKET_PROC_GENERIC:
@@ -200,6 +205,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         INC(j->command);
         RDELIM();
       }
+      break;
     }
 
     case LIMEADE_PACKET_PROC_UPDATE:
@@ -243,6 +249,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         INC(j->command);
         RDELIM();
       }
+      break;
     }
 
     case LIMEADE_PACKET_PERF:
@@ -269,6 +276,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.other);
       RDELIM();
+      break;
     }
 
     case LIMEADE_PACKET_COMMANDEER:
@@ -281,6 +289,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.id);
       RDELIM();
+      break;
     }
 
     case LIMEADE_PACKET_EXITED:
@@ -291,6 +300,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.exitcode);
       RDELIM();
+      break;
     }
 
     case LIMEADE_PACKET_CLOSE:
@@ -299,6 +309,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
 
       INC(data.explanation);
       RDELIM();
+      break;
     }
   }
 

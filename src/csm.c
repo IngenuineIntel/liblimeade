@@ -20,7 +20,7 @@
 #include<liblimeade/liblimeade-internal.h>
 
 // TODO
-void *limeade_csm(void *arg)
+void *limeade_th_csm(void *arg)
 {
   struct timespec rqtp, rmtp;
   /*

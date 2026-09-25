@@ -36,7 +36,7 @@ static int name(type in, void *out, int max)\
     return 1;\
   }\
   *(uint8_t*)out = indicator & sizeof(in);\
-  *((type*)out + 1) = in;\
+  *((type*)((uint8_t*)out + 1)) = in;\
   return sizeof(in) + 1;\
 }
 

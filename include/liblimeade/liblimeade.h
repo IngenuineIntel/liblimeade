@@ -99,12 +99,12 @@ enum limeade_mode
   // managing the encryption and network connection on its own.
   // This mode is designed to be compatible with this system, as if it were
   // spawned by sshd.
-  LIMEADE_MODE_HOST_SSH,
+  LIMEADE_MODE_HOST_SSH = 0,
 
   // There is a variation of this for the client, too; this mode spawns an ssh
   // process and pipes its stdin/out to itself, and uses the child process to
   // manage the networking/encryption.
-  LIMEADE_MODE_CLIENT_SSH,
+  LIMEADE_MODE_CLIENT_SSH = 1,
 
   // The client can also do networking/encryption in-house with libssh.
   LIMEADE_MODE_CLIENT_LIBSSH,
@@ -122,35 +122,33 @@ enum limeade_mode
 // the name of the SSH subsystem Limeade uses
 #define LIMEADE_SUBSYSTEM "limeade"
 
-// you have to change this line and recompile the library to change this
-
 // additional to these modes, there are compression settings to choose from
 enum limeade_compression_mode
 {
   // there are 3 options for compression
 
   // 1. no compression
-  LIMEADE_MODE_NO_COMPRESSION = 0,
+  LIMEADE_MODE_NO_COMPRESSION = 16,
 
   // 2. low compression all the time
-  LIMEADE_MODE_LOW_COMPRESSION = 16,
+  LIMEADE_MODE_LOW_COMPRESSION = 32,
 
   // 3. medium compression all the time
-  LIMEADE_MODE_MED_COMPRESSION = 32,
+  LIMEADE_MODE_MED_COMPRESSION = 48,
 
   // 4. high compression all the time
-  LIMEADE_MODE_HIGH_COMPRESSION = 48,
+  LIMEADE_MODE_HIGH_COMPRESSION = 64,
 
   // 5. start a thread that monitors compression time & bandwidth and
   // dynamically configures the compression level to maximize all resources,
   // called the Compression Supervisor Module or CSM
   //
   // 5.1: bias the CSM towards saving CPU cycles
-  LIMEADE_MODE_CSM_SAVE_CYCLES = 64,
+  LIMEADE_MODE_CSM_SAVE_CYCLES = 80,
   // 5.2: bias the CSM towards maximizing throughput at the detriment of the CPU
-  LIMEADE_MODE_CSM_SAVE_THROUGHPUT = 80,
+  LIMEADE_MODE_CSM_SAVE_THROUGHPUT = 96,
   // 5.3: bias in neither direction and attempt to maximize both equally
-  LIMEADE_MODE_CSM_SAVE_ALL = 96,
+  LIMEADE_MODE_CSM_SAVE_ALL = 102,
 };
 // note for CSM users:
 // CSM cannot be used in junction with LIMEADE_MOST_*_SSH options. This is
