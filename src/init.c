@@ -595,8 +595,11 @@ int limeade_connect(struct limeade_context *ctx)
   r = limeade_init_th_recv_step_2(ctx);
   CHECK(r) goto err_2;
 
-  r = limeade_init_th_csm_step_2(ctx);
-  CHECK(r) goto err_3;
+  if(ctx->csm)
+  {
+    r = limeade_init_th_csm_step_2(ctx);
+    CHECK(r) goto err_3;
+  }
 
   return LIMEADE_SUCCESS;
 
