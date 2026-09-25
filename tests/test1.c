@@ -5,6 +5,10 @@
 // THE TEST THAT IS THE 1 THAT IS THE FIRST 1
 // THE NO 1 1 NO 1 TEST
 
+#include<pthread.h>
+#include<stdio.h>
+#include<unistd.h>
+
 #include<liblimeade/liblimeade.h>
 #define test(e) printf("%s\n", LIMEADE_ERROR_REPRS[e]);
 int main(int argc, char **argv)
@@ -12,11 +16,19 @@ int main(int argc, char **argv)
   struct limeade_context c;
   struct limeade_indiv_event v, ev[3];
   struct limeade_events p;
+  int fds[2];
 
+  printf("limeade_init...\n");
   int e = limeade_init(&c, LIMEADE_MODE_HOST_SSH|LIMEADE_MODE_NO_COMPRESSION);
+  test(e);
 
-  c.compr_lvl = 2;
+  pipe(fds);
+  c.sfd = fds[1];
+  c.rfd = fds[0];
+
+  printf("limeade_connect...\n");
   e = limeade_connect(&c);
+  test(e);
 /*
   p.hostname = "arch";
   p.kernelver = "7.2.0-arch";
@@ -38,13 +50,23 @@ int main(int argc, char **argv)
   v.arg2    = "just give him the maalk, Josh!";
   v.retval = 69420;
 
-
   ev[0] = ev[1] = ev[2] = v;
 
   p.nr_events = 3;
   p.events = ev;
 
-  limeade_send(&c, LIMEADE_PACKET_EVENTS, p);
+  printf("limeade_send...\n");
+  e = limeade_send(&c, LIMEADE_PACKET_EVENTS, p);
+  test(e);
+
+  struct limeade_recvd r;
+  printf("limeade_recv_noreply...\n");
+  e = limeade_recv_noreply(&c, r);
+  
+  printf("r.pkt_sz = %i\n", r.pkt_sz);
+
+  write(STDOUT_FILENO, r.pkt, r.pkt_sz);
 
   return 0;
 }
+

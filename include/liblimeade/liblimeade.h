@@ -59,6 +59,7 @@ enum limeade_error
   LIMEADE_ERROR_MEMORY,          // failure to allocate memory
   LIMEADE_ERROR_NOT_SUPPORTED,   // feature not supported
   LIMEADE_ERROR_TH_RECV_DIED,    // receiving thread died
+  LIMEADE_ERROR_TH_CSM_DIED,     // CSM thread died
   LIMEADE_ERROR_OTHER,           // unspecified & probably assumed impossible
   
   LIMEADE_MAXIMUM_ERROR
@@ -67,22 +68,28 @@ enum limeade_error
 // textual equivalents of errors
 static const char *LIMEADE_ERROR_REPRS[] = {
   "Success/No error",
+
   "Garbage data supplied",
   "Compression failure",
+
   "libssh failure",
   "SSH failure",
   "Monotonic benchmark failure",
   "Network failure",
   "CSM failure",
+
   "No data on port",
   "Bad magic",
   "Bad format",
   "Bad data",
   "Bad compression",
+  
   "No acknowledgement from recipient",
   "Invalid context",
   "Allocation failure",
+  "Feature not supported",
   "Receiving thread died",
+  "Compression management thread died",
   "Not supported",
   "Unknown"
 };
