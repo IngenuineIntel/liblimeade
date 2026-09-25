@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: install zlib
+      run: sudo apt install zlib
     - name: make install
       run: sudo make install
     - name: make test
