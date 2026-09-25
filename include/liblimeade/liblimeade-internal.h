@@ -35,10 +35,19 @@ static int name(type in, void *out, int max)\
     *(uint8_t*)out = '\x00';\
     return 1;\
   }\
-  *(uint8_t*)out = indicator | (sizeof(in) - 1);\
+  *(uint8_t*)out = indicator | sizeof(in);\
   *((type*)((uint8_t*)out + 1)) = in;\
   return sizeof(in) + 1;\
 }
+
+/* limeade_statecheck
+ *
+ * checks any/all active threads and makes sure everything is in a functional
+ * state
+ *
+ * returns LIMEADE_SUCCESS on success
+ */
+int limeade_statecheck(struct limeade_context *ctx);
 
 /* limeade_monotonic
  *
