@@ -656,7 +656,6 @@ err_1:
 void limeade_destruct(struct limeade_context *ctx)
 {
   limeade_destruct_th_recv(ctx);
-  printf("passed\n");
   if(ctx->csm)
     limeade_destruct_th_csm(ctx);
   limeade_destruct_mutexes(ctx);

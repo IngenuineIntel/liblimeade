@@ -65,7 +65,11 @@ int main(int argc, char **argv)
   //test(e);
   
   //printf("r.pkt_sz = %i\n", r.pkt_sz);
-  write(STDOUT_FILENO, r.pkt, r.pkt_sz);
+  //write(STDOUT_FILENO, r.pkt, r.pkt_sz);
+  
+  struct limeade_events evs;
+  e = limeade_parse_events(&evs, r);
+  test(e);
 
   limeade_release(&r);
 

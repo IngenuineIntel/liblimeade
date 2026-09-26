@@ -330,7 +330,6 @@ struct limeade_context
   int port;
   uint64_t sessionid;
   uint32_t ack_wait_time_ms; // amount of time to try to send data before giving up
-  uint32_t retry_interval;   // time between resends (in milliseconds)
 
   // mutexes (all pthread_mutex_t)
   void *mtx_sfd;        // sfd (for using the file descriptor, not reading the memory)
