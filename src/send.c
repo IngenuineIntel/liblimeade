@@ -408,7 +408,7 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
 {
   register int _;
   struct limeade_packet_data pkt;
-  struct limeade_packet_flags flags, *f;
+  struct limeade_packet_flags flags = {0}, *f;
   struct limeade_csm_compression_entry entry;
   struct timespec compr_ts[2], send_ts;
   va_list arg;
@@ -507,6 +507,8 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   uint64_t iters, iters_giveup;
   va_list arg;
   va_start(arg, type);
+
+  memset(&flags, 0, sizeof(flags));
 
   _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
