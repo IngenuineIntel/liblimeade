@@ -22,7 +22,7 @@ int main(int argc, char **argv)
   int e = limeade_init(&c, LIMEADE_MODE_HOST_SSH|LIMEADE_MODE_NO_COMPRESSION);
   //test(e);
 
-  c.compr_lvl = 5;
+  c.compr_lvl = 0;
 
   pipe(fds);
   c.sfd = fds[1];

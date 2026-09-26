@@ -7,7 +7,6 @@
 #include<pthread.h>
 #include<stdlib.h>
 #include<stdint.h>
-#include<string.h>
 #include<unistd.h>
 
 #include<liblimeade/liblimeade-internal.h>
@@ -16,55 +15,49 @@
 
 void *limeade_th_recv_host_eth(void *arg)
 {
-  /* TODO fancy ass-docstring */
   struct limeade_context *ctx;
   struct limeade_recv_data *r;
-  struct timespec iter_wait, rmtp;
-  struct sockaddr_in tmp_cliaddr;
-  socklen_t tmp_cliaddr_l;
+  struct pollfd recv_poll;
+  struct sockaddr_in tmp_sockaddr;
+  socklen_t tmp_socklen;
   void *buffer;
-  unsigned int amt_recv;
+  int amt_recv, poll_ms;
 
   ctx = arg;
-  r = &ctx->recv;
+  r   = &ctx->recv;
 
   pthread_mutex_lock(r->mtx_ack);
 
-  memset(&tmp_cliaddr, 0, sizeof(tmp_cliaddr));
-
-  iter_wait.tv_sec  = 0;
-  iter_wait.tv_nsec = 999999999/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
+  poll_ms = 1000/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
 
   buffer = malloc(LIMEADE_RECV_TMP_SZ);
   if(!buffer)
     return NULL;
 
+  recv_poll.events = POLLIN;
+  recv_poll.fd = ctx->rfd;
+
   while(pthread_mutex_trylock(r->mtx_kys) == EBUSY)
   {
-    amt_recv = limeade_eth_recv(ctx, buffer, LIMEADE_RECV_TMP_SZ, (struct sockaddr*)&tmp_cliaddr,
-                                &tmp_cliaddr_l);
 
-    if(amt_recv <= 0)
-    {
-      // 0, EWOULDBLOCK, & EAGAIN are intended POSIX standard behavior for an
-      // empty socket queue.
-      if(amt_recv != 0 && errno != EWOULDBLOCK && errno != EAGAIN)
-        break;
-
-      nanosleep(&iter_wait, &rmtp);
+    if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
       continue;
-    }
+
+    pthread_mutex_lock(ctx->mtx_rfd);
+    pthread_mutex_lock(ctx->mtx_mode_union);
+    
+    amt_recv = recvfrom(recv_poll.fd, buffer, LIMEADE_RECV_TMP_SZ, 0,
+                        (struct sockaddr*)&tmp_sockaddr, &tmp_socklen);
+
+    pthread_mutex_unlock(ctx->mtx_rfd);
+    pthread_mutex_unlock(ctx->mtx_mode_union);
 
     if(limeade_prelim_confirm(buffer, amt_recv) != 0)
       continue;
 
-    limeade_th_recv_wr_pkt(r, buffer + MAGSZ, amt_recv,
-                          &tmp_cliaddr, tmp_cliaddr_l); 
-
+    limeade_th_recv_wr_pkt(r, buffer, amt_recv, &tmp_sockaddr, tmp_socklen);
   }
-
   free(buffer);
-  pthread_mutex_unlock(r->ack);
   return NULL;
 }
 
@@ -72,44 +65,47 @@ void *limeade_th_recv_client_eth(void *arg)
 {
   struct limeade_context *ctx;
   struct limeade_recv_data *r;
-  struct timespec iter_wait, rmtp;
+  struct pollfd recv_poll;
   void *buffer;
-  unsigned int amt_recv;
+  int amt_recv, poll_ms;
 
   ctx = arg;
   r   = &ctx->recv;
-
+  
   pthread_mutex_lock(r->mtx_ack);
 
-  iter_wait.tv_sec  = 0;
-  iter_wait.tv_nsec = 999999999/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
+  poll_ms = 1000/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
 
   buffer = malloc(LIMEADE_RECV_TMP_SZ);
   if(!buffer)
     return NULL;
 
+  recv_poll.events = POLLIN;
+  recv_poll.fd     = ctx->rfd;
+
   while(pthread_mutex_trylock(r->mtx_kys) == EBUSY)
   {
-    amt_recv = limeade_eth_recv(ctx, buffer, LIMEADE_RECV_TMP_SZ, NULL, 0);
 
-    if(amt_recv <= 0)
-    {
-      if(amt_recv != 0 && errno != EWOULDBLOCK && errno != EAGAIN)
-        break;
-
-      nanosleep(&iter_wait, &rmtp);
+    if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
       continue;
-    }
+
+    pthread_mutex_lock(ctx->mtx_rfd);
+
+    amt_recv = recvfrom(recv_poll.fd, buffer, LIMEADE_RECV_TMP_SZ, 0, NULL, NULL);
+
+    pthread_mutex_unlock(ctx->mtx_rfd);
 
     if(limeade_prelim_confirm(buffer, amt_recv) != 0)
       continue;
 
-    limeade_th_recv_wr_pkt(r, buffer + MAGSZ, amt_recv, NULL, 0);
+    limeade_th_recv_wr_pkt(r, buffer, amt_recv, NULL, 0);
+
+    recv_poll.fd = ctx->rfd;
   }
   free(buffer);
-  pthread_mutex_unlock(r->ack);
   return NULL;
 }
+
 
 void *limeade_th_recv_client_ssh(void *arg)
 {
@@ -140,7 +136,9 @@ void *limeade_th_recv_client_ssh(void *arg)
       continue;
 
     pthread_mutex_lock(ctx->mtx_rfd);
+
     amt_recv = read(recv_poll.fd, buffer, LIMEADE_RECV_TMP_SZ);
+
     pthread_mutex_unlock(ctx->mtx_rfd);
     
     if(limeade_prelim_confirm(buffer, amt_recv) != 0)
