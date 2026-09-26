@@ -578,11 +578,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   
   pthread_mutex_unlock(ctx->mtx_pub);
 
-  if(sem_init(&recv_ack.sem, 0, 1) != 0)
-  {
-    _ = LIMEADE_ERROR_OTHER;
-    goto err;
-  }
+  sem_init(&recv_ack.sem, 0, 1);
 
   if(pthread_create(&recv_ack_tid, NULL, &limeade_th_await, &recv_ack) != 0)
   {

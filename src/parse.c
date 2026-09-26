@@ -133,7 +133,13 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
 
   sem_init(&d.sem, 0, 1);
   pthread_mutex_init(&d.mtx, NULL);
-  pthread_create(&d.tid, NULL, limeade_recv_waiter, &d);
+
+  if(pthread_create(&d.tid, NULL, limeade_recv_waiter, &d) != 0)
+  {
+    sem_destroy(&d.sem);
+    pthread_mutex_destroy(&d.mtx);
+    return LIMEADE_ERROR_OTHER;
+  }
   sem_wait(&d.sem);
 
   do
