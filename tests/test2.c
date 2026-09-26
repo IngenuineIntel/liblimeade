@@ -36,12 +36,10 @@ int main(int argc, char **argv)
 
   host_ready = 1;
 
-  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_NO_COMPRESSION,
+  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_LOW_COMPRESSION,
                    "127.0.0.1", LIMEADE_PORT);
   limeade_perror("client init", e);
   NOT_OK(e);
-
-  client.compr_lvl = 0;
 
   e = limeade_connect(&client);
   limeade_perror("client connect", e);
