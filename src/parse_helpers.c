@@ -31,7 +31,7 @@ int limeade_get_nr_rows(struct limeade_recvd *pkt)
   void *next, *prev = pkt->data;
   for(;;)
   {
-    next = memmem(prev, rem, (char*)LIMEADE_ROW_DELIM, 1);
+    next = memchr(prev, LIMEADE_ROW_DELIM, rem);
     ret++;
 
     if(!next)

@@ -15,7 +15,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 {
   /* the most incredible docstirng you've ever read */
 
-  if(((struct limeade_packet_flags*)pkt)->type == LIMEADE_PACKET_ACKNOWLEDGE)
+  if(((struct limeade_packet_flags*)(pkt + MAGSZ))->type == LIMEADE_PACKET_ACKNOWLEDGE)
   {
     memcpy(r->ack, pkt, sz);
 

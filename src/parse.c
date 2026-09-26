@@ -215,7 +215,7 @@ LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
   float*:    limeade_cast_flt, \
   double*:   limeade_cast_dbl, \
   char**:    limeade_cast_str  \
-)(dst, src, rem)
+)(src, dst, rem)
 
 #define CAST_INIT()                                         \
 register int _;                                             \
