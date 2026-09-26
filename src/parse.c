@@ -18,6 +18,7 @@
 
 #include<errno.h> // IWYU pragma: keep
 #include<pthread.h>
+#include<semaphore.h>
 #include<stdlib.h>
 #include<string.h>
 
@@ -66,6 +67,14 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
   r->has_been_read = 1;
   r->ready         = 0;
 
+  if(ctx->mode == LIMEADE_MODE_HOST_ETH)
+  {
+    pthread_mutex_lock(ctx->mtx_mode_union);
+    ctx->cliaddr = r->addr;
+    ctx->cliaddr_len = r->addr_len;
+    pthread_mutex_unlock(ctx->mtx_mode_union);
+  }
+
   out->pkt = malloc(r->sz);
   if(!out->pkt)
   {
@@ -81,8 +90,9 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
 
   pthread_mutex_unlock(r->mtx);
 
-  f = out->pkt;
-  out->data = out->pkt + sizeof(*f);
+  out->flags = out->pkt + sizeof(LIMEADE_MAGIC);
+  f = out->flags;
+  out->data = out->flags + sizeof(*f);
   out->type  = f->type;
   out->compr = f->compr_lvl;
 
@@ -102,6 +112,7 @@ struct limeade_recv_waiter_data
 {
   struct timespec wait_t;
   pthread_mutex_t mtx;
+  sem_t sem;
   pthread_t tid;
 };
 
@@ -109,6 +120,7 @@ void *limeade_recv_waiter(void *arg)
 {
   struct limeade_recv_waiter_data *d = arg;
   pthread_mutex_lock(&d->mtx);
+  sem_post(&d->sem);
   nanosleep(&d->wait_t, &d->wait_t);
   pthread_mutex_unlock(&d->mtx);
   return NULL;
@@ -128,8 +140,16 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
   if(_ != LIMEADE_SUCCESS)
     return _;
 
+  sem_init(&d.sem, 0, 1);
   pthread_mutex_init(&d.mtx, NULL);
-  pthread_create(&d.tid, NULL, limeade_recv_waiter, &d);
+
+  if(pthread_create(&d.tid, NULL, limeade_recv_waiter, &d) != 0)
+  {
+    sem_destroy(&d.sem);
+    pthread_mutex_destroy(&d.mtx);
+    return LIMEADE_ERROR_OTHER;
+  }
+  sem_wait(&d.sem);
 
   do
   {
@@ -140,10 +160,16 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
       goto premature;
 
   } while(pthread_mutex_trylock(&d.mtx) == EBUSY);
+  pthread_join(d.tid, NULL);
+  sem_destroy(&d.sem);
+  pthread_mutex_destroy(&d.mtx);
   return LIMEADE_ERROR_NO_DATA;
 
 premature:
   pthread_cancel(d.tid);
+  pthread_join(d.tid, NULL);
+  sem_destroy(&d.sem);
+  pthread_mutex_destroy(&d.mtx);
   return e;
 }
 
@@ -163,7 +189,8 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data)
 
 static int limeade_cast_str(void *src, char **dst, int rem)
 {
-  register uint32_t l = limeade_pkt_strlen(src);
+  register uint32_t l = limeade_pkt_strlen(src, rem > 0 ? rem : 0);
+  if(l == UINT32_MAX) return -1;
   *dst = malloc(l + 1);
   if(!*dst) return -1;
   memcpy(*dst, src, l);
@@ -197,18 +224,19 @@ LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
   float*:    limeade_cast_flt, \
   double*:   limeade_cast_dbl, \
   char**:    limeade_cast_str  \
-)(dst, src, rem)
+)(src, dst, rem)
 
-#define CAST_INIT()                                         \
-register int _;                                             \
-void *idx = pkt.data;                                       \
-int rem = pkt.pkt_sz - sizeof(struct limeade_packet_flags); \
+#define CAST_INIT()                                        \
+register int _;                                            \
+void *idx = pkt.data;                                      \
+int rem = pkt.pkt_sz - sizeof(LIMEADE_MAGIC)               \
+                    - sizeof(struct limeade_packet_flags); \
 __attribute__((unused)) char last_delim;
 
 #define CAST(dst)\
 _ = _limeade_cast(dst, idx, rem); \
 rem -= _;                         \
-if(rem <= 0 || _ < 0) goto err;   \
+if(rem < 0 || _ < 0) goto err;    \
 idx += _;                         \
 last_delim = *(char*)(idx - 1);
 
@@ -304,7 +332,6 @@ err:
 
 int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
 {
-  void *alloc;
   struct limeade_indiv_event *j;
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_EVENTS);
@@ -320,8 +347,8 @@ int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
   if(limeade_get_nr_rows(&pkt) != out->nr_events + 1)
     return LIMEADE_ERROR_BAD_DATA;
 
-  alloc = malloc(sizeof(*j) * out->nr_events);
-  if(!alloc)
+  out->events = malloc(sizeof(*j) * out->nr_events);
+  if(!out->events)
     return LIMEADE_ERROR_MEMORY;
 
   for(int i = 0; i < out->nr_events; i++)
@@ -348,14 +375,12 @@ err:
     free(j->arg1);
     free(j->arg2);
   }
-  free(alloc);
 
   return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recvd pkt)
 {
-  void *alloc;
   struct limeade_indiv_proc *j;
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_PROC_GENERIC);
@@ -372,8 +397,8 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
   if(limeade_get_nr_rows(&pkt) != out->total + 1)
     return LIMEADE_ERROR_BAD_DATA;
 
-  alloc = malloc(sizeof(*j) * out->total);
-  if(!alloc)
+  out->procs = malloc(sizeof(*j) * out->total);
+  if(!out->procs)
     return LIMEADE_ERROR_MEMORY;
   
   for(int i = 0; i < out->total; i++)
@@ -395,7 +420,7 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
 err:
   for(int i = 0; i < out->total && &out->procs[i]; i++)
     free(out->procs[i].command);
-  free(alloc);
+  free(out->procs);
 
   return LIMEADE_ERROR_BAD_DATA;
 }
@@ -425,7 +450,7 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   t_sz = out->total_died    * sizeof(pid_t)
        + out->total_altered * sizeof(*out->altered);
 
-  alloc = malloc(t_sz);
+  alloc = calloc(1, t_sz ? t_sz : 1);
 
   if(!alloc)
     return LIMEADE_ERROR_MEMORY;
@@ -433,8 +458,19 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   out->died    = alloc;
   out->altered = alloc + out->total_died * sizeof(pid_t);
 
-  for(int i = 0; i < out->total_died; i++)
-    CAST(&out->died[i]);
+  if(out->total_died == 0)
+  {
+    if(rem <= 0 || *(char*)idx != LIMEADE_ROW_DELIM)
+      goto err;
+    idx++;
+    rem--;
+    last_delim = LIMEADE_ROW_DELIM;
+  }
+  else
+  {
+    for(int i = 0; i < out->total_died; i++)
+      CAST(&out->died[i]);
+  }
 
   IF_NOT_ROW_END()
     goto err;
@@ -551,9 +587,80 @@ err:
   return LIMEADE_ERROR_BAD_DATA;
 }
 
+void limeade_release_knock(struct limeade_knock *in)
+{}
+
+void limeade_release_recognize(struct limeade_recognize *in)
+{}
+
+void limeade_release_intro(struct limeade_intro *in)
+{
+  free(in->hostname);
+  free(in->kernelver);
+  free(in->distro);
+  free(in->origin_user);
+  free(in->processor);
+  free(in->vendor);
+}
+
+void limeade_release_ack(struct limeade_ack *in)
+{}
+
+void limeade_release_events(struct limeade_events *in)
+{
+  struct limeade_indiv_event *j;
+
+  for(int i = 0; i < in->nr_events; i++)
+  {
+    j = &in->events[i];
+    free(j->syscall);
+    free(j->arg1);
+    free(j->arg2);
+  }
+  free(in->events);
+}
+
+void limeade_release_proc_generic(struct limeade_proc_generic *in)
+{
+  for(int i = 0; i < in->total; i++)
+    free(in->procs[i].command);
+  free(in->procs);
+}
+
+void limeade_release_proc_update(struct limeade_proc_update *in)
+{
+  for(int i = 0; i < in->total_altered; i++)
+    free(in->altered[i].command);
+  free(in->died);
+}
+
+void limeade_release_perf(struct limeade_perf *in)
+{
+  free(in->other);
+}
+
+void limeade_release_commandeer(struct limeade_commandeer *in)
+{
+  free(in->command);
+}
+
+void limeade_release_exited(struct limeade_exited *in)
+{}
+
+void limeade_release_close(struct limeade_close *in)
+{
+  free(in->explanation);
+}
+
+void limeade_release_recvd(struct limeade_recvd *in)
+{
+  free(in->pkt);
+}
+
 #undef ENFORCE_PKT_TYPE
 #undef CAST_INIT
 #undef CAST
 #undef IF_NOT_ROW_END
+
 #undef _limeade_cast
 

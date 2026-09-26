@@ -43,7 +43,7 @@ void *limeade_th_csm(void *arg)
   }
   */
 
-  rqtp.tv_sec = 5;
+  rqtp.tv_sec = 1;
 
   for(;;)
     nanosleep(&rqtp, &rmtp);

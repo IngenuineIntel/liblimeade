@@ -330,7 +330,6 @@ struct limeade_context
   int port;
   uint64_t sessionid;
   uint32_t ack_wait_time_ms; // amount of time to try to send data before giving up
-  uint32_t retry_interval;   // time between resends (in milliseconds)
 
   // mutexes (all pthread_mutex_t)
   void *mtx_sfd;        // sfd (for using the file descriptor, not reading the memory)
@@ -369,7 +368,7 @@ int limeade_connect(struct limeade_context *ctx);
 // initializing the connection.
 
 // to deconstruct a struct limeade_context:
-void limeade_deconstruct(struct limeade_context *ctx);
+void limeade_destruct(struct limeade_context *ctx);
 
 
 
@@ -676,6 +675,8 @@ void limeade_release_commandeer(struct limeade_commandeer *in);
 void limeade_release_exited(struct limeade_exited *in);
 void limeade_release_close(struct limeade_close *in);
 
+void limeade_release_recvd(struct limeade_recvd *in);
+
 // for convenience:
 #define limeade_release(in) _Generic((in), \
   struct limeade_knock*:        limeade_release_knock,\
@@ -689,7 +690,13 @@ void limeade_release_close(struct limeade_close *in);
   struct limeade_commandeer*:   limeade_release_commandeer,\
   struct limeade_exited*:       limeade_release_exited,\
   struct limeade_close*:        limeade_release_close,\
-  struct limeade_context:       limeade_deconstruct\
+  struct limeade_recvd*:        limeade_release_recvd,\
+  struct limeade_context*:      limeade_destruct\
 )(in)
+
+
+/*** DIAGNOSTICS ***/
+// perror-like error system
+void limeade_perror(const char * const s, const int error);
 
 #endif /* _LIBLIMEADE_H_ */

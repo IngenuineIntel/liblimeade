@@ -84,9 +84,8 @@ void limeade_csm_add_latency_entry(struct limeade_context *ctx,
 static int name(void *src, type *dst, int rem)       \
 {                                                    \
   register uint8_t databyte = *(uint8_t*)src;        \
-  register uint8_t datatype = databyte & 0b11100000; \
-  register uint8_t datasize = datatype & 0b00011111; \
-  datatype &= 0b11100000;                            \
+  register uint8_t datatype = databyte & 0b11110000; \
+  register uint8_t datasize = databyte & 0b00011111; \
   if(datasize + 1 > rem) return 0;                   \
   typecheck(datatype)                                \
   {                                                  \
@@ -95,7 +94,7 @@ static int name(void *src, type *dst, int rem)       \
     else                                             \
     {                                                \
       *(type*)dst = 0;                               \
-      return 1;                                      \
+      return 2;                                      \
     }                                                \
   }                                                  \
   *dst = *(type*)(src + 1);                          \
@@ -121,7 +120,7 @@ int limeade_get_nr_rows(struct limeade_recvd *pkt);
  * reimplementation of strlen that uses LIMEADE_FIELD_DELIM or LIMEADE_ROW_DELIM
  * instead of 0x00
  */
-uint32_t limeade_pkt_strlen(const char *s);
+uint32_t limeade_pkt_strlen(const char *s, uint32_t max_len);
 
 /* limeade_th_recv_wr_pkt
  *

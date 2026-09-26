@@ -3,6 +3,7 @@
 #include<errno.h> // IWYU pragma: keep
 #include<math.h>  // isnan isinf
 #include<pthread.h>
+#include<semaphore.h>
 #include<stdarg.h>
 #include<stdlib.h>
 #include<string.h>
@@ -159,6 +160,9 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       struct limeade_events data = va_arg(arg, struct limeade_events);
       struct limeade_indiv_event *j;
 
+      INC(data.nr_events);
+      RDELIM();
+
       for(int i = 0; i < data.nr_events; i++)
       {
         j = &data.events[i];
@@ -212,22 +216,19 @@ void limeade_populate_packet(struct limeade_packet_data *in,
     {
       struct limeade_proc_update data = va_arg(arg, struct limeade_proc_update);
       struct limeade_indiv_proc *j;
-      int i, died;
+      int i;
 
       INC(data.total_died);
       FDELIM();
       INC(data.total_altered);
       RDELIM();
 
-      died = data.total_died - 1;
-      for(i = 0; i < died; i++)
+      for(i = 0; i < data.total_died; i++)
       {
         INC(data.died[i]);
-        FDELIM();
+        if(i + 1 < data.total_died)
+          FDELIM();
       }
-      // writing last in series outside the loop to avoid putting an FDELIM
-      // right before an RDELIM
-      INC(data.died[died]);
       RDELIM();
 
       for(i = 0; i < data.total_altered; i++)
@@ -414,6 +415,8 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
   va_list arg;
   va_start(arg, type);
 
+  memset(&flags, 0, sizeof(flags));
+
   _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
     return _;
@@ -475,12 +478,15 @@ struct limeade_ack_recv_th_pass
   unsigned int sz;
   void *data;
   pthread_mutex_t mtx;
+  sem_t sem;
 };
 
 void *limeade_th_await(void *arg)
 {
   struct limeade_ack_recv_th_pass *data = arg;
   pthread_mutex_lock(&data->mtx);
+  sem_post(&data->sem);
+
   struct limeade_recv_data *r = data->in;
 
   pthread_mutex_lock(r->mtx_ack); // hangs
@@ -502,11 +508,12 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   struct limeade_csm_latency_entry l_entry;
   struct limeade_ack_recv_th_pass recv_ack;
   struct limeade_ack a;
-  struct timespec compr_ts[2], latent_ts[2], sendts, recvwait, rmtp;
+  struct timespec compr_ts[2], latent_ts[2], sendts, recvwait;
   pthread_t recv_ack_tid;
-  uint64_t iters, iters_giveup;
   va_list arg;
   va_start(arg, type);
+
+  memset(&flags, 0, sizeof(flags));
 
   _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
@@ -563,36 +570,33 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   if(_ != LIMEADE_SUCCESS)
     goto err;
 
-  iters = 0;
-
-  // 0.1s accuracy (excluding time drift from execution time, which idgaf about)
-  recvwait.tv_sec  = 0;
-  recvwait.tv_nsec = 1000000000;
-
   pthread_mutex_lock(ctx->mtx_pub);
 
-  iters_giveup  = recvwait.tv_sec * 1000;
-  iters_giveup += recvwait.tv_nsec / 100000;
-
+  clock_gettime(CLOCK_REALTIME, &recvwait);
+  recvwait.tv_sec  += ctx->ack_wait_time_ms / 1000;
+  recvwait.tv_nsec += ctx->ack_wait_time_ms % 1000 * 1000000;
+  
   pthread_mutex_unlock(ctx->mtx_pub);
 
-  if(pthread_create(&recv_ack_tid, NULL, limeade_th_await, &recv_ack) != 0)
+  sem_init(&recv_ack.sem, 0, 1);
+
+  if(pthread_create(&recv_ack_tid, NULL, &limeade_th_await, &recv_ack) != 0)
   {
+    sem_destroy(&recv_ack.sem);
     _ = LIMEADE_ERROR_OTHER;
     goto err;
   }
 
-  do
+  sem_wait(&recv_ack.sem);
+  if(pthread_mutex_timedlock(&recv_ack.mtx, &recvwait) != 0)
   {
-    nanosleep(&recvwait, &rmtp);
-    if(++iters >= iters_giveup)
-    {
-      pthread_cancel(recv_ack_tid);
-      free(recv_ack.data);
-      _ = LIMEADE_ERROR_REJECTED;
-      goto err;
-    }
-  } while(pthread_mutex_trylock(&recv_ack.mtx) == EBUSY);
+    pthread_cancel(recv_ack_tid);
+    sem_destroy(&recv_ack.sem);
+    _ = LIMEADE_ERROR_REJECTED;
+    goto err;
+  }
+
+  sem_destroy(&recv_ack.sem);
 
   _ = limeade_monotonic(&latent_ts[1]);
   if(_ != LIMEADE_SUCCESS)

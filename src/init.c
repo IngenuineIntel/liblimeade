@@ -6,6 +6,7 @@
 #include<pthread.h>
 #include<signal.h>
 #include<stdarg.h>
+#include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
 #include<sys/socket.h>
@@ -165,8 +166,8 @@ static void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
 static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
 {
   struct limeade_recv_data *r = &ctx->recv;
-  //pthread_cancel(r->tid);
-  pthread_mutex_lock(r->mtx_kys);
+  //pthread_cancel(*(pthread_t*)r->tid);
+  pthread_mutex_unlock(r->mtx_kys);
   pthread_join(*(pthread_t*)r->tid, NULL);
 
   pthread_mutex_t *m;
@@ -401,25 +402,17 @@ static void limeade_destruct_client_eth_step_1(struct limeade_context *ctx)
 #define limeade_destruct_client_eth(ctx) limeade_destruct_client_eth_step_1(ctx)
 
 static inline int limeade_init_host_eth_step_1(struct limeade_context *ctx,
-                                               const char *dest, const int port)
+                                               const int port)
 {
-  int s;
-
   ctx->sfd = ctx->rfd = socket(AF_INET, SOCK_DGRAM, 0);
+  if(ctx->sfd < 0)
+    return LIMEADE_ERROR_NETWORK;
 
   memset(&ctx->saddr, 0, sizeof(ctx->saddr));
-
-  s = strlen(dest) + 1;
-  ctx->dest = malloc(s);
-  if(!ctx->dest)
-  {
-    close(ctx->sfd);
-    return LIMEADE_ERROR_MEMORY;
-  }
-  strncpy(ctx->dest, dest, s);
+  ctx->dest = NULL;
   ctx->port          = port;
 
-  //ctx->saddr.sin_port      = htons(ctx->port);
+  ctx->saddr_len             = sizeof(ctx->saddr);
   ctx->saddr.sin_addr.s_addr = htonl(INADDR_ANY);
   ctx->saddr.sin_family      = AF_INET;
 
@@ -501,7 +494,7 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
       allow_compr = 0;
       break;
     case LIMEADE_MODE_HOST_ETH:
-      r = limeade_init_host_eth_step_1(ctx, va_arg(arg, const char *), va_arg(arg, const int));
+      r = limeade_init_host_eth_step_1(ctx, va_arg(arg, int));
       break;
     case LIMEADE_MODE_CLIENT_ETH:
       r = limeade_init_client_eth_step_1(ctx, va_arg(arg, const char *), va_arg(arg, const int));
