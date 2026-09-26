@@ -26,7 +26,8 @@
 
 int limeade_get_nr_rows(struct limeade_recvd *pkt)
 {
-  int ret = 0, rem  = pkt->pkt_sz - sizeof(struct limeade_packet_flags);
+  int ret = 0, rem  = pkt->pkt_sz - sizeof(LIMEADE_MAGIC)
+                                  - sizeof(struct limeade_packet_flags);
   void *next, *prev = pkt->data;
   for(;;)
   {
