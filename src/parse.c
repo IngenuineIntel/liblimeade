@@ -18,6 +18,7 @@
 
 #include<errno.h> // IWYU pragma: keep
 #include<pthread.h>
+#include<semaphore.h>
 #include<stdlib.h>
 #include<string.h>
 
@@ -102,6 +103,7 @@ struct limeade_recv_waiter_data
 {
   struct timespec wait_t;
   pthread_mutex_t mtx;
+  sem_t sem;
   pthread_t tid;
 };
 
@@ -109,6 +111,7 @@ void *limeade_recv_waiter(void *arg)
 {
   struct limeade_recv_waiter_data *d = arg;
   pthread_mutex_lock(&d->mtx);
+  sem_post(&d->sem);
   nanosleep(&d->wait_t, &d->wait_t);
   pthread_mutex_unlock(&d->mtx);
   return NULL;
@@ -128,8 +131,10 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
   if(_ != LIMEADE_SUCCESS)
     return _;
 
+  sem_init(&d.sem, 0, 1);
   pthread_mutex_init(&d.mtx, NULL);
   pthread_create(&d.tid, NULL, limeade_recv_waiter, &d);
+  sem_wait(&d.sem);
 
   do
   {
@@ -141,11 +146,15 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
 
   } while(pthread_mutex_trylock(&d.mtx) == EBUSY);
   pthread_join(d.tid, NULL);
+  sem_destroy(&d.sem);
+  pthread_mutex_destroy(&d.mtx);
   return LIMEADE_ERROR_NO_DATA;
 
 premature:
   pthread_cancel(d.tid);
   pthread_join(d.tid, NULL);
+  sem_destroy(&d.sem);
+  pthread_mutex_destroy(&d.mtx);
   return e;
 }
 
