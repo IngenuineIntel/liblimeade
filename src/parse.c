@@ -67,6 +67,14 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
   r->has_been_read = 1;
   r->ready         = 0;
 
+  if(ctx->mode == LIMEADE_MODE_HOST_ETH)
+  {
+    pthread_mutex_lock(ctx->mtx_mode_union);
+    ctx->cliaddr = r->addr;
+    ctx->cliaddr_len = r->addr_len;
+    pthread_mutex_unlock(ctx->mtx_mode_union);
+  }
+
   out->pkt = malloc(r->sz);
   if(!out->pkt)
   {
@@ -181,7 +189,8 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data)
 
 static int limeade_cast_str(void *src, char **dst, int rem)
 {
-  register uint32_t l = limeade_pkt_strlen(src);
+  register uint32_t l = limeade_pkt_strlen(src, rem > 0 ? rem : 0);
+  if(l == UINT32_MAX) return -1;
   *dst = malloc(l + 1);
   if(!*dst) return -1;
   memcpy(*dst, src, l);
@@ -217,16 +226,17 @@ LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
   char**:    limeade_cast_str  \
 )(src, dst, rem)
 
-#define CAST_INIT()                                         \
-register int _;                                             \
-void *idx = pkt.data;                                       \
-int rem = pkt.pkt_sz - sizeof(struct limeade_packet_flags); \
+#define CAST_INIT()                                        \
+register int _;                                            \
+void *idx = pkt.data;                                      \
+int rem = pkt.pkt_sz - sizeof(LIMEADE_MAGIC)               \
+                    - sizeof(struct limeade_packet_flags); \
 __attribute__((unused)) char last_delim;
 
 #define CAST(dst)\
 _ = _limeade_cast(dst, idx, rem); \
 rem -= _;                         \
-if(rem <= 0 || _ < 0) goto err;   \
+if(rem < 0 || _ < 0) goto err;    \
 idx += _;                         \
 last_delim = *(char*)(idx - 1);
 
@@ -440,7 +450,7 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   t_sz = out->total_died    * sizeof(pid_t)
        + out->total_altered * sizeof(*out->altered);
 
-  alloc = malloc(t_sz);
+  alloc = calloc(1, t_sz ? t_sz : 1);
 
   if(!alloc)
     return LIMEADE_ERROR_MEMORY;
@@ -448,8 +458,19 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   out->died    = alloc;
   out->altered = alloc + out->total_died * sizeof(pid_t);
 
-  for(int i = 0; i < out->total_died; i++)
-    CAST(&out->died[i]);
+  if(out->total_died == 0)
+  {
+    if(rem <= 0 || *(char*)idx != LIMEADE_ROW_DELIM)
+      goto err;
+    idx++;
+    rem--;
+    last_delim = LIMEADE_ROW_DELIM;
+  }
+  else
+  {
+    for(int i = 0; i < out->total_died; i++)
+      CAST(&out->died[i]);
+  }
 
   IF_NOT_ROW_END()
     goto err;

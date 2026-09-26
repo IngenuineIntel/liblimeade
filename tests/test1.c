@@ -71,6 +71,8 @@ int main(int argc, char **argv)
   e = limeade_parse_events(&evs, r);
   test(e);
 
+  printf("%i\n", evs.nr_events);
+
   limeade_release(&r);
 
   limeade_destruct(&c);

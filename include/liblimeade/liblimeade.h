@@ -694,4 +694,9 @@ void limeade_release_recvd(struct limeade_recvd *in);
   struct limeade_context*:      limeade_destruct\
 )(in)
 
+
+/*** DIAGNOSTICS ***/
+// perror-like error system
+void limeade_perror(const char * const s, const int error);
+
 #endif /* _LIBLIMEADE_H_ */

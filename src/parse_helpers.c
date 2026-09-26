@@ -44,16 +44,16 @@ int limeade_get_nr_rows(struct limeade_recvd *pkt)
 
 int limeade_decompress_packet(struct limeade_recvd pkt)
 {
+  struct limeade_packet_flags *f = pkt.flags;
+
+  if(!f->compr_lvl)
+    return 0;
+
   uLongf new_l = 1 << 16;
   void *new = malloc((int)new_l);
 
   if(!new)
     return -1;
-
-  struct limeade_packet_flags *f = pkt.flags;
-
-  if(!f->compr_lvl)
-    return 0;
 
   if(uncompress(new, &new_l, pkt.data, f->packet_size) != Z_OK)
   {
@@ -82,7 +82,7 @@ int limeade_decompress_packet(struct limeade_recvd pkt)
 // unconventional but improves performance relatively quickly
 // also note that this uses SSE2 (16 byte) instead of AVX2 (32 byte) because I
 // forsee the strings being passed into this function not being very long
-uint32_t limeade_pkt_strlen(const char *s)
+uint32_t limeade_pkt_strlen(const char *s, uint32_t max_len)
 {
   __m128i fd, rd, chunk, m1, m2, mask;
   int match;
@@ -92,30 +92,26 @@ uint32_t limeade_pkt_strlen(const char *s)
   rd = _mm_set1_epi8(LIMEADE_ROW_DELIM);
   len = 0;
 
-  // aligning to memory page boundary
-  while(((uintptr_t)s & 15) && *s != LIMEADE_FIELD_DELIM
-                            && *s != LIMEADE_ROW_DELIM)
+  while(max_len >= 16)
   {
-    s++;
-    len++;
-  }
-
-  for(;;)
-  {
-    chunk = _mm_load_si128((const __m128i*)s);
+    chunk = _mm_loadu_si128((const __m128i*)s);
     m1    = _mm_cmpeq_epi8(chunk, fd);
     m2    = _mm_cmpeq_epi8(chunk, rd);
     mask  = _mm_or_si128(m1, m2);
     match = _mm_movemask_epi8(mask);
 
     if(match)
-    {
-      len += __builtin_ctz(match);
-      break;
-    }
-    s   += 16;
+      return len + __builtin_ctz(match);
+
+    s += 16;
     len += 16;
+    max_len -= 16;
   }
-  return len;
+
+  for(uint32_t i = 0; i < max_len; i++)
+    if(s[i] == LIMEADE_FIELD_DELIM || s[i] == LIMEADE_ROW_DELIM)
+      return len + i;
+
+  return UINT32_MAX;
 }
 

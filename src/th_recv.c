@@ -46,6 +46,7 @@ void *limeade_th_recv_host_eth(void *arg)
     pthread_mutex_lock(ctx->mtx_rfd);
     pthread_mutex_lock(ctx->mtx_mode_union);
     
+    tmp_socklen = sizeof(tmp_sockaddr);
     amt_recv = recvfrom(recv_poll.fd, buffer, LIMEADE_RECV_TMP_SZ, 0,
                         (struct sockaddr*)&tmp_sockaddr, &tmp_socklen);
 

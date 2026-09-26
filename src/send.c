@@ -216,22 +216,19 @@ void limeade_populate_packet(struct limeade_packet_data *in,
     {
       struct limeade_proc_update data = va_arg(arg, struct limeade_proc_update);
       struct limeade_indiv_proc *j;
-      int i, died;
+      int i;
 
       INC(data.total_died);
       FDELIM();
       INC(data.total_altered);
       RDELIM();
 
-      died = data.total_died - 1;
-      for(i = 0; i < died; i++)
+      for(i = 0; i < data.total_died; i++)
       {
         INC(data.died[i]);
-        FDELIM();
+        if(i + 1 < data.total_died)
+          FDELIM();
       }
-      // writing last in series outside the loop to avoid putting an FDELIM
-      // right before an RDELIM
-      INC(data.died[died]);
       RDELIM();
 
       for(i = 0; i < data.total_altered; i++)
