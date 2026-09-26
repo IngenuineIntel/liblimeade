@@ -574,23 +574,33 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   clock_gettime(CLOCK_REALTIME, &recvwait);
   recvwait.tv_sec  += ctx->ack_wait_time_ms / 1000;
-  recvwait.tv_nsec += ctx->ack_wait_time_ms * 100000;
+  recvwait.tv_nsec += ctx->ack_wait_time_ms % 1000 * 1000000;
   
   pthread_mutex_unlock(ctx->mtx_pub);
 
-  if(pthread_create(&recv_ack_tid, NULL, &limeade_th_await, &recv_ack) != 0)
+  if(sem_init(&recv_ack.sem, 0, 1) != 0)
   {
     _ = LIMEADE_ERROR_OTHER;
     goto err;
   }
 
+  if(pthread_create(&recv_ack_tid, NULL, &limeade_th_await, &recv_ack) != 0)
+  {
+    sem_destroy(&recv_ack.sem);
+    _ = LIMEADE_ERROR_OTHER;
+    goto err;
+  }
+
   sem_wait(&recv_ack.sem);
-  if(pthread_mutex_timedlock(&recv_ack.mtx, &recvwait))
+  if(pthread_mutex_timedlock(&recv_ack.mtx, &recvwait) != 0)
   {
     pthread_cancel(recv_ack_tid);
+    sem_destroy(&recv_ack.sem);
     _ = LIMEADE_ERROR_REJECTED;
     goto err;
   }
+
+  sem_destroy(&recv_ack.sem);
 
   _ = limeade_monotonic(&latent_ts[1]);
   if(_ != LIMEADE_SUCCESS)
