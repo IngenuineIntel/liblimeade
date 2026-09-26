@@ -28,7 +28,7 @@ void *limeade_th_recv_host_eth(void *arg)
 
   pthread_mutex_lock(r->mtx_ack);
 
-  poll_ms = 1000/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
+  poll_ms = 1000/(r->hz > 0 ? r->hz : LIMEADE_RECV_DEFAULT_HZ);
 
   buffer = malloc(LIMEADE_RECV_TMP_SZ);
   if(!buffer)
@@ -75,7 +75,7 @@ void *limeade_th_recv_client_eth(void *arg)
   
   pthread_mutex_lock(r->mtx_ack);
 
-  poll_ms = 1000/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
+  poll_ms = 1000/(r->hz > 0 ? r->hz : LIMEADE_RECV_DEFAULT_HZ);
 
   buffer = malloc(LIMEADE_RECV_TMP_SZ);
   if(!buffer)
@@ -121,7 +121,7 @@ void *limeade_th_recv_client_ssh(void *arg)
 
   pthread_mutex_lock(r->mtx_ack);
 
-  poll_ms = 1000/(r->hz ? r->hz > 0 : LIMEADE_RECV_DEFAULT_HZ);
+  poll_ms = 1000/(r->hz > 0 ? r->hz : LIMEADE_RECV_DEFAULT_HZ);
 
   buffer = malloc(LIMEADE_RECV_TMP_SZ);
   if(!buffer)
