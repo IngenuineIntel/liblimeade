@@ -82,8 +82,9 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
 
   pthread_mutex_unlock(r->mtx);
 
-  f = out->pkt;
-  out->data = out->pkt + sizeof(*f);
+  out->flags = out->pkt + sizeof(LIMEADE_MAGIC);
+  f = out->flags;
+  out->data = out->flags + sizeof(*f);
   out->type  = f->type;
   out->compr = f->compr_lvl;
 

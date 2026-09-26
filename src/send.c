@@ -160,6 +160,9 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       struct limeade_events data = va_arg(arg, struct limeade_events);
       struct limeade_indiv_event *j;
 
+      INC(data.nr_events);
+      RDELIM();
+
       for(int i = 0; i < data.nr_events; i++)
       {
         j = &data.events[i];

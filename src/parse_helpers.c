@@ -34,7 +34,7 @@ int limeade_get_nr_rows(struct limeade_recvd *pkt)
     ret++;
 
     if(!next)
-      return ret;
+      return ret - 1;
 
     rem -= (next - prev + 1);
     prev = next + 1;
