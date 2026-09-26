@@ -6,6 +6,7 @@
 #include<pthread.h>
 #include<signal.h>
 #include<stdarg.h>
+#include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
 #include<sys/socket.h>
@@ -165,8 +166,8 @@ static void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
 static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
 {
   struct limeade_recv_data *r = &ctx->recv;
-  //pthread_cancel(r->tid);
-  pthread_mutex_lock(r->mtx_kys);
+  //pthread_cancel(*(pthread_t*)r->tid);
+  pthread_mutex_unlock(r->mtx_kys);
   pthread_join(*(pthread_t*)r->tid, NULL);
 
   pthread_mutex_t *m;
@@ -655,6 +656,7 @@ err_1:
 void limeade_destruct(struct limeade_context *ctx)
 {
   limeade_destruct_th_recv(ctx);
+  printf("passed\n");
   if(ctx->csm)
     limeade_destruct_th_csm(ctx);
   limeade_destruct_mutexes(ctx);

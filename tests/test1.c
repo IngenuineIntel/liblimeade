@@ -67,6 +67,10 @@ int main(int argc, char **argv)
   //printf("r.pkt_sz = %i\n", r.pkt_sz);
   write(STDOUT_FILENO, r.pkt, r.pkt_sz + sizeof(LIMEADE_MAGIC));
 
+  limeade_release(&r);
+
+  limeade_destruct(&c);
+
   return 0;
 }
 

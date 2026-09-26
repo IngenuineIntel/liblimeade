@@ -140,10 +140,12 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
       goto premature;
 
   } while(pthread_mutex_trylock(&d.mtx) == EBUSY);
+  pthread_join(d.tid, NULL);
   return LIMEADE_ERROR_NO_DATA;
 
 premature:
   pthread_cancel(d.tid);
+  pthread_join(d.tid, NULL);
   return e;
 }
 
@@ -304,7 +306,6 @@ err:
 
 int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
 {
-  void *alloc;
   struct limeade_indiv_event *j;
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_EVENTS);
@@ -320,8 +321,8 @@ int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
   if(limeade_get_nr_rows(&pkt) != out->nr_events + 1)
     return LIMEADE_ERROR_BAD_DATA;
 
-  alloc = malloc(sizeof(*j) * out->nr_events);
-  if(!alloc)
+  out->events = malloc(sizeof(*j) * out->nr_events);
+  if(!out->events)
     return LIMEADE_ERROR_MEMORY;
 
   for(int i = 0; i < out->nr_events; i++)
@@ -348,14 +349,12 @@ err:
     free(j->arg1);
     free(j->arg2);
   }
-  free(alloc);
 
   return LIMEADE_ERROR_BAD_DATA;
 }
 
 int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recvd pkt)
 {
-  void *alloc;
   struct limeade_indiv_proc *j;
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_PROC_GENERIC);
@@ -372,8 +371,8 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
   if(limeade_get_nr_rows(&pkt) != out->total + 1)
     return LIMEADE_ERROR_BAD_DATA;
 
-  alloc = malloc(sizeof(*j) * out->total);
-  if(!alloc)
+  out->procs = malloc(sizeof(*j) * out->total);
+  if(!out->procs)
     return LIMEADE_ERROR_MEMORY;
   
   for(int i = 0; i < out->total; i++)
@@ -395,7 +394,7 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
 err:
   for(int i = 0; i < out->total && &out->procs[i]; i++)
     free(out->procs[i].command);
-  free(alloc);
+  free(out->procs);
 
   return LIMEADE_ERROR_BAD_DATA;
 }
@@ -551,9 +550,80 @@ err:
   return LIMEADE_ERROR_BAD_DATA;
 }
 
+void limeade_release_knock(struct limeade_knock *in)
+{}
+
+void limeade_release_recognize(struct limeade_recognize *in)
+{}
+
+void limeade_release_intro(struct limeade_intro *in)
+{
+  free(in->hostname);
+  free(in->kernelver);
+  free(in->distro);
+  free(in->origin_user);
+  free(in->processor);
+  free(in->vendor);
+}
+
+void limeade_release_ack(struct limeade_ack *in)
+{}
+
+void limeade_release_events(struct limeade_events *in)
+{
+  struct limeade_indiv_event *j;
+
+  for(int i = 0; i < in->nr_events; i++)
+  {
+    j = &in->events[i];
+    free(j->syscall);
+    free(j->arg1);
+    free(j->arg2);
+  }
+  free(in->events);
+}
+
+void limeade_release_proc_generic(struct limeade_proc_generic *in)
+{
+  for(int i = 0; i < in->total; i++)
+    free(in->procs[i].command);
+  free(in->procs);
+}
+
+void limeade_release_proc_update(struct limeade_proc_update *in)
+{
+  for(int i = 0; i < in->total_altered; i++)
+    free(in->altered[i].command);
+  free(in->died);
+}
+
+void limeade_release_perf(struct limeade_perf *in)
+{
+  free(in->other);
+}
+
+void limeade_release_commandeer(struct limeade_commandeer *in)
+{
+  free(in->command);
+}
+
+void limeade_release_exited(struct limeade_exited *in)
+{}
+
+void limeade_release_close(struct limeade_close *in)
+{
+  free(in->explanation);
+}
+
+void limeade_release_recvd(struct limeade_recvd *in)
+{
+  free(in->pkt);
+}
+
 #undef ENFORCE_PKT_TYPE
 #undef CAST_INIT
 #undef CAST
 #undef IF_NOT_ROW_END
+
 #undef _limeade_cast
 
