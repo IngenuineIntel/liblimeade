@@ -159,7 +159,7 @@ enum limeade_compression_mode
   // 5.2: bias the CSM towards maximizing throughput at the detriment of the CPU
   LIMEADE_MODE_CSM_SAVE_THROUGHPUT = 96,
   // 5.3: bias in neither direction and attempt to maximize both equally
-  LIMEADE_MODE_CSM_SAVE_ALL = 102,
+  LIMEADE_MODE_CSM_SAVE_ALL = 112,
 };
 // note for CSM users:
 // CSM cannot be used in junction with LIMEADE_MOST_*_SSH options. This is

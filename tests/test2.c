@@ -41,7 +41,7 @@ int main(int argc, char **argv)
   limeade_perror("client init", e);
   NOT_OK(e);
 
-  client.compr_lvl = 0;
+  client.compr_lvl = 9;
 
   e = limeade_connect(&client);
   limeade_perror("client connect", e);
@@ -70,6 +70,8 @@ int main(int argc, char **argv)
   limeade_perror("host recv", e);
   NOT_OK(e);
 
+  write(STDOUT_FILENO, received.pkt, received.pkt_sz);
+
   e = limeade_parse_proc_update(&parsed, received);
   limeade_perror("parse", e);
   NOT_OK(e);
@@ -90,8 +92,6 @@ int main(int argc, char **argv)
   }
 
   //printf("process update round trip passed\n\n");
-
-  write(STDOUT_FILENO, received.pkt, received.pkt_sz);
 
   result = EXIT_SUCCESS;
 

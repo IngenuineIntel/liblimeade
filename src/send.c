@@ -345,6 +345,14 @@ int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
     return LIMEADE_ERROR_COMPRESSION;
   }
 
+  // in case compression would be inefficient
+  if(compressed_len >= len)
+  {
+    free(compressed);
+    ((struct limeade_packet_flags*)pkt->flags)->compr_lvl = 0;
+    return LIMEADE_SUCCESS;
+  }
+
   memcpy(pkt->data, compressed, compressed_len);
   free(compressed);
 
