@@ -46,7 +46,8 @@ int main(void)
   int e;
 
   altered = calloc(nr, sizeof(*altered));
-  died = calloc(1, sizeof(*died));
+  died = malloc(sizeof(*died));
+  died[0] = 0;
   if(!altered || !died)
   {
     free(altered);

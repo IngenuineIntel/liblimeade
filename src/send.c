@@ -90,8 +90,8 @@ void limeade_populate_packet(struct limeade_packet_data *in,
   b += ret;\
   s -= ret;\
 }
-#define FDELIM() do { *(char*)b = LIMEADE_FIELD_DELIM; b++; s--; } while(0)
-#define RDELIM() do { *(char*)b = LIMEADE_ROW_DELIM; b++; s--; } while(0)
+#define FDELIM() *(char*)b = LIMEADE_FIELD_DELIM; b++; s--;
+#define RDELIM() *(char*)b = LIMEADE_ROW_DELIM; b++; s--;
 
   switch(in->type)
   {
@@ -226,8 +226,9 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       for(i = 0; i < data.total_died; i++)
       {
         INC(data.died[i]);
-        if(i + 1 < data.total_died)
-          FDELIM();
+        if(i + 1 == data.total_died)
+          break;
+        FDELIM();
       }
       RDELIM();
 
