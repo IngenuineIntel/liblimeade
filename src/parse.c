@@ -595,6 +595,7 @@ void limeade_release_recognize(struct limeade_recognize *in)
 
 void limeade_release_intro(struct limeade_intro *in)
 {
+  if(!in) return;
   free(in->hostname);
   free(in->kernelver);
   free(in->distro);
@@ -610,6 +611,8 @@ void limeade_release_events(struct limeade_events *in)
 {
   struct limeade_indiv_event *j;
 
+  if(!in) return;
+
   for(int i = 0; i < in->nr_events; i++)
   {
     j = &in->events[i];
@@ -622,6 +625,8 @@ void limeade_release_events(struct limeade_events *in)
 
 void limeade_release_proc_generic(struct limeade_proc_generic *in)
 {
+  if(!in) return;
+
   for(int i = 0; i < in->total; i++)
     free(in->procs[i].command);
   free(in->procs);
@@ -629,6 +634,8 @@ void limeade_release_proc_generic(struct limeade_proc_generic *in)
 
 void limeade_release_proc_update(struct limeade_proc_update *in)
 {
+  if(!in) return;
+
   for(int i = 0; i < in->total_altered; i++)
     free(in->altered[i].command);
   free(in->died);
@@ -641,6 +648,7 @@ void limeade_release_perf(struct limeade_perf *in)
 
 void limeade_release_commandeer(struct limeade_commandeer *in)
 {
+  if(!in) return;
   free(in->command);
 }
 
@@ -649,11 +657,13 @@ void limeade_release_exited(struct limeade_exited *in)
 
 void limeade_release_close(struct limeade_close *in)
 {
+  if(!in) return;
   free(in->explanation);
 }
 
 void limeade_release_recvd(struct limeade_recvd *in)
 {
+  if(!in) return;
   free(in->pkt);
 }
 
