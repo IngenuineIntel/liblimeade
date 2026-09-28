@@ -15,6 +15,7 @@ so: objs
 
 clean:
 	rm -f $(OBJS) liblimeade-0.1.so
+	$(MAKE) -C tests clean
 
 install: so uninstall
 	sudo cp liblimeade-0.1.so /usr/local/lib/liblimeade.so.0.1
@@ -32,3 +33,5 @@ uninstall:
 	-sudo rm /etc/ld.so.conf.d/liblimeade.conf
 	sudo ldconfig
 
+tests: install
+	$(MAKE) -C tests all

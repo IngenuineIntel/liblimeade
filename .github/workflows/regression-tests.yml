@@ -1,0 +1,24 @@
+name: Compilation & Regression Tests
+
+on:
+  push:
+    branches: [ "dev" ]
+  pull_request:
+    branches: [ "dev" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: make & install
+      run: sudo make install
+    
+    - name: make & run test1
+      run:  make -C tests test1
+
+    - name: make & run test2
+      run:  make -C tests test2
