@@ -24,40 +24,43 @@
 
 #include <liblimeade/liblimeade-internal.h>
 
-int limeade_decompress_packet(struct limeade_recvd pkt)
+int limeade_decompress_packet(struct limeade_recvd *pkt)
 {
-  struct limeade_packet_flags *f = pkt.flags;
+  struct limeade_packet_flags *f;
+
+  f = pkt->flags;
 
   if(!f->compr_lvl)
-    return 0;
+    return LIMEADE_SUCCESS;
 
   uLongf new_l = 1 << 16;
   void *new = malloc((int)new_l);
-
   if(!new)
-    return -1;
+    return LIMEADE_ERROR_MEMORY;
 
-  if(uncompress(new, &new_l, pkt.data, f->packet_size) != Z_OK)
+  if(uncompress(new, &new_l, pkt->data, f->packet_size) != Z_OK)
   {
     free(new);
-    return -1;
+    return LIMEADE_ERROR_COMPRESSION;
   }
 
-  pkt.pkt_sz = sizeof(LIMEADE_MAGIC) + sizeof(*f) + new_l;
-  pkt.pkt = realloc(pkt.pkt, pkt.pkt_sz);
-  if(!pkt.pkt)
+  pkt->pkt_sz = sizeof(LIMEADE_MAGIC) + sizeof(*f) + new_l;
+  void *resized = realloc(pkt->pkt, pkt->pkt_sz);
+
+  if(!resized)
   {
     free(new);
-    return -1;
+    return LIMEADE_ERROR_MEMORY;
   }
 
-  pkt.flags = pkt.pkt   + sizeof(LIMEADE_MAGIC);
-  pkt.data  = pkt.flags + sizeof(*f);
-  memcpy(pkt.data, new, new_l);
+  pkt->pkt = resized;
+  pkt->flags = pkt->pkt   + sizeof(LIMEADE_MAGIC);
+  pkt->data  = pkt->flags + sizeof(*f);
+  memcpy(pkt->data, new, new_l);
 
   free(new);
 
-  return 0;
+  return LIMEADE_SUCCESS;
 }
 
 // note: implementing this without SIMD would feel pretty gross, it's

@@ -9,7 +9,8 @@
 
 #include<liblimeade/liblimeade.h>
 
-#define E(m, e) do { if((e) != LIMEADE_SUCCESS) limeade_perror((m), (e)); } while(0)
+#define E(m, e) if(e != LIMEADE_SUCCESS) limeade_perror((m), (e));
+#define COMPR_LVL(ctx) printf("%i\n", ctx.compr_lvl);
 
 static int proc_update_matches(const struct limeade_proc_update *a,
                                const struct limeade_proc_update *b)
@@ -28,7 +29,7 @@ static int proc_update_matches(const struct limeade_proc_update *a,
 
     if(x->pid != y->pid || x->ppid != y->ppid || x->uid != y->uid ||
        x->threads != y->threads || x->cpu_ticks != y->cpu_ticks ||
-       x->ram_kb != y->ram_kb || strcmp(x->command, y->command) != 0)
+       x->ram_kb  != y->ram_kb  || strcmp(x->command, y->command) != 0)
       return 0;
   }
 
@@ -45,15 +46,8 @@ int main(void)
   pid_t *died;
   int e;
 
-  altered = calloc(nr, sizeof(*altered));
+  altered = malloc(sizeof(*altered) * nr);
   died = malloc(sizeof(*died));
-  died[0] = 0;
-  if(!altered || !died)
-  {
-    free(altered);
-    free(died);
-    return 1;
-  }
 
   died[0] = 9999;
 
@@ -93,19 +87,22 @@ int main(void)
     free(died);
     return 1;
   }
+
   e = limeade_init(&host, LIMEADE_MODE_HOST_ETH|LIMEADE_MODE_NO_COMPRESSION,
                    LIMEADE_PORT);
   E("host init", e);
 
-  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_NO_COMPRESSION,
+  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_LOW_COMPRESSION,
                    "127.0.0.1", LIMEADE_PORT);
   E("client init", e);
+  COMPR_LVL(client);
 
   e = limeade_connect(&host);
   E("host connect", e);
 
   e = limeade_connect(&client);
   E("client connect", e);
+  COMPR_LVL(client);
 
   e = limeade_send(&client, LIMEADE_PACKET_PROC_UPDATE, pkt1);
   E("client send", e);
@@ -124,19 +121,14 @@ int main(void)
     return 1;
   }
 
-  if(recvd.pkt_sz <= 15 * 1024)
-  {
-    fprintf(stderr, "packet is too small: %u bytes\n", recvd.pkt_sz);
-    limeade_release(&recvd);
-    limeade_destruct(&client);
-    limeade_destruct(&host);
-    for(int i = 0; i < nr; i++)
-      free(altered[i].command);
-    free(altered);
-    return 1;
-  }
-
+  printf("compr_lvl = %i\n", ((struct limeade_packet_flags*)recvd.flags)->compr_lvl);
+  //write(STDOUT_FILENO, recvd.pkt, recvd.pkt_sz);
   e = limeade_parse_proc_update(&pkt2, recvd);
+
+  printf("compr_lvl = %i\n", ((struct limeade_packet_flags*)recvd.flags)->compr_lvl);
+  if(recvd.pkt_sz <= 15 * 1024)
+    fprintf(stderr, "packet is too small: %u bytes\n", recvd.pkt_sz);
+
   E("host parse", e);
   if(e != LIMEADE_SUCCESS)
   {
@@ -150,6 +142,7 @@ int main(void)
     free(died);
     return 1;
   }
+
   if(!proc_update_matches(&pkt1, &pkt2))
   {
     fprintf(stderr, "post-parse validation failed\n");
@@ -164,7 +157,6 @@ int main(void)
     return 1;
   }
 
-  write(STDOUT_FILENO, recvd.pkt, recvd.pkt_sz);
 
   limeade_release(&pkt2);
   limeade_release(&recvd);

@@ -255,7 +255,7 @@ int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd pkt)
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_KNOCK);
 
   // these packet should never really be compressed anyway, but...
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -274,7 +274,7 @@ int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd 
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_RECOGNIZE);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -292,7 +292,7 @@ int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_INTRO);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -322,7 +322,7 @@ int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_ACK);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -346,7 +346,7 @@ int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_EVENTS);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -398,7 +398,7 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_PROC_GENERIC);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -443,27 +443,38 @@ err:
 
 int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd pkt)
 {
-  void *alloc;
+  void *alloc = NULL;
   int t_sz;
   struct limeade_indiv_proc *j;
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_PROC_UPDATE);
 
-  if(limeade_decompress_packet(pkt))
+  void *copy = malloc(pkt.pkt_sz);
+  if(!copy)
+    return LIMEADE_ERROR_MEMORY;
+  memcpy(copy, pkt.pkt, pkt.pkt_sz);
+  pkt.pkt = copy;
+  pkt.flags = pkt.pkt + sizeof(LIMEADE_MAGIC);
+  pkt.data = pkt.flags + sizeof(struct limeade_packet_flags);
+
+  if(limeade_decompress_packet(&pkt))
+  {
+    free(pkt.pkt);
     return LIMEADE_ERROR_COMPRESSION;
+  }
 
   CAST_INIT();
 
   CAST(&out->total_died);
-  IF_NOT_FIELD_END() return LIMEADE_ERROR_BAD_DATA;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->total_altered);
   IF_NOT_ROW_END()
-    return LIMEADE_ERROR_BAD_DATA;
+    goto err;
 
   t_sz = out->total_died    * sizeof(pid_t)
        + out->total_altered * sizeof(*out->altered);
 
-  alloc = malloc(t_sz);
+  alloc = calloc(1, t_sz);
 
   if(!alloc)
     return LIMEADE_ERROR_MEMORY;
@@ -493,19 +504,21 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
     CAST(&j->vm_rss_kb);
     IF_NOT_FIELD_END() goto err;
     CAST(&j->command);
-    IF_NOT_ROW_END()
-      goto err;
+    IF_NOT_ROW_END() goto err;
   }
 
-  if(rem != 0)
+  if(rem)
     goto err;
 
+  free(pkt.pkt);
   return LIMEADE_SUCCESS;
 
 err:
-  for(int i = 0; i < out->total_altered && &out->altered[i]; i++)
-    free(out->altered[i].command);
+  if(alloc)
+    for(int i = 0; i < out->total_altered; i++)
+      free(out->altered[i].command);
   free(alloc);
+  free(pkt.pkt);
 
   return LIMEADE_ERROR_BAD_DATA;
 }
@@ -514,7 +527,7 @@ int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_PERF);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -548,7 +561,7 @@ int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recv
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_COMMANDEER);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -568,7 +581,7 @@ int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_EXITED);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
@@ -586,7 +599,7 @@ int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_CLOSE);
 
-  if(limeade_decompress_packet(pkt))
+  if(limeade_decompress_packet(&pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();

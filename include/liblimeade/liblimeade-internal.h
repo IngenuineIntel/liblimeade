@@ -107,13 +107,15 @@ static int name(void *src, type *dst, int rem)       \
  *
  * 0 on success, -1 on error
  */
-int limeade_decompress_packet(struct limeade_recvd pkt);
+int limeade_decompress_packet(struct limeade_recvd *pkt);
+
 
 /* limeade_get_nr_rows
  *
  * self-explanatory
  */
-int limeade_get_nr_rows(struct limeade_recvd *pkt);
+// currently not within the implementation, might return soon.
+//int limeade_get_nr_rows(struct limeade_recvd *pkt);
 
 /* limeade_pkt_strlen
  *
