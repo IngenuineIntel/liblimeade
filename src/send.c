@@ -223,7 +223,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       INC(data.total_altered);
       RDELIM();
 
-      for(i = 0; i < data.total_died; i++)
+      for(i = 0;; i++)
       {
         INC(data.died[i]);
         if(i + 1 == data.total_died)
