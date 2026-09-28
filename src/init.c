@@ -296,8 +296,8 @@ static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const cha
       close(to_ssh[0]);
       close(to_ssh[1]);
 
-      // ssh -s limeade user@host
-      execlp("ssh", "ssh", "-s", LIMEADE_SUBSYSTEM, dest, NULL);
+      // ssh -s user@host limeade
+      execlp("ssh", "ssh", "-s", dest, LIMEADE_SUBSYSTEM, NULL);
 
       exit(-1);
 
@@ -483,11 +483,10 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
       // to te sshd process, whom the traffic is tunneled through
       ctx->rfd = STDIN_FILENO;
       ctx->sfd = STDOUT_FILENO;
-      allow_compr = 0;
       break;
     case LIMEADE_MODE_CLIENT_SSH:
       r = limeade_init_client_ssh_step_1(ctx, va_arg(arg, const char *));
-      allow_compr = 0;
+      // allow_compr = 0;
       break;
     case LIMEADE_MODE_CLIENT_LIBSSH:
       r = limeade_init_client_libssh_step_1(ctx, va_arg(arg, const char *));

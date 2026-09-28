@@ -22,6 +22,8 @@
 #include<stdlib.h>
 #include<string.h>
 
+#include<stdio.h>
+
 #include<liblimeade/liblimeade-internal.h>
 
 int limeade_send_acknowledge(struct limeade_context *ctx, struct limeade_recvd *pkt)
@@ -195,7 +197,7 @@ static int limeade_cast_str(void *src, char **dst, int rem)
   if(!*dst) return -1;
   memcpy(*dst, src, l);
   *(*dst + l) = '\x00';
-  return l + 1;
+  return l;
 }
 
 #define ENFORCE_PKT_TYPE(pkt, TYPE)\
@@ -236,9 +238,14 @@ __attribute__((unused)) char last_delim;
 #define CAST(dst)\
 _ = _limeade_cast(dst, idx, rem); \
 rem -= _;                         \
-if(rem < 0 || _ < 0) goto err;    \
+if(rem <= 0 || _ < 0) goto err;   \
 idx += _;                         \
-last_delim = *(char*)(idx - 1);
+last_delim = *(char*)idx;         \
+idx++;                            \
+rem--;
+
+#define IF_NOT_FIELD_END()\
+if(last_delim != LIMEADE_FIELD_DELIM)
 
 #define IF_NOT_ROW_END()\
 if(last_delim != LIMEADE_ROW_DELIM)
@@ -253,6 +260,7 @@ int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd pkt)
 
   CAST_INIT();
   CAST(&out->prev_connected);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->prev_session);
 
   return LIMEADE_SUCCESS;
@@ -269,11 +277,9 @@ int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd 
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
-  if(limeade_get_nr_rows(&pkt) != 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   CAST_INIT();
   CAST(&out->accepted);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->new_session);
 
   return LIMEADE_SUCCESS;
@@ -289,17 +295,21 @@ int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd pkt)
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
-  if(limeade_get_nr_rows(&pkt) != 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   CAST_INIT();
   CAST(&out->hostname);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->kernelver);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->distro);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->origin_user);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->processor);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->vendor);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->ram_mbs);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->swap_mbs);
 
   return LIMEADE_SUCCESS;
@@ -315,13 +325,13 @@ int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd pkt)
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
-  if(limeade_get_nr_rows(&pkt) != 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   CAST_INIT();
   CAST(&out->send_ts_s);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->send_ts_ms);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->recv_ts_s);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->recv_ts_ms);
   
   return LIMEADE_SUCCESS;
@@ -344,9 +354,6 @@ int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
   IF_NOT_ROW_END()
     return LIMEADE_ERROR_BAD_DATA;
 
-  if(limeade_get_nr_rows(&pkt) != out->nr_events + 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   out->events = malloc(sizeof(*j) * out->nr_events);
   if(!out->events)
     return LIMEADE_ERROR_MEMORY;
@@ -355,11 +362,17 @@ int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
   {
     j = &out->events[i];
     CAST(&j->ts_s);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->ts_ms);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->pid);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->syscall);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->arg1);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->arg2);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->retval);
     IF_NOT_ROW_END()
       goto err;
@@ -394,9 +407,6 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
   IF_NOT_ROW_END()
     return LIMEADE_ERROR_BAD_DATA;
 
-  if(limeade_get_nr_rows(&pkt) != out->total + 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   out->procs = malloc(sizeof(*j) * out->total);
   if(!out->procs)
     return LIMEADE_ERROR_MEMORY;
@@ -405,11 +415,17 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
   {
     j = &out->procs[i];
     CAST(&j->pid);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->ppid);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->uid);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->threads);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->cpu_ticks);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->vm_rss_kb);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->command);
     IF_NOT_ROW_END()
       goto err;
@@ -435,22 +451,19 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
 
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
-  
+
   CAST_INIT();
 
   CAST(&out->total_died);
+  IF_NOT_FIELD_END() return LIMEADE_ERROR_BAD_DATA;
   CAST(&out->total_altered);
-
   IF_NOT_ROW_END()
-    return LIMEADE_ERROR_BAD_DATA;
-
-  if(limeade_get_nr_rows(&pkt) != out->total_altered + 2)
     return LIMEADE_ERROR_BAD_DATA;
 
   t_sz = out->total_died    * sizeof(pid_t)
        + out->total_altered * sizeof(*out->altered);
 
-  alloc = calloc(1, t_sz ? t_sz : 1);
+  alloc = malloc(t_sz);
 
   if(!alloc)
     return LIMEADE_ERROR_MEMORY;
@@ -458,19 +471,8 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   out->died    = alloc;
   out->altered = alloc + out->total_died * sizeof(pid_t);
 
-  if(out->total_died == 0)
-  {
-    if(rem <= 0 || *(char*)idx != LIMEADE_ROW_DELIM)
-      goto err;
-    idx++;
-    rem--;
-    last_delim = LIMEADE_ROW_DELIM;
-  }
-  else
-  {
-    for(int i = 0; i < out->total_died; i++)
-      CAST(&out->died[i]);
-  }
+  for(int i = 0; i < out->total_died; i++)
+    CAST(&out->died[i]);
 
   IF_NOT_ROW_END()
     goto err;
@@ -479,15 +481,24 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   {
     j = &out->altered[i];
     CAST(&j->pid);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->ppid);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->uid);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->threads);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->cpu_ticks);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->vm_rss_kb);
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->command);
     IF_NOT_ROW_END()
       goto err;
   }
+
+  if(rem != 0)
+    goto err;
 
   return LIMEADE_SUCCESS;
 
@@ -506,19 +517,25 @@ int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt)
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
-  if(limeade_get_nr_rows(&pkt) != 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   CAST_INIT();
   CAST(&out->cores);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->avg_cpu_pct);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_total_kb);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_free_kb);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_available_kb);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_cached_kb);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->load_1m);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->load_5m);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->load_15m);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->other);
 
   return LIMEADE_SUCCESS;
@@ -534,12 +551,11 @@ int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recv
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
-  if(limeade_get_nr_rows(&pkt) != 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   CAST_INIT();
   CAST(&out->command);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->flags);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->id);
 
   return LIMEADE_SUCCESS;
@@ -555,11 +571,9 @@ int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt)
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
-  if(limeade_get_nr_rows(&pkt) != 1)
-    return LIMEADE_ERROR_BAD_DATA;
-
   CAST_INIT();
   CAST(&out->id);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->exitcode);
 
   return LIMEADE_SUCCESS;
@@ -574,9 +588,6 @@ int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt)
 
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
-
-  if(limeade_get_nr_rows(&pkt) != 1)
-    return LIMEADE_ERROR_BAD_DATA;
 
   CAST_INIT();
   CAST(&out->explanation);
@@ -595,6 +606,7 @@ void limeade_release_recognize(struct limeade_recognize *in)
 
 void limeade_release_intro(struct limeade_intro *in)
 {
+  if(!in) return;
   free(in->hostname);
   free(in->kernelver);
   free(in->distro);
@@ -610,6 +622,8 @@ void limeade_release_events(struct limeade_events *in)
 {
   struct limeade_indiv_event *j;
 
+  if(!in) return;
+
   for(int i = 0; i < in->nr_events; i++)
   {
     j = &in->events[i];
@@ -622,6 +636,8 @@ void limeade_release_events(struct limeade_events *in)
 
 void limeade_release_proc_generic(struct limeade_proc_generic *in)
 {
+  if(!in) return;
+
   for(int i = 0; i < in->total; i++)
     free(in->procs[i].command);
   free(in->procs);
@@ -629,6 +645,8 @@ void limeade_release_proc_generic(struct limeade_proc_generic *in)
 
 void limeade_release_proc_update(struct limeade_proc_update *in)
 {
+  if(!in) return;
+
   for(int i = 0; i < in->total_altered; i++)
     free(in->altered[i].command);
   free(in->died);
@@ -641,6 +659,7 @@ void limeade_release_perf(struct limeade_perf *in)
 
 void limeade_release_commandeer(struct limeade_commandeer *in)
 {
+  if(!in) return;
   free(in->command);
 }
 
@@ -649,11 +668,13 @@ void limeade_release_exited(struct limeade_exited *in)
 
 void limeade_release_close(struct limeade_close *in)
 {
+  if(!in) return;
   free(in->explanation);
 }
 
 void limeade_release_recvd(struct limeade_recvd *in)
 {
+  if(!in) return;
   free(in->pkt);
 }
 

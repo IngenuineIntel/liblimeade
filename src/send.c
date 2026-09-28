@@ -90,8 +90,8 @@ void limeade_populate_packet(struct limeade_packet_data *in,
   b += ret;\
   s -= ret;\
 }
-#define FDELIM() *(char*)b = LIMEADE_FIELD_DELIM; b++; s--
-#define RDELIM() *(char*)b = LIMEADE_ROW_DELIM; b++; s--
+#define FDELIM() *(char*)b = LIMEADE_FIELD_DELIM; b++; s--;
+#define RDELIM() *(char*)b = LIMEADE_ROW_DELIM; b++; s--;
 
   switch(in->type)
   {
@@ -223,11 +223,12 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       INC(data.total_altered);
       RDELIM();
 
-      for(i = 0; i < data.total_died; i++)
+      for(i = 0;; i++)
       {
         INC(data.died[i]);
-        if(i + 1 < data.total_died)
-          FDELIM();
+        if(i + 1 == data.total_died)
+          break;
+        FDELIM();
       }
       RDELIM();
 
@@ -343,6 +344,14 @@ int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
   {
     free(compressed);
     return LIMEADE_ERROR_COMPRESSION;
+  }
+
+  // in case compression would be inefficient
+  if(compressed_len >= len)
+  {
+    free(compressed);
+    ((struct limeade_packet_flags*)pkt->flags)->compr_lvl = 0;
+    return LIMEADE_SUCCESS;
   }
 
   memcpy(pkt->data, compressed, compressed_len);

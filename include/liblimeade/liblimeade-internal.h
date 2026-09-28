@@ -94,11 +94,11 @@ static int name(void *src, type *dst, int rem)       \
     else                                             \
     {                                                \
       *(type*)dst = 0;                               \
-      return 2;                                      \
+      return 1;                                      \
     }                                                \
   }                                                  \
   *dst = *(type*)(src + 1);                          \
-  return 2 + sizeof(type);                           \
+  return 1 + sizeof(type);                           \
 }
 
 /* limeade_decompress_packet
