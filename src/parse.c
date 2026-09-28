@@ -244,8 +244,8 @@ last_delim = *(char*)idx;         \
 idx++;                            \
 rem--;
 
-#define IF_ROW_END()\
-if(last_delim == LIMEADE_ROW_DELIM)
+#define IF_NOT_FIELD_END()\
+if(last_delim != LIMEADE_FIELD_DELIM)
 
 #define IF_NOT_ROW_END()\
 if(last_delim != LIMEADE_ROW_DELIM)
@@ -260,7 +260,7 @@ int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd pkt)
 
   CAST_INIT();
   CAST(&out->prev_connected);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->prev_session);
 
   return LIMEADE_SUCCESS;
@@ -279,7 +279,7 @@ int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd 
 
   CAST_INIT();
   CAST(&out->accepted);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->new_session);
 
   return LIMEADE_SUCCESS;
@@ -297,19 +297,19 @@ int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd pkt)
 
   CAST_INIT();
   CAST(&out->hostname);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->kernelver);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->distro);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->origin_user);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->processor);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->vendor);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->ram_mbs);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->swap_mbs);
 
   return LIMEADE_SUCCESS;
@@ -327,11 +327,11 @@ int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd pkt)
 
   CAST_INIT();
   CAST(&out->send_ts_s);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->send_ts_ms);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->recv_ts_s);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->recv_ts_ms);
   
   return LIMEADE_SUCCESS;
@@ -362,17 +362,17 @@ int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt)
   {
     j = &out->events[i];
     CAST(&j->ts_s);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->ts_ms);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->pid);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->syscall);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->arg1);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->arg2);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->retval);
     IF_NOT_ROW_END()
       goto err;
@@ -415,17 +415,17 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
   {
     j = &out->procs[i];
     CAST(&j->pid);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->ppid);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->uid);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->threads);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->cpu_ticks);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->vm_rss_kb);
-  IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->command);
     IF_NOT_ROW_END()
       goto err;
@@ -448,22 +448,15 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   struct limeade_indiv_proc *j;
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_PROC_UPDATE);
-  printf("checkpoint 0\n");
 
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
-  printf("survived decompression\n");
 
   CAST_INIT();
 
   CAST(&out->total_died);
-  printf("survived total_died\n");
-  printf("%hhx\n", last_delim);
-
-  IF_ROW_END() return LIMEADE_ERROR_BAD_DATA;
+  IF_NOT_FIELD_END() return LIMEADE_ERROR_BAD_DATA;
   CAST(&out->total_altered);
-  printf("%hhx\n", last_delim);
-
   IF_NOT_ROW_END()
     return LIMEADE_ERROR_BAD_DATA;
 
@@ -479,32 +472,27 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   out->altered = alloc + out->total_died * sizeof(pid_t);
 
   for(int i = 0; i < out->total_died; i++)
-  {
-    printf("%hhx\n", last_delim);
     CAST(&out->died[i]);
-  }
 
   IF_NOT_ROW_END()
     goto err;
 
-  printf("made it past total_died\n");
   for(int i = 0; i < out->total_altered; i++)
   {
     j = &out->altered[i];
     CAST(&j->pid);
-    IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->ppid);
-    IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->uid);
-    IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->threads);
-    IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->cpu_ticks);
-    IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->vm_rss_kb);
-    IF_ROW_END() goto err;
+    IF_NOT_FIELD_END() goto err;
     CAST(&j->command);
-    printf("Made it into here\n");
     IF_NOT_ROW_END()
       goto err;
   }
@@ -531,23 +519,23 @@ int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt)
 
   CAST_INIT();
   CAST(&out->cores);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->avg_cpu_pct);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_total_kb);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_free_kb);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_available_kb);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_cached_kb);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->load_1m);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->load_5m);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->load_15m);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->other);
 
   return LIMEADE_SUCCESS;
@@ -565,9 +553,9 @@ int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recv
 
   CAST_INIT();
   CAST(&out->command);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->flags);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->id);
 
   return LIMEADE_SUCCESS;
@@ -585,7 +573,7 @@ int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt)
 
   CAST_INIT();
   CAST(&out->id);
-  IF_ROW_END() goto err;
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->exitcode);
 
   return LIMEADE_SUCCESS;
