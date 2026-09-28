@@ -645,19 +645,19 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data);
 //
 // note that if the wrong function is called for parsing, it will detect it
 // and return a LIMEADE_ERROR_GARBAGE
-int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd pkt);
-int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd pkt);
-int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd pkt);
+int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd *pkt);
+int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd *pkt);
+int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd *pkt);
 #define limeade_parse_introduction limeade_parse_intro
-int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd pkt);
+int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd *pkt);
 #define limeade_parse_acknowledge limeade_parse_ack
-int limeade_parse_events(struct limeade_events *out, struct limeade_recvd pkt);
-int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recvd pkt);
-int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd pkt);
-int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd pkt);
-int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recvd pkt);
-int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd pkt);
-int limeade_parse_close(struct limeade_close *out, struct limeade_recvd pkt);
+int limeade_parse_events(struct limeade_events *out, struct limeade_recvd *pkt);
+int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recvd *pkt);
+int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd *pkt);
+int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd *pkt);
+int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recvd *pkt);
+int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd *pkt);
+int limeade_parse_close(struct limeade_close *out, struct limeade_recvd *pkt);
 
 // the following functions are for releasing the parsed data created by the
 // above functions. They are not meant to be called directly: see below

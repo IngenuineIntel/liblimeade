@@ -68,7 +68,7 @@ int main(int argc, char **argv)
   //write(STDOUT_FILENO, r.pkt, r.pkt_sz);
   
   struct limeade_events evs;
-  e = limeade_parse_events(&evs, r);
+  e = limeade_parse_events(&evs, &r);
   test(e);
 
   printf("%i\n", evs.nr_events);

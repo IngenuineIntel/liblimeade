@@ -9,9 +9,8 @@
 
 #include<liblimeade/liblimeade.h>
 
-#define E(m, e) if(e != LIMEADE_SUCCESS) limeade_perror((m), (e));
+#define E(m, e) /*if(e != LIMEADE_SUCCESS)*/ limeade_perror((m), (e));
 #define COMPR_LVL(ctx) printf("%i\n", ctx.compr_lvl);
-
 static int proc_update_matches(const struct limeade_proc_update *a,
                                const struct limeade_proc_update *b)
 {
@@ -38,7 +37,7 @@ static int proc_update_matches(const struct limeade_proc_update *a,
 
 int main(void)
 {
-  const int nr = 256;
+  const int nr = 512;
   struct limeade_context client, host;
   struct limeade_recvd recvd = {0};
   struct limeade_proc_update pkt1 = {0}, pkt2 = {0};
@@ -92,7 +91,7 @@ int main(void)
                    LIMEADE_PORT);
   E("host init", e);
 
-  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_LOW_COMPRESSION,
+  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_HIGH_COMPRESSION,
                    "127.0.0.1", LIMEADE_PORT);
   E("client init", e);
   COMPR_LVL(client);
@@ -121,13 +120,14 @@ int main(void)
     return 1;
   }
 
-  printf("compr_lvl = %i\n", ((struct limeade_packet_flags*)recvd.flags)->compr_lvl);
+  printf("sz = %i\n", recvd.pkt_sz);
   //write(STDOUT_FILENO, recvd.pkt, recvd.pkt_sz);
-  e = limeade_parse_proc_update(&pkt2, recvd);
+  e = limeade_parse_proc_update(&pkt2, &recvd);
 
-  printf("compr_lvl = %i\n", ((struct limeade_packet_flags*)recvd.flags)->compr_lvl);
-  if(recvd.pkt_sz <= 15 * 1024)
-    fprintf(stderr, "packet is too small: %u bytes\n", recvd.pkt_sz);
+  //write(STDOUT_FILENO, recvd.pkt, recvd.pkt_sz);
+  printf("sz = %i\n", recvd.pkt_sz);
+  //if(recvd.pkt_sz <= 15 * 1024)
+  //  fprintf(stderr, "packet is too small: %u bytes\n", recvd.pkt_sz);
 
   E("host parse", e);
   if(e != LIMEADE_SUCCESS)
@@ -156,7 +156,6 @@ int main(void)
     free(died);
     return 1;
   }
-
 
   limeade_release(&pkt2);
   limeade_release(&recvd);

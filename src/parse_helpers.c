@@ -45,18 +45,19 @@ int limeade_decompress_packet(struct limeade_recvd *pkt)
   }
 
   pkt->pkt_sz = sizeof(LIMEADE_MAGIC) + sizeof(*f) + new_l;
-  void *resized = realloc(pkt->pkt, pkt->pkt_sz);
+  pkt->pkt    = realloc(pkt->pkt, pkt->pkt_sz);
 
-  if(!resized)
+  if(!pkt->pkt)
   {
     free(new);
     return LIMEADE_ERROR_MEMORY;
   }
 
-  pkt->pkt = resized;
   pkt->flags = pkt->pkt   + sizeof(LIMEADE_MAGIC);
   pkt->data  = pkt->flags + sizeof(*f);
   memcpy(pkt->data, new, new_l);
+  f = pkt->flags;
+  f->packet_size = pkt->pkt_sz;
 
   free(new);
 
