@@ -46,9 +46,16 @@ int main(void)
   int e;
 
   altered = malloc(sizeof(*altered) * nr);
-  died = malloc(sizeof(*died));
+  died = malloc(sizeof(*died) * 8);
 
-  died[0] = 9999;
+  died[0] = 1;
+  died[1] = 2;
+  died[2] = 3;
+  died[3] = 4;
+  died[4] = 5;
+  died[5] = 6;
+  died[6] = 9;
+  died[7] = 11;
 
   for(int i = 0; i < nr; i++)
   {
@@ -72,7 +79,7 @@ int main(void)
     }
   }
 
-  pkt1.total_died = 1;
+  pkt1.total_died = 8;
   pkt1.total_altered = nr;
   pkt1.died = died;
   pkt1.altered = altered;
@@ -91,7 +98,7 @@ int main(void)
                    LIMEADE_PORT);
   E("host init", e);
 
-  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_HIGH_COMPRESSION,
+  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_LOW_COMPRESSION,
                    "127.0.0.1", LIMEADE_PORT);
   E("client init", e);
   COMPR_LVL(client);

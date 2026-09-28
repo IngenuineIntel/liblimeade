@@ -449,14 +449,6 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
 
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_PROC_UPDATE);
 
-  void *copy = malloc(pkt->pkt_sz);
-  if(!copy)
-    return LIMEADE_ERROR_MEMORY;
-  memcpy(copy, pkt->pkt, pkt->pkt_sz);
-  pkt->pkt = copy;
-  pkt->flags = pkt->pkt + sizeof(LIMEADE_MAGIC);
-  pkt->data = pkt->flags + sizeof(struct limeade_packet_flags);
-
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
@@ -471,7 +463,7 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   t_sz = out->total_died    * sizeof(pid_t)
        + out->total_altered * sizeof(*out->altered);
 
-  alloc = calloc(1, t_sz);
+  alloc = malloc(t_sz);
 
   if(!alloc)
     return LIMEADE_ERROR_MEMORY;
@@ -511,7 +503,7 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
 
 err:
   if(alloc)
-    for(int i = 0; i < out->total_altered; i++)
+    for(int i = 0; i < out->total_altered && &out->altered[i]; i++)
       free(out->altered[i].command);
   free(alloc);
 
