@@ -58,6 +58,7 @@ int limeade_decompress_packet(struct limeade_recvd *pkt)
   memcpy(pkt->data, new, new_l);
   f = pkt->flags;
   f->packet_size = pkt->pkt_sz;
+  f->compr_lvl   = 0;
 
   free(new);
 

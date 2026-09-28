@@ -62,13 +62,13 @@ int main(void)
     char name[256];
     snprintf(name, sizeof(name), "limeade-test3-%03d-%s-%s-%s",
              i, "0123456789abcdef", "fedcba9876543210", "abcdefghijklmnop");
-    altered[i].pid = 1000 + i;
-    altered[i].ppid = 2000 + i;
-    altered[i].uid = 3000 + i;
-    altered[i].threads = 1 + (i % 4);
+    altered[i].pid       = 1000 + i;
+    altered[i].ppid      = 2000 + i;
+    altered[i].uid       = 3000 + i;
+    altered[i].threads   = 1 + (i % 4);
     altered[i].cpu_ticks = 1234 + i;
-    altered[i].ram_kb = 4096 + i;
-    altered[i].command = strdup(name);
+    altered[i].ram_kb    = 4096 + i;
+    altered[i].command   = strdup(name);
     if(!altered[i].command)
     {
       for(int j = 0; j < i; j++)
@@ -79,7 +79,7 @@ int main(void)
     }
   }
 
-  pkt1.total_died = 8;
+  pkt1.total_died = 1;
   pkt1.total_altered = nr;
   pkt1.died = died;
   pkt1.altered = altered;

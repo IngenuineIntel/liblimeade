@@ -223,14 +223,16 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       INC(data.total_altered);
       RDELIM();
 
-      for(i = 0;; i++)
+      data.total_died--;
+      for(i = 0; i < data.total_died; i++)
       {
         INC(data.died[i]);
-        if(i + 1 == data.total_died)
-          break;
         FDELIM();
       }
+      INC(data.died[data.total_died]);
       RDELIM();
+
+      //data.total_died++;
 
       for(i = 0; i < data.total_altered; i++)
       {
@@ -631,7 +633,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   ack.type   = ((typeof(f))ack.flags)->type;
   ack.compr  = ((typeof(f))ack.flags)->compr_lvl;
 
-  _ = limeade_parse_ack(&a, ack);
+  _ = limeade_parse_ack(&a, &ack);
   if(_ != LIMEADE_SUCCESS)
     goto err;
   
