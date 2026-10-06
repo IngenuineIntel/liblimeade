@@ -13,25 +13,17 @@
 
 #include<liblimeade/liblimeade-internal.h>
 
-static void prep_str(char *in)
-{
-  if(!in) return;
-  for(char *i = in; *i != '\x00'; i++)
-    if(*i == LIMEADE_FIELD_DELIM || *i == LIMEADE_ROW_DELIM)
-      *i = ' ';
-}
+LIMEADE_GEN_PREP_FN(prep_u8,    uint8_t,  LIMEADE_UINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_u16,   uint16_t, LIMEADE_UINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_u32,   uint32_t, LIMEADE_UINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_u64,   uint64_t, LIMEADE_UINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_i8,    int8_t,   LIMEADE_SINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_i16,   int16_t,  LIMEADE_SINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_i32,   int32_t,  LIMEADE_SINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_i64,   int64_t,  LIMEADE_SINT_INDICATOR);
+LIMEADE_GEN_PREP_FN(prep_float, float,    LIMEADE_FLT_INDICATOR);
 
-LIMEADE_GEN_PREP_FN(limeade_prep_u8,    uint8_t,  LIMEADE_UINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_u16,   uint16_t, LIMEADE_UINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_u32,   uint32_t, LIMEADE_UINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_u64,   uint64_t, LIMEADE_UINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_i8,    int8_t,   LIMEADE_SINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_i16,   int16_t,  LIMEADE_SINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_i32,   int32_t,  LIMEADE_SINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_i64,   int64_t,  LIMEADE_SINT_INDICATOR);
-LIMEADE_GEN_PREP_FN(limeade_prep_float, float,    LIMEADE_FLT_INDICATOR);
-
-static int limeade_prep_double(double in, void *out, int max)
+static int prep_double(double in, void *out, int max)
 {
   if(!out) return 0;
   if(sizeof(in) + 1 > max) return -1;
@@ -45,28 +37,30 @@ static int limeade_prep_double(double in, void *out, int max)
   return sizeof(in) + 1;
 }
 
-static int limeade_prep_str(const char *in, void *out, int max)
+static int prep_str(const char *in, void *out, int max)
 {
   if(!in || !out) return 0;
   int r = strlen(in) + 1;
   if(r > max) return -1;
   memcpy(out, in, r);
-  prep_str(out);
+  for(char *i = out; *i != '\0'; i++)
+    if(*i == LIMEADE_FIELD_DELIM || *i == LIMEADE_ROW_DELIM)
+      *i = ' ';
   return --r;
 }
 
-#define limeade_ins_v(in, out, max) _Generic((in),\
-  uint8_t: limeade_prep_u8,        \
-  uint16_t: limeade_prep_u16,      \
-  uint32_t: limeade_prep_u32,      \
-  uint64_t: limeade_prep_u64,      \
-  int8_t: limeade_prep_i8,         \
-  int16_t: limeade_prep_i16,       \
-  int32_t: limeade_prep_i32,       \
-  int64_t: limeade_prep_i64,       \
-  float: limeade_prep_float,       \
-  double: limeade_prep_double,     \
-  char*: limeade_prep_str          \
+#define ins_v(in, out, max) _Generic((in),\
+  uint8_t: prep_u8,        \
+  uint16_t: prep_u16,      \
+  uint32_t: prep_u32,      \
+  uint64_t: prep_u64,      \
+  int8_t: prep_i8,         \
+  int16_t: prep_i16,       \
+  int32_t: prep_i32,       \
+  int64_t: prep_i64,       \
+  float: prep_float,       \
+  double: prep_double,     \
+  char*: prep_str          \
 )(in, out, max)
 
 void limeade_populate_packet(struct limeade_packet_data *in,
@@ -85,7 +79,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
 
 #define INC(in)\
 {\
-  int ret = limeade_ins_v(in, b, s);\
+  int ret = ins_v(in, b, s);\
   if(ret < 0) goto err;\
   b += ret;\
   s -= ret;\

@@ -122,7 +122,7 @@ int limeade_decompress_packet(struct limeade_recvd *pkt);
  * reimplementation of strlen that uses LIMEADE_FIELD_DELIM or LIMEADE_ROW_DELIM
  * instead of 0x00
  */
-uint32_t limeade_pkt_strlen(const char *s, uint32_t max_len);
+int limeade_pkt_strlen(const char *s, uint32_t max_len);
 
 /* limeade_th_recv_wr_pkt
  *

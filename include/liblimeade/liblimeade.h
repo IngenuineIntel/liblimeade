@@ -457,7 +457,7 @@ struct limeade_introduction
 {
   char *hostname;    // hostname of the client machine
   char *kernelver;   // Linux version on the client machine
-  char *distro;      // distrobution of the client machine
+  char *distro;      // distribution of the client machine
   char *origin_user; // user who initialized the connection
   char *processor;   // processor of the client machine
   char *vendor;      // vendorID of the processor

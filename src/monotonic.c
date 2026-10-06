@@ -36,9 +36,11 @@ int64_t limeade_monotonic_diff_ms(struct timespec *a, struct timespec *b)
   if(ret < 0)
     ret = 0 - ret;
 
-  ret *= 1000;
-
+  // also in theory, multiplication after division is preferable since it gives
+  // `ms` some time to be calculated before it's needed (integer division takes
+  // a long time)
   ms = (b->tv_nsec - a->tv_nsec) / 1000000;
+  ret *= 1000;
 
   if(ms < 0)
     ms = 0 - ms;

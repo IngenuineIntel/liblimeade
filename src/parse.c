@@ -191,8 +191,8 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data)
 
 static int limeade_cast_str(void *src, char **dst, int rem)
 {
-  register uint32_t l = limeade_pkt_strlen(src, rem > 0 ? rem : 0);
-  if(l == UINT32_MAX) return -1;
+  register int l = limeade_pkt_strlen(src, rem > 0 ? rem : 0);
+  if(l < 0) return -1;
   *dst = malloc(l + 1);
   if(!*dst) return -1;
   memcpy(*dst, src, l);

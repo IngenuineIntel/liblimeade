@@ -69,11 +69,11 @@ int limeade_decompress_packet(struct limeade_recvd *pkt)
 // unconventional but improves performance relatively quickly
 // also note that this uses SSE2 (16 byte) instead of AVX2 (32 byte) because I
 // forsee the strings being passed into this function not being very long
-uint32_t limeade_pkt_strlen(const char *s, uint32_t max_len)
+int limeade_pkt_strlen(const char *s, uint32_t max_len)
 {
   __m128i fd, rd, chunk, m1, m2, mask;
   int match;
-  uint32_t len = 0;
+  uint32_t len;
 
   fd = _mm_set1_epi8(LIMEADE_FIELD_DELIM);
   rd = _mm_set1_epi8(LIMEADE_ROW_DELIM);
@@ -98,7 +98,6 @@ uint32_t limeade_pkt_strlen(const char *s, uint32_t max_len)
   for(uint32_t i = 0; i < max_len; i++)
     if(s[i] == LIMEADE_FIELD_DELIM || s[i] == LIMEADE_ROW_DELIM)
       return len + i;
-
-  return UINT32_MAX;
+  return -1;
 }
 
