@@ -19,7 +19,7 @@ int main(int argc, char **argv)
   int fds[2];
 
   //printf("limeade_init...\n");
-  int e = limeade_init(&c, LIMEADE_MODE_HOST_SSH|LIMEADE_MODE_NO_COMPRESSION);
+  int e = limeade_init(&c, LIMEADE_MODE_HOST_SSH|LIMEADE_MODE_LOW_COMPRESSION);
   //test(e);
 
   c.compr_lvl = 0;
@@ -28,6 +28,7 @@ int main(int argc, char **argv)
   c.sfd = fds[1];
   c.rfd = fds[0];
 
+  // note: this shouldn't actually work, but the library isn't done lol
   //printf("limeade_connect...\n");
   e = limeade_connect(&c);
   //test(e);
@@ -67,9 +68,13 @@ int main(int argc, char **argv)
   //printf("r.pkt_sz = %i\n", r.pkt_sz);
   //write(STDOUT_FILENO, r.pkt, r.pkt_sz);
   
+  printf("packet size (compressed): %i\n", r.pkt_sz);
+
   struct limeade_events evs;
   e = limeade_parse_events(&evs, &r);
   test(e);
+
+  printf("packet size (uncompressed): %i\n", r.pkt_sz);
 
   printf("%i\n", evs.nr_events);
 

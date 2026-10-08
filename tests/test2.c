@@ -9,7 +9,7 @@
 
 #include<liblimeade/liblimeade.h>
 
-#define E(m, e) /*if(e != LIMEADE_SUCCESS)*/ limeade_perror((m), (e));
+#define E(m, e) printf("%s: %s\n", m, LIMEADE_ERROR_REPRS[e]);
 #define COMPR_LVL(ctx) printf("%i\n", ctx.compr_lvl);
 static int proc_update_matches(const struct limeade_proc_update *a,
                                const struct limeade_proc_update *b)

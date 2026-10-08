@@ -3,6 +3,7 @@
 // AGPL
 
 #include<pthread.h>
+#include<semaphore.h>
 #include<string.h>
 
 #include<liblimeade/liblimeade-internal.h>
@@ -27,8 +28,8 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 
     // LIMEADE_ACK packets are awaited by awaiting the unlock of r->mtx_ack. If
     // the main thread doesn't wait, it never knows if the peer sent an ACK
-    pthread_mutex_unlock(r->mtx_ack);
-    pthread_mutex_lock(r->mtx_ack);
+    sem_post(r->sem_ack);
+    sem_wait(r->sem_ack);
   } else
   {
     pthread_mutex_lock(r->mtx_idx);

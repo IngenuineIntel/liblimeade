@@ -4,6 +4,7 @@
 #include<errno.h>
 #include<netinet/in.h>
 #include<pthread.h>
+#include<semaphore.h>
 #include<signal.h>
 #include<stdarg.h>
 #include<stdio.h>
@@ -67,18 +68,22 @@ static inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
 
   // mutexes
   // this allocation is 4 mutexes, then a pthread_t at the endj
-  mutexes = malloc(sizeof(pthread_mutex_t) * 4 + sizeof(pthread_t));
+  long sz = sizeof(pthread_mutex_t) * 3 + sizeof(sem_t) + sizeof(pthread_t);
+  mutexes = malloc(sz);
   if(!mutexes)
     return LIMEADE_ERROR_MEMORY;
 
-  for(int i = 0; i < 4; i++)
+  for(int i = 0; i < 3; i++)
     pthread_mutex_init(&mutexes[i], NULL);
 
-  r->mtx_ack  = &mutexes[0];
-  r->mtx_idx  = &mutexes[1];
-  r->mtx_kys  = &mutexes[2];
-  r->mtx_lost = &mutexes[3];
-  r->tid      = (pthread_t*)&mutexes[4];
+  r->mtx_idx  = &mutexes[0];
+  r->mtx_kys  = &mutexes[1];
+  r->mtx_lost = &mutexes[2];
+  r->tid      = mutexes + (sz - sizeof(pthread_t));
+  r->sem_ack  = r->tid - sizeof(sem_t);
+
+  sem_init(r->sem_ack, 0, 1);
+
   pthread_mutex_lock(r->mtx_kys);
 
   r->nr_pkts = LIMEADE_NR_PKTS_DEFAULT;
@@ -160,7 +165,12 @@ static inline int limeade_init_th_recv_step_2(struct limeade_context *ctx)
 
 static void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
 {
-  free(ctx->recv.mtx_ack);
+  struct limeade_recv_data *r = &ctx->recv;
+  pthread_mutex_destroy(r->mtx_idx);
+  pthread_mutex_destroy(r->mtx_kys);
+  pthread_mutex_destroy(r->mtx_lost);
+  sem_destroy(r->sem_ack);
+  free(ctx->recv.mtx_idx);
 }
 
 static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)

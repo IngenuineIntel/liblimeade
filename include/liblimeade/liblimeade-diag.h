@@ -42,7 +42,7 @@ void limeade_diag_enum(int x);
 
 
 // a `perror`-style error representation for liblimeade errors
-void limeade_perror(const char *s, enum limeade_error e);
+void limeade_perror(const char * const s, const enum limeade_error e);
 
 #endif /* _LIBLIMEADE_DIAG_C */
 
