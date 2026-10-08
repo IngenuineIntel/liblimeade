@@ -550,14 +550,15 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   
   pthread_mutex_unlock(ctx->mtx_pub);
 
-  for(;;)
-  {
-    if(pthread_mutex_timedlock(r->mtx_ack, &recvwait) != 0)
-    {
-      _ = LIMEADE_ERROR_REJECTED;
-      goto err;
-    }
+  retry:
 
+  if(pthread_mutex_timedlock(r->mtx_ack, &recvwait) != 0)
+  {
+    _ = LIMEADE_ERROR_REJECTED;
+    goto err;
+  }
+
+  {
     char ack_pkt[r->ack_sz];
     recv_ack.pkt    = ack_pkt;
     recv_ack.flags  = ack_f = recv_ack.pkt + sizeof(LIMEADE_MAGIC);
@@ -569,13 +570,14 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
     memcpy(ack_pkt, r->ack, r->ack_sz);
 
     _ = limeade_parse_ack(&a, &recv_ack);
-    if(_ != LIMEADE_SUCCESS)
-      goto err;
-
-    if(a.send_ts_ms == f->ts_ms
-    || a.send_ts_s  == f->ts_s)
-      break;
   }
+
+  if(_ != LIMEADE_SUCCESS)
+    goto err;
+
+  if(a.send_ts_ms != f->ts_ms
+  || a.send_ts_s  != f->ts_s)
+    goto retry;
 
   c_entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
   l_entry.elapsed_ms = limeade_monotonic_diff_ms(&latent_ts[0], &latent_ts[1]);
@@ -585,7 +587,8 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   _ = LIMEADE_SUCCESS;
 
-err:
+  err:
+
   free(pkt.pkt);
   return _;
 }

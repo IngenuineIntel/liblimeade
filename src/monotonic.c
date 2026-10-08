@@ -21,6 +21,7 @@
 
 int limeade_monotonic(struct timespec *ts)
 {
+  /* monotonic timestamp wrapper */
   if(clock_gettime(CLOCK_MONOTONIC, ts) != 0)
     return LIMEADE_ERROR_MONOTONIC;
   return LIMEADE_SUCCESS;
@@ -28,25 +29,14 @@ int limeade_monotonic(struct timespec *ts)
 
 int64_t limeade_monotonic_diff_ms(struct timespec *a, struct timespec *b)
 {
-  int64_t ret, ms;
+  /* calculates the difference between two time values in milliseconds */
+  int64_t a_t, b_t, ret;
 
-  ret = b->tv_sec - a->tv_sec;
+  a_t = (a->tv_sec * 1000) + (a->tv_nsec / 1000000);
+  b_t = (b->tv_sec * 1000) + (b->tv_nsec / 1000000);
 
-  // in theory, b should be the latter timestamp, but just in case:
-  if(ret < 0)
-    ret = 0 - ret;
+  ret = b_t - a_t;
 
-  // also in theory, multiplication after division is preferable since it gives
-  // `ms` some time to be calculated before it's needed (integer division takes
-  // a long time)
-  ms = (b->tv_nsec - a->tv_nsec) / 1000000;
-  ret *= 1000;
-
-  if(ms < 0)
-    ms = 0 - ms;
+  return ret > 0 ? ret : 0 - ret;
   
-  ret += ms;
-
-  return ret;
 }
-
