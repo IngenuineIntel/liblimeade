@@ -477,46 +477,20 @@ err:
   return _;
 }
 
-struct limeade_ack_recv_th_pass
-{
-  struct limeade_recv_data *in;
-  unsigned int sz;
-  void *data;
-  pthread_mutex_t mtx;
-  sem_t sem;
-};
-
-void *limeade_th_await(void *arg)
-{
-  struct limeade_ack_recv_th_pass *data = arg;
-  pthread_mutex_lock(&data->mtx);
-  sem_post(&data->sem);
-
-  struct limeade_recv_data *r = data->in;
-
-  pthread_mutex_lock(r->mtx_ack); // hangs
-
-  data->sz = r->ack_sz;
-  memcpy(data->data, r->ack, data->sz);
-
-  pthread_mutex_unlock(r->mtx_ack);
-  pthread_mutex_unlock(&data->mtx);
-  return NULL;
-}
-
 int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ...)
 {
   register int _;
-  struct limeade_packet_data pkt, ack;
-  struct limeade_packet_flags flags, *f;
+  struct limeade_recv_data *r;
+  struct limeade_packet_data pkt, recv_ack;
+  struct limeade_packet_flags flags, *f, *ack_f;
   struct limeade_csm_compression_entry c_entry;
   struct limeade_csm_latency_entry l_entry;
-  struct limeade_ack_recv_th_pass recv_ack;
   struct limeade_ack a;
   struct timespec compr_ts[2], latent_ts[2], sendts, recvwait;
-  pthread_t recv_ack_tid;
   va_list arg;
   va_start(arg, type);
+
+  r = &ctx->recv;
 
   memset(&flags, 0, sizeof(flags));
 
@@ -583,60 +557,35 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   
   pthread_mutex_unlock(ctx->mtx_pub);
 
-  sem_init(&recv_ack.sem, 0, 1);
-
-  if(pthread_create(&recv_ack_tid, NULL, &limeade_th_await, &recv_ack) != 0)
+  for(;;)
   {
-    sem_destroy(&recv_ack.sem);
-    _ = LIMEADE_ERROR_OTHER;
-    goto err;
+    if(pthread_mutex_timedlock(r->mtx_ack, &recvwait) != 0)
+    {
+      _ = LIMEADE_ERROR_REJECTED;
+      goto err;
+    }
+
+    char ack_pkt[r->ack_sz];
+    recv_ack.pkt    = ack_pkt;
+    recv_ack.flags  = ack_f = recv_ack.pkt + sizeof(LIMEADE_MAGIC);
+    recv_ack.data   = recv_ack.flags + sizeof(*ack_f);
+    recv_ack.pkt_sz = r->ack_sz;
+    recv_ack.type   = ack_f->type;
+    recv_ack.compr  = ack_f->compr_lvl;
+
+    memcpy(ack_pkt, r->ack, r->ack_sz);
+
+    _ = limeade_parse_ack(&a, &recv_ack);
+    if(_ != LIMEADE_SUCCESS)
+      goto err;
+
+    if(a.send_ts_ms == f->ts_ms
+    || a.send_ts_s  == f->ts_s)
+      break;
   }
-
-  sem_wait(&recv_ack.sem);
-  if(pthread_mutex_timedlock(&recv_ack.mtx, &recvwait) != 0)
-  {
-    pthread_cancel(recv_ack_tid);
-    sem_destroy(&recv_ack.sem);
-    _ = LIMEADE_ERROR_REJECTED;
-    goto err;
-  }
-
-  sem_destroy(&recv_ack.sem);
-
-  _ = limeade_monotonic(&latent_ts[1]);
-  if(_ != LIMEADE_SUCCESS)
-    goto err;
 
   c_entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
   l_entry.elapsed_ms = limeade_monotonic_diff_ms(&latent_ts[0], &latent_ts[1]);
-
-  // I currently don't think this is worth doing, but I'll keep it here just in
-  // case.
-  //recv_ack.data = realloc(recv_ack.data, recv_ack.sz);
-  //if(!recv_ack.data)
-  //{
-  //  free(pkt.pkt);
-  //  return LIMEADE_ERROR_MEMORY;
-  //}
-
-  // confirming that the ACK we received is the one for the packet we sent
-  ack.pkt_sz = recv_ack.sz;
-  ack.pkt    = recv_ack.data;
-  ack.flags  = ack.pkt + sizeof(LIMEADE_MAGIC);
-  ack.data   = ack.flags + sizeof(*f);
-  ack.type   = ((typeof(f))ack.flags)->type;
-  ack.compr  = ((typeof(f))ack.flags)->compr_lvl;
-
-  _ = limeade_parse_ack(&a, &ack);
-  if(_ != LIMEADE_SUCCESS)
-    goto err;
-  
-  if(a.send_ts_s != sendts.tv_sec || a.send_ts_ms != sendts.tv_nsec * 100000)
-  {
-    // we got an ACK, it's not the one for the packet we sent
-    _ = LIMEADE_ERROR_BAD_DATA;
-    goto err;
-  }
 
   limeade_csm_add_compr_entry(ctx, &c_entry);
   limeade_csm_add_latency_entry(ctx, &l_entry);
