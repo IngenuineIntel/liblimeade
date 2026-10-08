@@ -5,7 +5,6 @@
 #include<netinet/in.h>
 #include<poll.h>
 #include<pthread.h>
-#include<semaphore.h>
 #include<stdlib.h>
 #include<stdint.h>
 #include<unistd.h>
@@ -27,7 +26,7 @@ void *limeade_th_recv_host_eth(void *arg)
   ctx = arg;
   r   = &ctx->recv;
 
-  sem_wait(r->sem_ack);
+  pthread_mutex_lock(r->mtx_ack);
 
   poll_ms = 1000/(r->hz > 0 ? r->hz : LIMEADE_RECV_DEFAULT_HZ);
 
@@ -74,7 +73,7 @@ void *limeade_th_recv_client_eth(void *arg)
   ctx = arg;
   r   = &ctx->recv;
   
-  sem_wait(r->sem_ack);
+  pthread_mutex_lock(r->mtx_ack);
 
   poll_ms = 1000/(r->hz > 0 ? r->hz : LIMEADE_RECV_DEFAULT_HZ);
 
@@ -120,7 +119,7 @@ void *limeade_th_recv_client_ssh(void *arg)
   ctx = arg;
   r   = &ctx->recv;
 
-  sem_wait(r->sem_ack);
+  pthread_mutex_lock(r->mtx_ack);
 
   poll_ms = 1000/(r->hz > 0 ? r->hz : LIMEADE_RECV_DEFAULT_HZ);
 

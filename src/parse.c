@@ -22,6 +22,8 @@
 #include<stdlib.h>
 #include<string.h>
 
+#include<stdio.h>
+
 #include<liblimeade/liblimeade-internal.h>
 
 int limeade_send_acknowledge(struct limeade_context *ctx, struct limeade_recvd *pkt)

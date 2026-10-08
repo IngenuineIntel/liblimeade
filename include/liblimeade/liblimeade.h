@@ -262,9 +262,9 @@ struct limeade_recv_data
   // `ack_addr` & `ack_add_len` are only used when working with UDP
   struct sockaddr_in ack_addr;
   socklen_t ack_addr_len;
-  // semaphore for waiting for ACKs
+  // mutex for waiting for ACKs
   // almost always locked; one must already be waiting
-  void *sem_ack;
+  void *mtx_ack;
 
   void *mtx_idx;
   void *mtx_kys; // kill switch indicator to the thread
@@ -693,5 +693,10 @@ void limeade_release_recvd(struct limeade_recvd *in);
   struct limeade_recvd*:        limeade_release_recvd,\
   struct limeade_context*:      limeade_destruct\
 )(in)
+
+
+/*** DIAGNOSTICS ***/
+// perror-like error system
+void limeade_perror(const char * const s, const int error);
 
 #endif /* _LIBLIMEADE_H_ */
