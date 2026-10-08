@@ -14,8 +14,8 @@ so: objs
 	$(CC) -shared -o liblimeade-0.1.so $(OBJS) -lz
 
 clean:
-	rm -f $(OBJS) liblimeade-0.1.so
-	$(MAKE) -C tests clean
+	-@rm -f $(OBJS) liblimeade-0.1.so liblimeade.o
+	-@$(MAKE) -C tests clean
 
 install: so uninstall
 	sudo cp liblimeade-0.1.so /usr/local/lib/liblimeade.so.0.1

@@ -512,13 +512,6 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   limeade_populate_packet(&pkt, &flags, arg);
 
-  recv_ack.data = malloc(1 << 16);
-  if(!recv_ack.data)
-  {
-    free(pkt.pkt);
-    return LIMEADE_ERROR_MEMORY;
-  }
-
   c_entry.precompr_sz = pkt.pkt_sz;
 
   _ = limeade_deflate_packet(&pkt, flags.compr_lvl);
@@ -593,7 +586,6 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   _ = LIMEADE_SUCCESS;
 
 err:
-  free(recv_ack.data);
   free(pkt.pkt);
   return _;
 }
