@@ -131,6 +131,7 @@ static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
   struct limeade_recv_data *r = &ctx->recv;
   sem_post(&r->sem_kys);
   pthread_join(r->tid, NULL);
+  sem_destroy(&r->sem_kys);
 }
 
 #define limeade_destruct_th_recv(ctx)\

@@ -18,7 +18,7 @@ int main(int argc, char **argv)
   struct limeade_events p;
   int fds[2];
 
-  //printf("limeade_init...\n");
+  printf("limeade_init...\n");
   int e = limeade_init(&c, LIMEADE_MODE_HOST_SSH|LIMEADE_MODE_NO_COMPRESSION);
   //test(e);
 
@@ -28,7 +28,7 @@ int main(int argc, char **argv)
   c.sfd = fds[1];
   c.rfd = fds[0];
 
-  //printf("limeade_connect...\n");
+  printf("limeade_connect...\n");
   e = limeade_connect(&c);
   //test(e);
 
@@ -55,16 +55,16 @@ int main(int argc, char **argv)
   p.nr_events = 6;
   p.events = ev;
 
-  //printf("limeade_send...\n");
+  printf("limeade_send...\n");
   e = limeade_send(&c, LIMEADE_PACKET_EVENTS, p);
   //test(e);
 
   struct limeade_recvd r;
-  //printf("limeade_recv_noreply...\n");
+  printf("limeade_recv_noreply...\n");
   e = limeade_recv_wait_noreply(&c, &r, 3000);
   //test(e);
   
-  //printf("r.pkt_sz = %i\n", r.pkt_sz);
+  printf("r.pkt_sz = %i\n", r.pkt_sz);
   //write(STDOUT_FILENO, r.pkt, r.pkt_sz);
   
   struct limeade_events evs;
@@ -75,6 +75,7 @@ int main(int argc, char **argv)
 
   limeade_release(&r);
 
+  printf("destruct...\n");
   limeade_destruct(&c);
 
   return 0;
