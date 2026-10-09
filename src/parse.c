@@ -217,16 +217,16 @@ static int limeade_cast_str(void *src, char **dst, int rem)
   if(((struct limeade_packet_flags*)pkt->flags)->type != TYPE)\
     return LIMEADE_ERROR_GARBAGE;
 
-LIMEADE_CAST_FUNC(limeade_cast_u8, uint8_t, LIMEADE_TYPECHECK_UINT);
-LIMEADE_CAST_FUNC(limeade_cast_u16, uint16_t, LIMEADE_TYPECHECK_UINT);
-LIMEADE_CAST_FUNC(limeade_cast_u32, uint32_t, LIMEADE_TYPECHECK_UINT);
-LIMEADE_CAST_FUNC(limeade_cast_u64, uint64_t, LIMEADE_TYPECHECK_UINT);
-LIMEADE_CAST_FUNC(limeade_cast_i8, int8_t, LIMEADE_TYPECHECK_INT);
-LIMEADE_CAST_FUNC(limeade_cast_i16, int16_t, LIMEADE_TYPECHECK_INT);
-LIMEADE_CAST_FUNC(limeade_cast_i32, int32_t, LIMEADE_TYPECHECK_INT);
-LIMEADE_CAST_FUNC(limeade_cast_i64, int64_t, LIMEADE_TYPECHECK_INT);
-LIMEADE_CAST_FUNC(limeade_cast_flt, float, LIMEADE_TYPECHECK_FLT);
-LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT);
+LIMEADE_CAST_FUNC(limeade_cast_u8, uint8_t, LIMEADE_TYPECHECK_UINT)
+LIMEADE_CAST_FUNC(limeade_cast_u16, uint16_t, LIMEADE_TYPECHECK_UINT)
+LIMEADE_CAST_FUNC(limeade_cast_u32, uint32_t, LIMEADE_TYPECHECK_UINT)
+LIMEADE_CAST_FUNC(limeade_cast_u64, uint64_t, LIMEADE_TYPECHECK_UINT)
+LIMEADE_CAST_FUNC(limeade_cast_i8, int8_t, LIMEADE_TYPECHECK_INT)
+LIMEADE_CAST_FUNC(limeade_cast_i16, int16_t, LIMEADE_TYPECHECK_INT)
+LIMEADE_CAST_FUNC(limeade_cast_i32, int32_t, LIMEADE_TYPECHECK_INT)
+LIMEADE_CAST_FUNC(limeade_cast_i64, int64_t, LIMEADE_TYPECHECK_INT)
+LIMEADE_CAST_FUNC(limeade_cast_flt, float, LIMEADE_TYPECHECK_FLT)
+LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT)
 #define _limeade_cast(dst, src, rem) _Generic((dst), \
   uint8_t*:  limeade_cast_u8,  \
   uint16_t*: limeade_cast_u16, \
@@ -255,7 +255,7 @@ if(rem <= 0 || _ < 0) goto err;   \
 idx += _;                         \
 last_delim = *(char*)idx;         \
 idx++;                            \
-rem--;
+rem--
 
 #define IF_NOT_FIELD_END()\
 if(last_delim != LIMEADE_FIELD_DELIM)

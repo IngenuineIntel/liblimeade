@@ -1,7 +1,7 @@
 #!/usr/bin/make
 
 CC     := clang
-CFLAGS := -fPIC -O1 -Wall -Iinclude -std=gnu11
+CFLAGS := -fPIC -O2 -Wall -Iinclude -std=gnu23 -Wpedantic -Werror -Wno-gnu-pointer-arith
 SRCS   := $(wildcard src/*.c)
 OBJS   := $(SRCS:.c=.o)
 
