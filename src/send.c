@@ -41,13 +41,16 @@ static int prep_double(double in, void *out, int max)
 static int prep_str(const char *in, void *out, int max)
 {
   if(!in || !out) return 0;
-  int r = strlen(in) + 1;
-  if(r > max) return -1;
-  memcpy(out, in, r);
-  for(char *i = out; *i != '\0'; i++)
+  int c = 0;
+  char *j = out, *i = (char*)in;
+  for(; *i != '\0' && c < max; i++, j++, c++)
+  {
     if(*i == LIMEADE_FIELD_DELIM || *i == LIMEADE_ROW_DELIM)
-      *i = ' ';
-  return --r;
+      *j = ' ';
+    else
+      *j = *i;
+  }
+  return c;
 }
 
 #define ins_v(in, out, max) _Generic((in),\
@@ -67,7 +70,7 @@ static int prep_str(const char *in, void *out, int max)
 void limeade_populate_packet(struct limeade_packet_data *in,
                              struct limeade_packet_flags *flags, va_list arg)
 {
-  register int s = 65536 + sizeof(LIMEADE_MAGIC);
+  register int s = LIMEADE_MAX_PKT_SZ + sizeof(LIMEADE_MAGIC);
   int m   = s;
   void *b = malloc(s);
   in->pkt = b;
