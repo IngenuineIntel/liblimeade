@@ -54,7 +54,7 @@ int main()
   // lower its clock frequency
   nanosleep(&rqtp, &rmtp);
 
-  e = limeade_init(host, LIMEADE_MODE_HOST_ETH | LIMEADE_MODE_LOW_COMPRESSION, LIMEADE_PORT);
+  e = limeade_init(host, LIMEADE_MODE_HOST_ETH | LIMEADE_MODE_NO_COMPRESSION, LIMEADE_PORT);
   TEST(e);
   e = limeade_connect(host);
   TEST(e);
@@ -72,7 +72,7 @@ int main()
     
     //printf("\ninit...");
     STOPWATCH(init_start);
-    e = limeade_init(ctx, LIMEADE_MODE_CLIENT_ETH | LIMEADE_MODE_LOW_COMPRESSION, "127.0.0.1", LIMEADE_PORT);
+    e = limeade_init(ctx, LIMEADE_MODE_CLIENT_ETH | LIMEADE_MODE_NO_COMPRESSION, "127.0.0.1", LIMEADE_PORT);
     STOPWATCH(init_stop);
     TEST(e);
 

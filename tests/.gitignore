@@ -1,2 +1,3 @@
-test3.csv
-*.png
+*.svg
+*.csv
+test*.out
