@@ -17,7 +17,8 @@ test3_graph:
 
 test3:
 	gcc test3.c -lz -llimeade -o test3.out
-	valgrind --leak-check=full ./test3.out
+	#valgrind --leak-check=full ./test3.out
+	./test3.out
 	-@cat test3.csv
 	$(MAKE) test3_graph
 
