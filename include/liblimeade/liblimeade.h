@@ -19,6 +19,7 @@
 #define _LIBLIMEADE_H_
 
 #include <netinet/in.h>
+#include <semaphore.h>
 #include <stdint.h>
 #include <sys/socket.h>
 
@@ -94,7 +95,7 @@ static const char *LIMEADE_ERROR_REPRS[] = {
   "Feature not supported",
   "Receiving thread died",
   "Compression management thread died",
-  "Not supported",
+  "Other",
   "Unknown"
 };
 
@@ -179,6 +180,8 @@ struct limeade_csm_compression_entry
   uint32_t precompr_sz;  // size of data before compression
   uint32_t postcompr_sz; // size of data after compression
   uint32_t elapsed_ms;   // elapsed time in milliseconds
+
+  uint8_t ready:1; // whether or not this is initialized
 };
 
 // the data for a single entry of latency data
@@ -186,24 +189,35 @@ struct limeade_csm_latency_entry
 {
   uint32_t send_sz;    // size of data sent
   uint32_t elapsed_ms; // elapsed time in milliseconds
+
+  uint8_t ready:1; // whether or not this is initialized
 };
+
+// size of hist_* ring buffers
+#define LIMEADE_CSM_BENCH_BUFFER_SZ 30
+
+// frequency of iteration (in ms(p), not hz)
+#define LIMEADE_CSM_FREQ_MS_P 5000
 
 struct limeade_csm_data
 {
-  struct limeade_csm_compression_entry *hist_compr;  // compression benchmarks
-  struct limeade_csm_latency_entry     *hist_latent; // latency benchmarks
+  uint8_t enabled; // 0 if not, 1 if so
+  pthread_mutex_t mtx;
+
+  struct limeade_csm_compression_entry hist_compr[LIMEADE_CSM_BENCH_BUFFER_SZ];
+  struct limeade_csm_latency_entry     hist_latent[LIMEADE_CSM_BENCH_BUFFER_SZ];
 
   uint32_t hist_compr_sz;   // size of compression benchmark ring buffer
   uint32_t hist_latent_sz;  // size of latency benchmark ring buffer
   uint32_t hist_compr_idx;  // current index in compression benchmarks
   uint32_t hist_latent_idx; // current index in latency benchmarks
-  float freq_s;  // frequency that CSM operates at (iter/sec)
-  void *tid;     // thread ID (*pthread_t)
-  void *mtx_kys; // kill signal mutex (*pthread_mutex_t)
+  uint32_t freq; // frequency (in ms(p), not hz)
+
+  pthread_t tid;
+  // CSM doesn't need a semaphore, because it won't be allocating any heap
 };
 
-// size of hist_* ring buffers
-#define LIMEADE_CSM_BENCH_BUFFER_SIZE 30
+
 // frequency
 // can be altered after calling `limeade_init` with:
 //
@@ -213,131 +227,104 @@ struct limeade_csm_data
 //
 // likewise, this can be used for any component of ctx->csm
 //
-#define LIMEADE_CSM_FREQ_S 2.0 // every 2 seconds
 
 // on a host machine (particularly LIMEADE_MODE_HOST_ETH), a list of clients has to be
 // stored
 
-// limeade_recv_data
-// liblimeade hosts an additional thread used for receiving data, making recv
-// calls by the main thread faster, as they simply copy the data from a buffer
-// in memory
-// packets are kept in a ring buffer with both a read and write index
+#define LIMEADE_NR_PKTS 10 // number of packets stored at a time
+#define LIMEADE_MAX_PKT_SZ 65536 // maximum size of packet
+
+// TODO really good documentation
 struct limeade_indiv_recv
 {
-  void *data;
+  pthread_mutex_t mtx;
+
+  char data[LIMEADE_MAX_PKT_SZ];
   uint32_t sz;
-  void *mtx;
-  union
-  {
-    struct sockaddr_in addr;
-    socklen_t addr_len;
-  };
+  
+  // only populated when running as UDP host
+  struct sockaddr_in addr;
+  socklen_t addr_len;
+
   union
   {
     uint8_t flags;
+
     struct
     {
-      uint8_t has_been_read:1;
-      uint8_t ready:1;
-      uint8_t reserved:6;
+      uint8_t been_read:1; // if the packet has been read
+      uint8_t ready:1;     // if the packet is ready to be read
     };
   };
 };
 
+#define LIMEADE_TH_RECV_DFLT_HZ 4
+// TODO really good documentation
 struct limeade_recv_data
 {
-  void *tid; // pthread_t
-  uint16_t nr_pkts;
-  uint16_t read_idx;
-  uint16_t wr_idx;
-  uint16_t pkts_lost;
-  uint16_t hz;
-  struct limeade_indiv_recv *pkts;
+  // readonly
+  pthread_t tid;
+  uint16_t hz; // frequency to operate at (kindof)
 
-  // if a packet is LIMEADE_ACK, it is put elsewhere
-  // not a ring buffer, because it shouldn't have to be
-  uint32_t ack_sz;
-  void *ack;
-  // `ack_addr` & `ack_add_len` are only used when working with UDP
-  struct sockaddr_in ack_addr;
-  socklen_t ack_addr_len;
-  // mutex for waiting for ACKs
-  // almost always locked; one must already be waiting
-  void *mtx_ack;
+  pthread_mutex_t mtx_unread;
+  uint16_t nr_pkts_unread; // total number of packets that haven't been read
 
-  void *mtx_idx;
-  void *mtx_kys; // kill switch indicator to the thread
-  void *mtx_lost;
-};
-#define LIMEADE_NR_PKTS_DEFAULT 5
-// the size of the buffer kept by the recv thread to write packets into
-#define LIMEADE_RECV_TMP_SZ 65536
-// default value for `limeade_recv_data.hz`
-#define LIMEADE_RECV_DEFAULT_HZ 4
+  pthread_mutex_t mtx_nr_read;
+  uint32_t nr_pkts_read; // total number of packet that have been read
 
-// node-based data type for managing clients when operating as an ethernet host
-struct limeade_eth_client
-{
-  uint8_t idx;      // index within the series of nodes
-  uint16_t pkts_to; // packets sent to this client
-  uint16_t pkts_fr; // packets received from this client
-  uint64_t session; // session ID of the client
-  struct sockaddr_in cliaddr;
-  socklen_t cliaddr_len;
-  struct limeade_eth_client *prev; // previous node (or NULL if it's the first)
-  struct limeade_eth_client *next; // next node (or NULL if it's the last)
+  pthread_mutex_t mtx_lost;
+  uint32_t nr_pkts_lost; // number of packets that were overwritten without
+                         // being read (number of packets lost)
+
+  pthread_mutex_t mtx_idx;
+  uint16_t idx_read, idx_write; // indexes for the next packet to read, & the next
+                                // packet to write
+
+  struct limeade_indiv_recv pkts[LIMEADE_NR_PKTS]; // the packets themselves
+
+  struct limeade_indiv_recv ack; // acknowledgement packets go here
+
+  sem_t sem_kys; // kill switch for recv thread
 };
 
-// limeade_context
-// serves as the state/instance holder for the functions in this library
+// TODO really good documentation
 struct limeade_context
 {
+  // readonly
   uint8_t mode;
   uint8_t compr_mode;
+
+  pthread_mutex_t mtx_compr_lvl;
   uint8_t compr_lvl;
 
-  int sfd;
-  int rfd;
+  pthread_mutex_t mtx_rfd; // (for using the file descriptor, not writing the memory)
+  int rfd; // fd for receiving
 
-  union
-  {
-    pid_t ssh_pid;  // LIMEADE_MODE_CLIENT_SSH
-#ifdef LIMEADE_HAS_LIBSSH2
-    void *ssh_data; // LIMEADE_MODE_CLIENT_LIBSSH
-#endif
-    struct          // LIMEADE_MODE_*_ETH
-    {
-      struct sockaddr_in saddr;
-      socklen_t saddr_len;
+  pthread_mutex_t mtx_sfd;
+  int sfd; // fd for sending
 
-      // LIMEADE_MODE_HOST_ETH
-      // must be populated before calls to limeade_send when operating as a UDP
-      // host
-      struct sockaddr_in cliaddr;
-      socklen_t cliaddr_len;
-    };
-  };
-
-  // recv thread
-  struct limeade_recv_data recv;
-
-  // csm thread
-  struct limeade_csm_data *csm;
-
-  // "public attributes"
+  pthread_mutex_t mtx_pub_attrs;
   char *dest;
   int port;
   uint64_t sessionid;
-  uint32_t ack_wait_time_ms; // amount of time to try to send data before giving up
+  uint32_t ack_wait_time_ms;
 
-  // mutexes (all pthread_mutex_t)
-  void *mtx_sfd;        // sfd (for using the file descriptor, not reading the memory)
-  void *mtx_rfd;        // rfd (for using the file descriptor, not reading the memory)
-  void *mtx_mode_union; // anything in the union
-  void *mtx_compr;      // compr_*
-  void *mtx_th_csm;     // csm
-  void *mtx_pub;        // pub attrs
+  pthread_mutex_t mtx_mode_specific;
+  union
+  {
+    pid_t ssh_pid; // LIMEADE_MODE_CLIENT_SSH
+
+    struct sockaddr_in saddr; // LIMEADE_MODE_CLIENT_ETH
+    socklen_t saddr_len;
+
+    // must be populated before calls to send packets
+    struct sockaddr_in cliaddr; // LIMEADE_MODE_HOST_ETH
+    socklen_t cliaddr_len;
+  };
+
+  struct limeade_recv_data recv;
+  struct limeade_csm_data csm;
+
 };
 
 /* limeade_init

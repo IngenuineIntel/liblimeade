@@ -17,30 +17,30 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 
   if(((struct limeade_packet_flags*)(pkt + MAGSZ))->type == LIMEADE_PACKET_ACKNOWLEDGE)
   {
-    memcpy(r->ack, pkt, sz);
+    memcpy(r->ack.data, pkt, sz);
 
     if(addr)
     {
-      memcpy(&r->ack_addr, addr, sizeof(*addr));
-      r->ack_addr_len = len;
+      memcpy(&r->ack.addr, addr, sizeof(*addr));
+      r->ack.addr_len = len;
     }
 
-    // LIMEADE_ACK packets are awaited by awaiting the unlock of r->mtx_ack. If
+    // LIMEADE_ACK packets are awaited by awaiting the unlock of &r->ack.mtx. If
     // the main thread doesn't wait, it never knows if the peer sent an ACK
-    pthread_mutex_unlock(r->mtx_ack);
-    pthread_mutex_lock(r->mtx_ack);
+    pthread_mutex_unlock(&r->ack.mtx);
+    pthread_mutex_lock(&r->ack.mtx);
   } else
   {
-    pthread_mutex_lock(r->mtx_idx);
+    pthread_mutex_lock(&r->mtx_idx);
     
-    r->wr_idx++;
-    if(r->wr_idx >= r->nr_pkts)
-      r->wr_idx = 0;
+    r->idx_write++;
+    if(r->idx_write >= LIMEADE_NR_PKTS)
+      r->idx_write = 0;
 
-    register struct limeade_indiv_recv *d = &r->pkts[r->wr_idx];
-    pthread_mutex_unlock(r->mtx_idx);
+    register struct limeade_indiv_recv *d = &r->pkts[r->idx_write];
+    pthread_mutex_unlock(&r->mtx_idx);
 
-    pthread_mutex_lock(d->mtx);
+    pthread_mutex_lock(&d->mtx);
     memcpy(d->data, pkt, sz);
     d->sz = sz;
 
@@ -50,31 +50,31 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
       d->addr_len = len;
     }
 
-    if(d->has_been_read != 0)
+    if(d->been_read != 0)
     {
-      pthread_mutex_lock(r->mtx_lost);
-      r->pkts_lost++;
-      pthread_mutex_unlock(r->mtx_lost);
+      pthread_mutex_lock(&r->mtx_lost);
+      r->nr_pkts_lost++;
+      pthread_mutex_unlock(&r->mtx_lost);
     }
-    d->has_been_read = 0;
+    d->been_read = 0;
     d->ready = 1;
 
-    pthread_mutex_unlock(d->mtx);
+    pthread_mutex_unlock(&d->mtx);
   }
 
 }
 
-int limeade_eth_recv(const struct limeade_context *ctx,
+int limeade_eth_recv(struct limeade_context *ctx,
                      const void *buffer, const unsigned int sz,
                      struct sockaddr *cliaddr, socklen_t *cli_len)
 {
-  pthread_mutex_lock(ctx->mtx_rfd);
-  pthread_mutex_lock(ctx->mtx_mode_union);
+  pthread_mutex_lock(&ctx->mtx_rfd);
+  pthread_mutex_lock(&ctx->mtx_mode_specific);
 
   int ret = recvfrom(ctx->rfd, (void*)buffer, sz, 0, cliaddr, cli_len);
 
-  pthread_mutex_unlock(ctx->mtx_rfd);
-  pthread_mutex_unlock(ctx->mtx_mode_union);
+  pthread_mutex_unlock(&ctx->mtx_rfd);
+  pthread_mutex_unlock(&ctx->mtx_mode_specific);
 
   return ret;
 }

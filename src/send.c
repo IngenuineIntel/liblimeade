@@ -372,41 +372,41 @@ int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
 
 int limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *pkt)
 {
-  pthread_mutex_lock(ctx->mtx_sfd);
+  pthread_mutex_lock(&ctx->mtx_sfd);
 
   if(ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH)
     write(ctx->sfd, pkt->pkt, pkt->pkt_sz);
 
   else if(ctx->mode == LIMEADE_MODE_CLIENT_ETH)
   {
-    pthread_mutex_lock(ctx->mtx_mode_union);
+    pthread_mutex_lock(&ctx->mtx_mode_specific);
 
     sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
            (struct sockaddr*)&ctx->saddr, ctx->saddr_len);
 
-    pthread_mutex_unlock(ctx->mtx_mode_union);
+    pthread_mutex_unlock(&ctx->mtx_mode_specific);
 
   } else if (ctx->mode == LIMEADE_MODE_HOST_ETH)
   {
-    pthread_mutex_lock(ctx->mtx_mode_union);
+    pthread_mutex_lock(&ctx->mtx_mode_specific);
 
     sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
            (struct sockaddr*)&ctx->cliaddr, ctx->cliaddr_len);
 
-    pthread_mutex_unlock(ctx->mtx_mode_union);
+    pthread_mutex_unlock(&ctx->mtx_mode_specific);
 
   } else if(ctx->mode == LIMEADE_MODE_CLIENT_LIBSSH)
   {
-    pthread_mutex_unlock(ctx->mtx_sfd);
+    pthread_mutex_unlock(&ctx->mtx_sfd);
     return LIMEADE_ERROR_NOT_SUPPORTED;
 
   } else
   {
-    pthread_mutex_unlock(ctx->mtx_sfd);
+    pthread_mutex_unlock(&ctx->mtx_sfd);
     return LIMEADE_ERROR_INVALID_CONTEXT;
   }
 
-  pthread_mutex_unlock(ctx->mtx_sfd);  
+  pthread_mutex_unlock(&ctx->mtx_sfd);  
   return LIMEADE_SUCCESS;
 }
 
@@ -434,9 +434,9 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
 
   pkt.type = flags.type = type;
 
-  pthread_mutex_lock(ctx->mtx_compr);
+  pthread_mutex_lock(&ctx->mtx_compr_lvl);
   flags.compr_lvl = ctx->compr_lvl;
-  pthread_mutex_unlock(ctx->mtx_compr);
+  pthread_mutex_unlock(&ctx->mtx_compr_lvl);
 
   limeade_populate_packet(&pkt, &flags, arg);
 
@@ -506,9 +506,9 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   pkt.type = flags.type = type;
 
-  pthread_mutex_lock(ctx->mtx_compr);
+  pthread_mutex_lock(&ctx->mtx_compr_lvl);
   flags.compr_lvl = ctx->compr_lvl;
-  pthread_mutex_unlock(ctx->mtx_compr);
+  pthread_mutex_unlock(&ctx->mtx_compr_lvl);
 
   limeade_populate_packet(&pkt, &flags, arg);
 
@@ -542,32 +542,32 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   if(_ != LIMEADE_SUCCESS)
     goto err;
 
-  pthread_mutex_lock(ctx->mtx_pub);
+  pthread_mutex_lock(&ctx->mtx_pub_attrs);
 
   clock_gettime(CLOCK_REALTIME, &recvwait);
   recvwait.tv_sec  += ctx->ack_wait_time_ms / 1000;
   recvwait.tv_nsec += ctx->ack_wait_time_ms % 1000 * 1000000;
   
-  pthread_mutex_unlock(ctx->mtx_pub);
+  pthread_mutex_unlock(&ctx->mtx_pub_attrs);
 
   retry:
 
-  if(pthread_mutex_timedlock(r->mtx_ack, &recvwait) != 0)
+  if(pthread_mutex_timedlock(&r->ack.mtx, &recvwait) != 0)
   {
     _ = LIMEADE_ERROR_REJECTED;
     goto err;
   }
 
   {
-    char ack_pkt[r->ack_sz];
+    char ack_pkt[r->ack.sz];
     recv_ack.pkt    = ack_pkt;
     recv_ack.flags  = ack_f = recv_ack.pkt + sizeof(LIMEADE_MAGIC);
     recv_ack.data   = recv_ack.flags + sizeof(*ack_f);
-    recv_ack.pkt_sz = r->ack_sz;
+    recv_ack.pkt_sz = r->ack.sz;
     recv_ack.type   = ack_f->type;
     recv_ack.compr  = ack_f->compr_lvl;
 
-    memcpy(ack_pkt, r->ack, r->ack_sz);
+    memcpy(ack_pkt, r->ack.data, r->ack.sz);
 
     _ = limeade_parse_ack(&a, &recv_ack);
   }

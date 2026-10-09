@@ -49,48 +49,51 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
 {
   struct limeade_indiv_recv *r;
   struct limeade_packet_flags *f;
+  uint16_t *read_idx;
 
   int _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
     return _;
 
-  pthread_mutex_lock(ctx->recv.mtx_idx);
-  r = &ctx->recv.pkts[ctx->recv.read_idx];
-  pthread_mutex_unlock(ctx->recv.mtx_idx);
+  pthread_mutex_lock(&ctx->recv.mtx_idx);
+  
+  read_idx = &ctx->recv.idx_read;
+  r = &ctx->recv.pkts[*read_idx];
+  (*read_idx)++;
+  if(*read_idx == LIMEADE_NR_PKTS)
+    *read_idx = 0;
 
-  pthread_mutex_lock(r->mtx);
+  pthread_mutex_unlock(&ctx->recv.mtx_idx);
 
-  if(r->has_been_read != 0 || r->ready == 0)
+  pthread_mutex_lock(&r->mtx);
+
+  if(r->been_read != 0 || r->ready == 0)
   {
-    pthread_mutex_unlock(r->mtx);
+    pthread_mutex_unlock(&r->mtx);
     return LIMEADE_ERROR_NO_DATA;
   }
 
-  r->has_been_read = 1;
+  r->been_read = 1;
   r->ready         = 0;
 
   if(ctx->mode == LIMEADE_MODE_HOST_ETH)
   {
-    pthread_mutex_lock(ctx->mtx_mode_union);
+    pthread_mutex_lock(&ctx->mtx_mode_specific);
     ctx->cliaddr = r->addr;
     ctx->cliaddr_len = r->addr_len;
-    pthread_mutex_unlock(ctx->mtx_mode_union);
+    pthread_mutex_unlock(&ctx->mtx_mode_specific);
   }
 
   out->pkt = malloc(r->sz);
   if(!out->pkt)
   {
-    pthread_mutex_unlock(r->mtx);
+    pthread_mutex_unlock(&r->mtx);
     return LIMEADE_ERROR_MEMORY;
   }
   memcpy(out->pkt, r->data, r->sz);
   out->pkt_sz = r->sz;
 
-  pthread_mutex_lock(ctx->recv.mtx_idx);
-  ctx->recv.read_idx = (ctx->recv.read_idx + 1) % ctx->recv.nr_pkts;
-  pthread_mutex_unlock(ctx->recv.mtx_idx);
-
-  pthread_mutex_unlock(r->mtx);
+  pthread_mutex_unlock(&r->mtx);
 
   out->flags = out->pkt + sizeof(LIMEADE_MAGIC);
   f = out->flags;

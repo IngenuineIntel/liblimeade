@@ -8,9 +8,9 @@
 
 int limeade_statecheck(struct limeade_context *ctx)
 {
-  if(ctx->csm)
+  if(ctx->csm.enabled)
   {
-    if(pthread_kill(*(pthread_t*)ctx->csm->tid, 0) != 0)
+    if(pthread_kill(ctx->csm.tid, 0) != 0)
       return LIMEADE_ERROR_TH_CSM_DIED;
   }
 

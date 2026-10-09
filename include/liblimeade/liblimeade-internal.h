@@ -137,9 +137,9 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
  *
  * receives next UDP packet for UDP mode
  */
-int limeade_eth_recv(const struct limeade_context *ctx,
-                            const void *buffer, const unsigned int sz,
-                            struct sockaddr *cliaddr, socklen_t *cli_len);
+int limeade_eth_recv(struct limeade_context *ctx,
+                     const void *buffer, const unsigned int sz,
+                     struct sockaddr *cliaddr, socklen_t *cli_len);
 
 /* limeade_ssh_recv
  *
