@@ -11,10 +11,19 @@
 
 #define STOPWATCH(a) clock_gettime(CLOCK_MONOTONIC, &a[i])
 #define TEST(e) if(e != LIMEADE_OK){printf("error: %s\n", LIMEADE_ERROR_REPRS[e]); goto end;}
-#define NR_SAMPLES 5
+#define NR_SAMPLES 20
 #define OUT_CSV    "test3.csv"
-#define TS_DIFF(start, stop)\
-  (uint64_t)((stop.tv_sec - start.tv_sec) * 1000 + (stop.tv_nsec - stop.tv_nsec) / 1000)
+int64_t ts_diff(struct timespec a, struct timespec b)
+{
+  int64_t a_t, b_t, ret;
+
+  a_t = (a.tv_sec * 1000000) + (a.tv_nsec / 1000);
+  b_t = (b.tv_sec * 1000000) + (b.tv_nsec / 1000);
+
+  ret = b_t - a_t;
+
+  return ret > 0 ? ret : 0 - ret;
+}
 
 int main()
 {
@@ -52,31 +61,33 @@ int main()
 
   e = limeade_init(host, LIMEADE_MODE_HOST_ETH | LIMEADE_MODE_LOW_COMPRESSION, LIMEADE_PORT);
   TEST(e);
+  e = limeade_connect(host);
+  TEST(e);
 
   for(int i = 0; i < NR_SAMPLES; i++)
   {
-    printf("init...\n");
+    printf("\ninit...");
     STOPWATCH(init_start);
     e = limeade_init(ctx, LIMEADE_MODE_CLIENT_ETH | LIMEADE_MODE_LOW_COMPRESSION, "127.0.0.1", LIMEADE_PORT);
     STOPWATCH(init_stop);
     TEST(e);
-    printf("connect...\n");
+    printf("connect...");
     STOPWATCH(conn_start);
     e = limeade_connect(ctx);
     STOPWATCH(conn_stop);
     TEST(e);
-    printf("sending...\n");
+    printf("sending...");
     STOPWATCH(send_start);
     e = limeade_send(ctx, LIMEADE_PACKET_INTRO, intro);
     STOPWATCH(send_stop);
     TEST(e);
     nanosleep(&rqtp, &rmtp);
-    printf("receiving...\n");
+    printf("receiving...");
     STOPWATCH(recv_start);
-    e = limeade_recv_wait_noreply(ctx, &r, 5000);
+    e = limeade_recv_wait_noreply(host, &r, 5000);
     STOPWATCH(recv_stop);
     TEST(e);
-    printf("releasing...\n");
+    printf("releasing...");
     STOPWATCH(dstr_start);
     limeade_release(ctx);
     limeade_release(&r);
@@ -89,11 +100,11 @@ int main()
   for(int i = 0; i < NR_SAMPLES; i++)
   {
     fprintf(fd, "%lu,%lu,%lu,%lu,%lu,\n", 
-            TS_DIFF(init_start[i], init_stop[i]),
-            TS_DIFF(conn_start[i], conn_stop[i]),
-            TS_DIFF(send_start[i], send_stop[i]),
-            TS_DIFF(recv_start[i], recv_stop[i]),
-            TS_DIFF(dstr_start[i], dstr_stop[i]));
+            ts_diff(init_start[i], init_stop[i]),
+            ts_diff(conn_start[i], conn_stop[i]),
+            ts_diff(send_start[i], send_stop[i]),
+            ts_diff(recv_start[i], recv_stop[i]),
+            ts_diff(dstr_start[i], dstr_stop[i]));
   }
   fclose(fd);
 
