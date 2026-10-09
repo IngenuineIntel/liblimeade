@@ -9,6 +9,11 @@
 
 #define MAGSZ sizeof(LIMEADE_MAGIC)
 
+void limeade_recv_stop_signal(int signal)
+{
+  (void)signal;
+}
+
 void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
                             unsigned int sz, struct sockaddr_in *addr,
                             socklen_t len)

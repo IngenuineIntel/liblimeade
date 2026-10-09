@@ -19,10 +19,10 @@ test3:
 	gcc test3.c -lz -llimeade -o test3.out
 	#valgrind --leak-check=full ./test3.out
 	./test3.out
-	-@cat test3.csv
+	#-@cat test3.csv
 	$(MAKE) test3_graph
 
 clean:
-	-@rm test*.out *.csv *.txt *.png -r env
+	-@rm test*.out *.csv *.txt *.png
 
 all: test1 test2 test3

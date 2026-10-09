@@ -53,6 +53,8 @@ static inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
 {
   /* populates ctx->recv (step 1) */
 
+  signal(SIGUSR1, limeade_recv_stop_signal);
+
   struct limeade_recv_data  *r = &ctx->recv;
   struct limeade_indiv_recv *j;
 
@@ -130,6 +132,7 @@ static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
 {
   struct limeade_recv_data *r = &ctx->recv;
   sem_post(&r->sem_kys);
+  pthread_kill(r->tid, SIGUSR1);
   pthread_join(r->tid, NULL);
   sem_destroy(&r->sem_kys);
 }

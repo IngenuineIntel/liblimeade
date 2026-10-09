@@ -21,7 +21,7 @@ void *limeade_th_recv_host_eth(void *arg)
   struct sockaddr_in tmp_sockaddr;
   socklen_t tmp_socklen;
   void *buffer;
-  int amt_recv, poll_ms;
+  int amt_recv, poll_ms, poll_ret;
 
   ctx = arg;
   r   = &ctx->recv;
@@ -40,7 +40,10 @@ void *limeade_th_recv_host_eth(void *arg)
   while(sem_trywait(&r->sem_kys) != 0 && errno == EAGAIN)
   {
 
-    if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
+    poll_ret = poll(&recv_poll, 1, poll_ms);
+    if(poll_ret < 0 && errno == EINTR)
+      continue;
+    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
       continue;
 
     pthread_mutex_lock(&ctx->mtx_rfd);
@@ -68,7 +71,7 @@ void *limeade_th_recv_client_eth(void *arg)
   struct limeade_recv_data *r;
   struct pollfd recv_poll;
   void *buffer;
-  int amt_recv, poll_ms;
+  int amt_recv, poll_ms, poll_ret;
 
   ctx = arg;
   r   = &ctx->recv;
@@ -87,7 +90,10 @@ void *limeade_th_recv_client_eth(void *arg)
   while(sem_trywait(&r->sem_kys) != 0 && errno == EAGAIN)
   {
 
-    if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
+    poll_ret = poll(&recv_poll, 1, poll_ms);
+    if(poll_ret < 0 && errno == EINTR)
+      continue;
+    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
       continue;
 
     pthread_mutex_lock(&ctx->mtx_rfd);
@@ -114,7 +120,7 @@ void *limeade_th_recv_client_ssh(void *arg)
   struct limeade_recv_data *r;
   struct pollfd recv_poll;
   void *buffer;
-  int amt_recv, poll_ms;
+  int amt_recv, poll_ms, poll_ret;
 
   ctx = arg;
   r   = &ctx->recv;
@@ -133,7 +139,10 @@ void *limeade_th_recv_client_ssh(void *arg)
   {
     recv_poll.fd = ctx->rfd;
 
-    if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
+    poll_ret = poll(&recv_poll, 1, poll_ms);
+    if(poll_ret < 0 && errno == EINTR)
+      continue;
+    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
       continue;
 
     pthread_mutex_lock(&ctx->mtx_rfd);

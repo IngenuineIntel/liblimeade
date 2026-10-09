@@ -154,6 +154,9 @@ inline int limeade_ssh_recv(const struct limeade_context *ctx,
  */
 int limeade_prelim_confirm(const void *buffer, const int sz);
 
+// signal hook for th_recv
+void limeade_recv_stop_signal(int signal);
+
 /*** th_recv functions ***/
 void *limeade_th_recv_client_eth(void *arg);
 void *limeade_th_recv_host_eth(void *arg);

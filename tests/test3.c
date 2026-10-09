@@ -11,7 +11,7 @@
 
 #define STOPWATCH(a) clock_gettime(CLOCK_MONOTONIC, &a[i])
 #define TEST(e) if(e != LIMEADE_OK){printf("error: %s\n", LIMEADE_ERROR_REPRS[e]); goto end;}
-#define NR_SAMPLES 50
+#define NR_SAMPLES 300
 #define OUT_CSV    "test3.csv"
 int64_t ts_diff(struct timespec a, struct timespec b)
 {
@@ -48,16 +48,16 @@ int main()
   };
   int e;
 
-  printf("sizeof(struct limeade_context)      = %lu\n", sizeof(struct limeade_context));
-  printf("sizeof(struct limeade_recv_data)    = %lu\n", sizeof(struct limeade_recv_data));
-  printf("sizeof(struct limeade_indiv_recv)   = %lu\n", sizeof(struct limeade_indiv_recv));
-  printf("sizeof(struct limeade_recvd)        = %lu\n", sizeof(struct limeade_recvd));
-  printf("sizeof(struct limeade_packet_flags) = %lu\n", sizeof(struct limeade_packet_flags));
-  printf("sizeof(pthread_mutex_t)             = %lu\n", sizeof(pthread_mutex_t));
-  printf("sizeof(sem_t)                       = %lu\n", sizeof(sem_t));
-  printf("sizeof(int)                         = %lu\n", sizeof(int));
-  printf("sizeof(long)                        = %lu\n", sizeof(long));
-  printf("sizeof(long long)                   = %lu\n", sizeof(long long));
+  //printf("sizeof(struct limeade_context)      = %lu\n", sizeof(struct limeade_context));
+  //printf("sizeof(struct limeade_recv_data)    = %lu\n", sizeof(struct limeade_recv_data));
+  //printf("sizeof(struct limeade_indiv_recv)   = %lu\n", sizeof(struct limeade_indiv_recv));
+  //printf("sizeof(struct limeade_recvd)        = %lu\n", sizeof(struct limeade_recvd));
+  //printf("sizeof(struct limeade_packet_flags) = %lu\n", sizeof(struct limeade_packet_flags));
+  //printf("sizeof(pthread_mutex_t)             = %lu\n", sizeof(pthread_mutex_t));
+  //printf("sizeof(sem_t)                       = %lu\n", sizeof(sem_t));
+  //printf("sizeof(int)                         = %lu\n", sizeof(int));
+  //printf("sizeof(long)                        = %lu\n", sizeof(long));
+  //printf("sizeof(long long)                   = %lu\n", sizeof(long long));
 
   e = limeade_init(host, LIMEADE_MODE_HOST_ETH | LIMEADE_MODE_LOW_COMPRESSION, LIMEADE_PORT);
   TEST(e);
@@ -66,32 +66,35 @@ int main()
 
   for(int i = 0; i < NR_SAMPLES; i++)
   {
-    printf("\ninit...");
+    memset(ctx, 0, sizeof(*ctx));
+    memset(&r, 0, sizeof(r));
+    
+    //printf("\ninit...");
     STOPWATCH(init_start);
     e = limeade_init(ctx, LIMEADE_MODE_CLIENT_ETH | LIMEADE_MODE_LOW_COMPRESSION, "127.0.0.1", LIMEADE_PORT);
     STOPWATCH(init_stop);
     TEST(e);
 
-    printf("connect...");
+    //printf("connect...");
     STOPWATCH(conn_start);
     e = limeade_connect(ctx);
     STOPWATCH(conn_stop);
     TEST(e);
 
-    printf("sending...");
+    //printf("sending...");
     STOPWATCH(send_start);
     e = limeade_send(ctx, LIMEADE_PACKET_INTRO, intro);
     STOPWATCH(send_stop);
     TEST(e);
 
     nanosleep(&rqtp, &rmtp);
-    printf("receiving...");
+    //printf("receiving...");
     STOPWATCH(recv_start);
     e = limeade_recv_wait_noreply(host, &r, 5000);
     STOPWATCH(recv_stop);
     TEST(e);
 
-    printf("releasing...");
+    //printf("releasing...");
     STOPWATCH(dstr_start);
     limeade_release(ctx);
     limeade_release(&r);

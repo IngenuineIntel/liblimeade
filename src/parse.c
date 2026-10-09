@@ -61,10 +61,11 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
   pthread_mutex_lock(&ctx->recv.mtx_idx);
   
   read_idx = &ctx->recv.idx_read;
-  r = &ctx->recv.pkts[*read_idx];
   (*read_idx)++;
   if(*read_idx == LIMEADE_NR_PKTS)
     *read_idx = 0;
+  
+  r = &ctx->recv.pkts[*read_idx];
 
   pthread_mutex_unlock(&ctx->recv.mtx_idx);
   pthread_mutex_lock(&r->mtx);
@@ -142,7 +143,7 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
   d.wait_t.tv_sec  = wait_ms / 1000;
   d.wait_t.tv_nsec = wait_ms % 1000 * 1000000;
   wait_inc.tv_sec  = 0;
-  wait_inc.tv_nsec = 100000000; // 10hz
+  wait_inc.tv_nsec = 10000000; // 100hz
 
   int _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
@@ -161,13 +162,14 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
 
   do
   {
-    nanosleep(&wait_inc, &rem);
     e = limeade_recv_noreply(ctx, out);
 
     if(e != LIMEADE_ERROR_NO_DATA)
       goto premature;
 
+    nanosleep(&wait_inc, &rem);
   } while(pthread_mutex_trylock(&d.mtx) == EBUSY);
+
   pthread_join(d.tid, NULL);
   sem_destroy(&d.sem);
   pthread_mutex_destroy(&d.mtx);
