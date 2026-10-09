@@ -346,8 +346,8 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   va_list arg;
   va_start(arg, flags);
   
-  ctx->mode       = (uint8_t)flags & (uint8_t)15;  // 0b00001111
-  ctx->compr_mode = (uint8_t)flags & (uint8_t)240; // 0b11110000
+  ctx->mode       = (uint8_t)flags & 0b00001111;
+  ctx->compr_mode = (uint8_t)flags & 0b11110000;
 
   ctx->dest       = NULL;
   ctx->csm.enabled = 0;
