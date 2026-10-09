@@ -383,7 +383,7 @@ int limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *p
     pthread_mutex_lock(&ctx->mtx_mode_specific);
 
     sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
-           (struct sockaddr*)&ctx->saddr, ctx->saddr_len);
+          (struct sockaddr*)&ctx->saddr, sizeof(ctx->saddr));
 
     pthread_mutex_unlock(&ctx->mtx_mode_specific);
 

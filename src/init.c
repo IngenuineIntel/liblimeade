@@ -325,7 +325,7 @@ static inline int limeade_init_host_eth_step_2(struct limeade_context *ctx)
 {
   ctx->saddr.sin_port = htons(ctx->port);
 
-  if(bind(ctx->rfd, (struct sockaddr*)&ctx->saddr, ctx->saddr_len) != 0)
+  if(bind(ctx->rfd, (struct sockaddr*)&ctx->saddr, sizeof(ctx->saddr)) != 0)
     return LIMEADE_ERROR_NETWORK;
   return LIMEADE_SUCCESS;
 }
