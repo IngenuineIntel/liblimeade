@@ -51,6 +51,10 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
   struct limeade_packet_flags *f;
   uint16_t *read_idx;
 
+  if(!out) return LIMEADE_ERROR_INVALID_CONTEXT;
+  memset(out, 0, sizeof(*out));
+  if(!ctx) return LIMEADE_ERROR_INVALID_CONTEXT;
+
   int _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
     return _;
@@ -75,6 +79,12 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
 
   r->been_read = 1;
   r->ready         = 0;
+
+  if(r->sz < sizeof(LIMEADE_MAGIC) + sizeof(*f))
+  {
+    pthread_mutex_unlock(&r->mtx);
+    return LIMEADE_ERROR_GARBAGE;
+  }
 
   if(ctx->mode == LIMEADE_MODE_HOST_ETH)
   {

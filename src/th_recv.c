@@ -37,7 +37,7 @@ void *limeade_th_recv_host_eth(void *arg)
   recv_poll.events = POLLIN;
   recv_poll.fd = ctx->rfd;
 
-  while(sem_trywait(&r->sem_kys) == EAGAIN)
+  while(sem_trywait(&r->sem_kys) != 0 && errno == EAGAIN)
   {
 
     if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
@@ -84,7 +84,7 @@ void *limeade_th_recv_client_eth(void *arg)
   recv_poll.events = POLLIN;
   recv_poll.fd     = ctx->rfd;
 
-  while(sem_trywait(&r->sem_kys) == EAGAIN)
+  while(sem_trywait(&r->sem_kys) != 0 && errno == EAGAIN)
   {
 
     if(!poll(&recv_poll, 1, poll_ms) || !(recv_poll.revents & POLLIN))
@@ -129,7 +129,7 @@ void *limeade_th_recv_client_ssh(void *arg)
 
   recv_poll.events = POLLIN;
 
-  while(sem_trywait(&r->sem_kys) == EAGAIN)
+  while(sem_trywait(&r->sem_kys) != 0 && errno == EAGAIN)
   {
     recv_poll.fd = ctx->rfd;
 
