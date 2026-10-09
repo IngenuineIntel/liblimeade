@@ -11,7 +11,7 @@
 
 #define STOPWATCH(a) clock_gettime(CLOCK_MONOTONIC, &a[i])
 #define TEST(e) if(e != LIMEADE_OK){printf("error: %s\n", LIMEADE_ERROR_REPRS[e]); goto end;}
-#define NR_SAMPLES 20
+#define NR_SAMPLES 50
 #define OUT_CSV    "test3.csv"
 int64_t ts_diff(struct timespec a, struct timespec b)
 {
@@ -22,7 +22,7 @@ int64_t ts_diff(struct timespec a, struct timespec b)
 
   ret = b_t - a_t;
 
-  return ret > 0 ? ret : 0 - ret;
+  return ret;
 }
 
 int main()
@@ -71,22 +71,26 @@ int main()
     e = limeade_init(ctx, LIMEADE_MODE_CLIENT_ETH | LIMEADE_MODE_LOW_COMPRESSION, "127.0.0.1", LIMEADE_PORT);
     STOPWATCH(init_stop);
     TEST(e);
+
     printf("connect...");
     STOPWATCH(conn_start);
     e = limeade_connect(ctx);
     STOPWATCH(conn_stop);
     TEST(e);
+
     printf("sending...");
     STOPWATCH(send_start);
     e = limeade_send(ctx, LIMEADE_PACKET_INTRO, intro);
     STOPWATCH(send_stop);
     TEST(e);
+
     nanosleep(&rqtp, &rmtp);
     printf("receiving...");
     STOPWATCH(recv_start);
     e = limeade_recv_wait_noreply(host, &r, 5000);
     STOPWATCH(recv_stop);
     TEST(e);
+
     printf("releasing...");
     STOPWATCH(dstr_start);
     limeade_release(ctx);
@@ -95,7 +99,7 @@ int main()
   }
 
   FILE *fd = fopen(OUT_CSV, "w");
-  fprintf(fd, "init time,conn time,send time,recv time,destruct time,\n");
+  fprintf(fd, "limeade_init,limeade_connect,limeade_send,limeade_recv,limeade_release,\n");
 
   for(int i = 0; i < NR_SAMPLES; i++)
   {
@@ -109,6 +113,7 @@ int main()
   fclose(fd);
 
 end:
+  limeade_release(host);
   free(ctx);
   free(host);
   return 0;
