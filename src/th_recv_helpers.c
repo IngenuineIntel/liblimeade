@@ -25,8 +25,6 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
       r->ack.addr_len = len;
     }
 
-    // LIMEADE_ACK packets are awaited by awaiting the unlock of &r->ack.mtx. If
-    // the main thread doesn't wait, it never knows if the peer sent an ACK
     pthread_mutex_unlock(&r->ack.mtx);
     pthread_mutex_lock(&r->ack.mtx);
   } else
@@ -105,4 +103,6 @@ int limeade_prelim_confirm(const void *buffer, const int sz)
 f:
   return -1;
 }
+
+#undef MAGSZ
 

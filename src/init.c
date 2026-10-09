@@ -184,6 +184,9 @@ static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const cha
 {
   /* manages pipe/dup/execve for LIMEADE_MODE_CLIENT_SSH */
 
+  if(!dest)
+    return LIMEADE_ERROR_GARBAGE;
+
   ctx->dest = strdup(dest);
 
   int to_ssh[2];

@@ -51,9 +51,8 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
   struct limeade_packet_flags *f;
   uint16_t *read_idx;
 
-  if(!out) return LIMEADE_ERROR_INVALID_CONTEXT;
+  if(!out || !ctx) return LIMEADE_ERROR_INVALID_CONTEXT;
   memset(out, 0, sizeof(*out));
-  if(!ctx) return LIMEADE_ERROR_INVALID_CONTEXT;
 
   int _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
@@ -68,17 +67,16 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
     *read_idx = 0;
 
   pthread_mutex_unlock(&ctx->recv.mtx_idx);
-
   pthread_mutex_lock(&r->mtx);
 
-  if(r->been_read != 0 || r->ready == 0)
+  if(r->been_read != 0 || r->ready != 1)
   {
     pthread_mutex_unlock(&r->mtx);
     return LIMEADE_ERROR_NO_DATA;
   }
 
   r->been_read = 1;
-  r->ready         = 0;
+  r->ready     = 0;
 
   if(r->sz < sizeof(LIMEADE_MAGIC) + sizeof(*f))
   {
@@ -95,11 +93,6 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
   }
 
   out->pkt = malloc(r->sz);
-  if(!out->pkt)
-  {
-    pthread_mutex_unlock(&r->mtx);
-    return LIMEADE_ERROR_MEMORY;
-  }
   memcpy(out->pkt, r->data, r->sz);
   out->pkt_sz = r->sz;
 
@@ -267,7 +260,6 @@ int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd *pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_KNOCK);
 
-  // these packet should never really be compressed anyway, but...
   if(limeade_decompress_packet(pkt))
     return LIMEADE_ERROR_COMPRESSION;
 
