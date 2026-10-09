@@ -231,7 +231,7 @@ struct limeade_csm_data
 // on a host machine (particularly LIMEADE_MODE_HOST_ETH), a list of clients has to be
 // stored
 
-#define LIMEADE_NR_PKTS 10 // number of packets stored at a time
+#define LIMEADE_NR_PKTS 8 // number of packets stored at a time
 #define LIMEADE_MAX_PKT_SZ 65536 // maximum size of packet
 
 // TODO really good documentation

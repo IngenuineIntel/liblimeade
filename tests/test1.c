@@ -14,6 +14,7 @@
 int main(int argc, char **argv)
 {
   struct limeade_context c;
+  printf("sizeof(struct limeade_context) = %lu\n", sizeof(c));
   struct limeade_indiv_event v, ev[6];
   struct limeade_events p;
   int fds[2];
@@ -74,6 +75,7 @@ int main(int argc, char **argv)
   printf("%i\n", evs.nr_events);
 
   limeade_release(&r);
+  limeade_release(&evs);
 
   printf("destruct...\n");
   limeade_destruct(&c);

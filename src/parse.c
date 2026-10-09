@@ -401,6 +401,7 @@ err:
     free(j->arg1);
     free(j->arg2);
   }
+  free(out->events);
 
   return LIMEADE_ERROR_BAD_DATA;
 }

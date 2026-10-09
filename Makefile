@@ -33,5 +33,5 @@ uninstall:
 	-sudo rm /etc/ld.so.conf.d/liblimeade.conf
 	sudo ldconfig
 
-tests: install
+tests: clean install
 	$(MAKE) -C tests all
