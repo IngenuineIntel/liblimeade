@@ -20,8 +20,5 @@ jobs:
     - name: make & install
       run: sudo make install
     
-    - name: make & run test1
-      run:  make -C tests test1
-
-    - name: make & run test2
-      run:  make -C tests test2
+    - name: make & run tests
+      run: make tests
