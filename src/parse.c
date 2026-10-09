@@ -67,14 +67,17 @@ int limeade_recv_noreply(struct limeade_context *ctx, struct limeade_recvd *out)
   
   r = &ctx->recv.pkts[*read_idx];
 
-  pthread_mutex_unlock(&ctx->recv.mtx_idx);
   pthread_mutex_lock(&r->mtx);
 
   if(r->been_read != 0 || r->ready != 1)
   {
     pthread_mutex_unlock(&r->mtx);
+    (*read_idx)--;
+    pthread_mutex_unlock(&ctx->recv.mtx_idx);
     return LIMEADE_ERROR_NO_DATA;
   }
+
+  pthread_mutex_unlock(&ctx->recv.mtx_idx);
 
   r->been_read = 1;
   r->ready     = 0;

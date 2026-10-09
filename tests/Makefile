@@ -4,7 +4,6 @@
 test1:
 	gcc test1.c -lz -llimeade -o test1.out
 	valgrind --leak-check=full ./test1.out
-	@echo \n\n\n
 
 test2:
 	gcc test2.c -lz -llimeade -o test2.out
@@ -17,12 +16,11 @@ test3_graph:
 
 test3:
 	gcc test3.c -lz -llimeade -o test3.out
-	#valgrind --leak-check=full ./test3.out
 	./test3.out
 	#-@cat test3.csv
 	$(MAKE) test3_graph
 
 clean:
-	-@rm test*.out *.csv *.txt *.png
+	-@rm test*.out *.csv *.txt *.png *.svg
 
 all: test1 test2 test3

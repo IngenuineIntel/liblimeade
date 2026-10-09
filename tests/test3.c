@@ -11,14 +11,14 @@
 
 #define STOPWATCH(a) clock_gettime(CLOCK_MONOTONIC, &a[i])
 #define TEST(e) if(e != LIMEADE_OK){printf("error: %s\n", LIMEADE_ERROR_REPRS[e]); goto end;}
-#define NR_SAMPLES 300
+#define NR_SAMPLES 1000
 #define OUT_CSV    "test3.csv"
 int64_t ts_diff(struct timespec a, struct timespec b)
 {
   int64_t a_t, b_t, ret;
 
-  a_t = (a.tv_sec * 1000000) + (a.tv_nsec / 1000);
-  b_t = (b.tv_sec * 1000000) + (b.tv_nsec / 1000);
+  a_t = (a.tv_sec * 1000000000) + (a.tv_nsec);
+  b_t = (b.tv_sec * 1000000000) + (b.tv_nsec);
 
   ret = b_t - a_t;
 
@@ -34,7 +34,7 @@ int main()
   struct timespec dstr_start[NR_SAMPLES], dstr_stop[NR_SAMPLES];
   struct limeade_context *ctx  = malloc(sizeof(struct limeade_context));
   struct limeade_context *host = malloc(sizeof(struct limeade_context));
-  struct timespec rqtp = {0, 1000000}, rmtp;
+  struct timespec rqtp = {0, 500000}, rmtp; // 0.5ms(p)
   struct limeade_recvd r;
   struct limeade_intro intro = {
     .hostname = "hostname",
@@ -48,26 +48,27 @@ int main()
   };
   int e;
 
-  //printf("sizeof(struct limeade_context)      = %lu\n", sizeof(struct limeade_context));
-  //printf("sizeof(struct limeade_recv_data)    = %lu\n", sizeof(struct limeade_recv_data));
-  //printf("sizeof(struct limeade_indiv_recv)   = %lu\n", sizeof(struct limeade_indiv_recv));
-  //printf("sizeof(struct limeade_recvd)        = %lu\n", sizeof(struct limeade_recvd));
-  //printf("sizeof(struct limeade_packet_flags) = %lu\n", sizeof(struct limeade_packet_flags));
-  //printf("sizeof(pthread_mutex_t)             = %lu\n", sizeof(pthread_mutex_t));
-  //printf("sizeof(sem_t)                       = %lu\n", sizeof(sem_t));
-  //printf("sizeof(int)                         = %lu\n", sizeof(int));
-  //printf("sizeof(long)                        = %lu\n", sizeof(long));
-  //printf("sizeof(long long)                   = %lu\n", sizeof(long long));
+  // when the program has just loaded, the CPU tends to be clocking higher,
+  // which, for the same of a benchmark, creates variadic results which are
+  // useless to us. Here we pause to attempt to give the CPU some time to
+  // lower its clock frequency
+  nanosleep(&rqtp, &rmtp);
 
   e = limeade_init(host, LIMEADE_MODE_HOST_ETH | LIMEADE_MODE_LOW_COMPRESSION, LIMEADE_PORT);
   TEST(e);
   e = limeade_connect(host);
   TEST(e);
 
+  nanosleep(&rqtp, &rmtp);
+  
   for(int i = 0; i < NR_SAMPLES; i++)
   {
     memset(ctx, 0, sizeof(*ctx));
     memset(&r, 0, sizeof(r));
+
+    // we pause ever so slightly here to attempt to not make the CPU start
+    // clocking higher, so we can more consistent results
+    nanosleep(&rqtp, &rmtp);
     
     //printf("\ninit...");
     STOPWATCH(init_start);

@@ -28,13 +28,13 @@ for column, line in zip(df.columns, ax.lines):
 		label=f"{column} cuml. avg.",
 	)
 ax.set_xlabel("iterations")
-ax.set_ylabel("time (µs)")
+ax.set_ylabel("time (nanoseconds)")
 ax.set_title("Liblimeade Benchmarks")
 ax.set_yscale("log")
-ax.yaxis.set_major_formatter(plt.matplotlib.ticker.StrMethodFormatter('{x:,.0f}'))
+ax.yaxis.set_major_formatter(plt.matplotlib.ticker.StrMethodFormatter("{x:,.0f}"))
 ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5))
 plt.tight_layout()
-plt.savefig("test3.png", dpi=200, bbox_inches="tight")
+plt.savefig("test3.svg", format="svg", dpi=200, bbox_inches="tight")
 
 print("Graph generated!")
-os.system("xdg-open test3.png")
+os.system("xdg-open test3.svg")
