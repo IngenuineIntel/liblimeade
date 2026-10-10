@@ -141,48 +141,6 @@ static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
   limeade_destruct_th_recv_step_2(ctx);\
   limeade_destruct_th_recv_step_1(ctx);
 
-static inline int limeade_init_th_csm_step_1(struct limeade_context *ctx)
-{
-  /* populates for the CSM thread (step 1) */
-  ctx->csm.enabled = 1;
-  ctx->csm.freq = LIMEADE_CSM_FREQ_MS_P;
-  return LIMEADE_SUCCESS;
-}
-
-static inline int limeade_init_th_csm_step_2(struct limeade_context *ctx)
-{
-  /* populates for the CSM thread (step 2) */
-  struct limeade_csm_data *c = &ctx->csm;
-
-  for(int i = 0; i < LIMEADE_CSM_BENCH_BUFFER_SZ; i++)
-  {
-    c->hist_compr[i].ready = 0;
-    c->hist_latent[i].ready = 0;
-  }
-
-  pthread_mutex_init(&c->mtx, NULL);
-
-  if(pthread_create(&c->tid, NULL, limeade_th_csm, ctx) != 0)
-    return LIMEADE_ERROR_OTHER;
-  return LIMEADE_SUCCESS;
-}
-
-static inline void limeade_destruct_th_csm_step_1(struct limeade_context *ctx)
-{
-  /* releases data for the CSM thread (step 1) */
-}
-
-static void limeade_destruct_th_csm_step_2(struct limeade_context *ctx)
-{
-  /* releases data for the CSM thread (step 2) */
-  pthread_mutex_destroy(&ctx->csm.mtx);
-  pthread_cancel(ctx->csm.tid);
-}
-
-#define limeade_destruct_th_csm(ctx)\
-  limeade_destruct_th_csm_step_2(ctx);\
-  limeade_destruct_th_csm_step_1(ctx)
-
 static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const char *dest)
 {
   /* manages pipe/dup/execve for LIMEADE_MODE_CLIENT_SSH */
@@ -356,7 +314,6 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   ctx->compr_mode = (uint8_t)flags & 0b11110000;
 
   ctx->dest       = NULL;
-  ctx->csm.enabled = 0;
 
   uint8_t allow_compr = 1;
   
@@ -405,23 +362,16 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
         ctx->compr_lvl = 6;
         break;
       default:
-        r = limeade_init_th_csm_step_1(ctx);
-
-        CHECK(r)
-          goto err_2;
-        break;
+        ctx->compr_lvl = 1; // best default is LOW_COMPRESSION
     }
   }
 
   r = limeade_init_th_recv_step_1(ctx);
   CHECK(r)
-    goto err_3;
+    goto err_2;
 
   return LIMEADE_SUCCESS;
 
-err_3:
-  if(ctx->csm.enabled)
-    limeade_destruct_th_csm_step_1(ctx);
 err_2:
   limeade_destruct_mutexes(ctx);
 err_1:
@@ -465,16 +415,8 @@ int limeade_connect(struct limeade_context *ctx)
   r = limeade_init_th_recv_step_2(ctx);
   CHECK(r) goto err_2;
 
-  if(ctx->csm.enabled)
-  {
-    r = limeade_init_th_csm_step_2(ctx);
-    CHECK(r) goto err_3;
-  }
-
   return LIMEADE_SUCCESS;
 
-err_3:
-  limeade_destruct_th_recv_step_2(ctx);
 err_2:
   switch(ctx->mode)
   {
@@ -491,8 +433,6 @@ err_2:
 
 err_1:
   limeade_destruct_th_recv_step_1(ctx);
-  if(ctx->csm.enabled)
-    limeade_destruct_th_csm(ctx);
   limeade_destruct_mutexes(ctx);
   switch(ctx->mode)
   {
@@ -513,8 +453,6 @@ err_1:
 void limeade_destruct(struct limeade_context *ctx)
 {
   limeade_destruct_th_recv(ctx);
-  if(ctx->csm.enabled)
-    limeade_destruct_th_csm(ctx);
   limeade_destruct_mutexes(ctx);
   switch(ctx->mode)
   {

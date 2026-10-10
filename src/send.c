@@ -419,8 +419,7 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
   register int _;
   struct limeade_packet_data pkt;
   struct limeade_packet_flags flags, *f;
-  struct limeade_csm_compression_entry entry;
-  struct timespec compr_ts[2], send_ts;
+  struct timespec send_ts;
   va_list arg;
   va_start(arg, type);
 
@@ -430,12 +429,6 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
   if(_ != LIMEADE_SUCCESS)
     return _;
 
-  _ = limeade_monotonic(&compr_ts[0]);
-  if(_ != LIMEADE_SUCCESS)
-    return _;
-
-  entry.compr_lvl = ctx->compr_lvl;
-
   pkt.type = flags.type = type;
 
   pthread_mutex_lock(&ctx->mtx_compr_lvl);
@@ -444,13 +437,9 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
 
   limeade_populate_packet(&pkt, &flags, arg);
 
-  entry.precompr_sz = pkt.pkt_sz;
-
   _ = limeade_deflate_packet(&pkt, flags.compr_lvl);
   if(_ != LIMEADE_SUCCESS)
     goto err;
-
-  entry.postcompr_sz = pkt.pkt_sz;
 
   _ = limeade_monotonic(&send_ts);
   if(_ != LIMEADE_SUCCESS)
@@ -462,17 +451,9 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...)
   f->ts_s        = send_ts.tv_sec;
   f->ts_ms       = send_ts.tv_nsec / 100;
 
-  _ = limeade_monotonic(&compr_ts[1]);
-  if(_ != LIMEADE_SUCCESS)
-    goto err;
-
   _ = limeade_send_base(ctx, &pkt);
   if(_ != LIMEADE_SUCCESS)
     goto err;
-
-  entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
-
-  limeade_csm_add_compr_entry(ctx, &entry);
 
   _ = LIMEADE_SUCCESS;
 
@@ -487,10 +468,8 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   struct limeade_recv_data *r;
   struct limeade_packet_data pkt, recv_ack;
   struct limeade_packet_flags flags, *f, *ack_f;
-  struct limeade_csm_compression_entry c_entry;
-  struct limeade_csm_latency_entry l_entry;
   struct limeade_ack a;
-  struct timespec compr_ts[2], latent_ts[2], sendts, recvwait;
+  struct timespec sendts, recvwait;
   va_list arg;
   va_start(arg, type);
 
@@ -502,12 +481,6 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   if(_ != LIMEADE_SUCCESS)
     return _;
 
-  _ = limeade_monotonic(&compr_ts[0]);
-  if(_ != LIMEADE_SUCCESS)
-    return _;
-
-  c_entry.compr_lvl = ctx->compr_lvl;
-
   pkt.type = flags.type = type;
 
   pthread_mutex_lock(&ctx->mtx_compr_lvl);
@@ -516,14 +489,9 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   limeade_populate_packet(&pkt, &flags, arg);
 
-  c_entry.precompr_sz = pkt.pkt_sz;
-
   _ = limeade_deflate_packet(&pkt, flags.compr_lvl);
   if(_ != LIMEADE_SUCCESS)
     goto err;
-
-  c_entry.postcompr_sz = pkt.pkt_sz;
-  l_entry.send_sz      = pkt.pkt_sz;
 
   _ = limeade_monotonic(&sendts);
   if(_ != LIMEADE_SUCCESS)
@@ -533,14 +501,6 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   f->packet_size = pkt.pkt_sz;
   f->ts_s        = sendts.tv_sec;
   f->ts_ms       = sendts.tv_nsec / 1000000;
-
-  _ = limeade_monotonic(&compr_ts[1]);
-  if(_ != LIMEADE_SUCCESS)
-    goto err;
-
-  _ = limeade_monotonic(&latent_ts[0]);
-  if(_ != LIMEADE_SUCCESS)
-    goto err;
 
   _ = limeade_send_base(ctx, &pkt);
   if(_ != LIMEADE_SUCCESS)
@@ -582,12 +542,6 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   if(a.send_ts_ms != f->ts_ms
   || a.send_ts_s  != f->ts_s)
     goto retry;
-
-  c_entry.elapsed_ms = limeade_monotonic_diff_ms(&compr_ts[0], &compr_ts[1]);
-  l_entry.elapsed_ms = limeade_monotonic_diff_ms(&latent_ts[0], &latent_ts[1]);
-
-  limeade_csm_add_compr_entry(ctx, &c_entry);
-  limeade_csm_add_latency_entry(ctx, &l_entry);
 
   _ = LIMEADE_SUCCESS;
 

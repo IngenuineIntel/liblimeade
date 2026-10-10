@@ -150,86 +150,7 @@ enum limeade_compression_mode
 
   // 4. high compression all the time
   LIMEADE_MODE_HIGH_COMPRESSION = 64,
-
-  // 5. start a thread that monitors compression time & bandwidth and
-  // dynamically configures the compression level to maximize all resources,
-  // called the Compression Supervisor Module or CSM
-  //
-  // 5.1: bias the CSM towards saving CPU cycles
-  LIMEADE_MODE_CSM_SAVE_CYCLES = 80,
-  // 5.2: bias the CSM towards maximizing throughput at the detriment of the CPU
-  LIMEADE_MODE_CSM_SAVE_THROUGHPUT = 96,
-  // 5.3: bias in neither direction and attempt to maximize both equally
-  LIMEADE_MODE_CSM_SAVE_ALL = 112,
 };
-// note for CSM users:
-// CSM cannot be used in junction with LIMEADE_MOST_*_SSH options. This is
-// because it's impossible to reliably measure CPU processing time to send a
-// packet when another process is doing all the hard work. If such a
-// collision occures, any CSM argument will be replaced with
-// LIMEADE_MODE_LOW_COMPRESSION.
-
-// limeade_csm_data
-// data used when utilizing CSM
-
-// the data for a single entry of compression data
-// note: compression level is not passed because it can be inferred
-struct limeade_csm_compression_entry
-{
-  uint32_t compr_lvl;    // compression level
-  uint32_t precompr_sz;  // size of data before compression
-  uint32_t postcompr_sz; // size of data after compression
-  uint32_t elapsed_ms;   // elapsed time in milliseconds
-
-  uint8_t ready:1; // whether or not this is initialized
-};
-
-// the data for a single entry of latency data
-struct limeade_csm_latency_entry
-{
-  uint32_t send_sz;    // size of data sent
-  uint32_t elapsed_ms; // elapsed time in milliseconds
-
-  uint8_t ready:1; // whether or not this is initialized
-};
-
-// size of hist_* ring buffers
-#define LIMEADE_CSM_BENCH_BUFFER_SZ 30
-
-// frequency of iteration (in ms(p), not hz)
-#define LIMEADE_CSM_FREQ_MS_P 5000
-
-struct limeade_csm_data
-{
-  uint8_t enabled; // 0 if not, 1 if so
-  pthread_mutex_t mtx;
-
-  struct limeade_csm_compression_entry hist_compr[LIMEADE_CSM_BENCH_BUFFER_SZ];
-  struct limeade_csm_latency_entry     hist_latent[LIMEADE_CSM_BENCH_BUFFER_SZ];
-
-  uint32_t hist_compr_sz;   // size of compression benchmark ring buffer
-  uint32_t hist_latent_sz;  // size of latency benchmark ring buffer
-  uint32_t hist_compr_idx;  // current index in compression benchmarks
-  uint32_t hist_latent_idx; // current index in latency benchmarks
-  uint32_t freq; // frequency (in ms(p), not hz)
-
-  pthread_t tid;
-  // CSM doesn't need a semaphore, because it won't be allocating any heap
-};
-
-
-// frequency
-// can be altered after calling `limeade_init` with:
-//
-//pthread_mutex_lock(ctx->csm_mtx);
-//ctx->csm->freq_s = 3
-//pthread_mutex_unlock(ctx->csm_mtx);
-//
-// likewise, this can be used for any component of ctx->csm
-//
-
-// on a host machine (particularly LIMEADE_MODE_HOST_ETH), a list of clients has to be
-// stored
 
 #define LIMEADE_NR_PKTS 8 // number of packets stored at a time
 #define LIMEADE_MAX_PKT_SZ 65536 // maximum size of packet
@@ -323,7 +244,6 @@ struct limeade_context
   };
 
   struct limeade_recv_data recv;
-  struct limeade_csm_data csm;
 
 };
 

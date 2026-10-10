@@ -61,20 +61,6 @@ int limeade_monotonic(struct timespec *ts);
  */
 int64_t limeade_monotonic_diff_ms(struct timespec *a, struct timespec *b);
 
-/* limeade_csm_add_compr_entry
- *
- * add `entry` to CSM benchmark data, or exits if CSM isn't active
- */
-void limeade_csm_add_compr_entry(struct limeade_context *ctx,
-                                  struct limeade_csm_compression_entry *entry);
-
-/* limeade_csm_add_latency_entry
- *
- * add `entry` to CSM benchmark data, or exists if CSM isn't active
- */
-void limeade_csm_add_latency_entry(struct limeade_context *ctx,
-                                   struct limeade_csm_latency_entry *entry);
-
 // the following macros are for creating functions used for parsing data from
 // packets
 #define LIMEADE_TYPECHECK_UINT(x) if(x != 0b00100000)

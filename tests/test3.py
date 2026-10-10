@@ -17,7 +17,8 @@ df.columns = df.columns.map(lambda c: "" if pd.isna(c) else str(c).strip())
 df = df.loc[:, ~df.columns.map(lambda c: c == "" or c.startswith("Unnamed:"))]
 df = df.reset_index(drop=True)
 
-ax = df.plot(kind="line", alpha=0.65)
+plt.style.use("dark_background")
+ax = df.plot(kind="line", alpha=0.65, figsize=(10, 6))
 for column, line in zip(df.columns, ax.lines):
 	ax.plot(
 		df.index,
@@ -31,8 +32,10 @@ ax.set_xlabel("iterations")
 ax.set_ylabel("time (nanoseconds)")
 ax.set_title("Liblimeade Benchmarks")
 ax.set_yscale("log")
+ax.set_ylim(top=300_000)
 ax.yaxis.set_major_formatter(plt.matplotlib.ticker.StrMethodFormatter("{x:,.0f}"))
-ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5))
+ax.tick_params(axis="y", which="both", left=True, right=True, labelleft=True, labelright=True)
+ax.legend(loc="center left", bbox_to_anchor=(1.12, 0.5))
 plt.tight_layout()
 plt.savefig("test3.svg", format="svg", dpi=200, bbox_inches="tight")
 
