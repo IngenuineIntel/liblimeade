@@ -153,7 +153,7 @@ enum limeade_compression_mode
 };
 
 #define LIMEADE_NR_PKTS 8 // number of packets stored at a time
-#define LIMEADE_MAX_PKT_SZ 65536 // maximum size of packet
+#define LIMEADE_MAX_PKT_SZ (1 << 17) // maximum size of packet
 
 // TODO really good documentation
 struct limeade_indiv_recv

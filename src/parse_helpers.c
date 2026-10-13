@@ -33,7 +33,7 @@ int limeade_decompress_packet(struct limeade_recvd *pkt)
   if(!f->compr_lvl)
     return LIMEADE_SUCCESS;
 
-  uLongf new_l = 1 << 16;
+  uLongf new_l = LIMEADE_MAX_PKT_SZ;
   void *new = malloc((int)new_l);
   if(!new)
     return LIMEADE_ERROR_MEMORY;

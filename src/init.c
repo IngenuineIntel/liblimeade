@@ -26,9 +26,6 @@
 
 static inline int limeade_init_mutexes(struct limeade_context *ctx)
 {
-  /* populates mtx_sfd, mtx_rfd, mtx_mode_union, mtx_compr, mtx_th_csm, &
-   * mtx_pub
-   */
   pthread_mutex_init(&ctx->mtx_compr_lvl,     NULL);
   pthread_mutex_init(&ctx->mtx_sfd,           NULL);
   pthread_mutex_init(&ctx->mtx_rfd,           NULL);
@@ -40,8 +37,6 @@ static inline int limeade_init_mutexes(struct limeade_context *ctx)
 
 static void limeade_destruct_mutexes(struct limeade_context *ctx)
 {
-  /* releases mtx_sfd, mtx_rfd, mtx_mode_union, mtx_compr, mtx_th_csm, & mtx_pub
-   */
   pthread_mutex_destroy(&ctx->mtx_compr_lvl);
   pthread_mutex_destroy(&ctx->mtx_sfd);
   pthread_mutex_destroy(&ctx->mtx_rfd);
