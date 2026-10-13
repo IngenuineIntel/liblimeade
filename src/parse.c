@@ -316,6 +316,8 @@ int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd *pkt)
   IF_NOT_FIELD_END() goto err;
   CAST(&out->vendor);
   IF_NOT_FIELD_END() goto err;
+  CAST(&out->nr_cores);
+  IF_NOT_FIELD_END() goto err;
   CAST(&out->ram_mbs);
   IF_NOT_FIELD_END() goto err;
   CAST(&out->swap_mbs);
@@ -527,9 +529,9 @@ int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd *pkt)
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
-  CAST(&out->cores);
+  CAST(&out->tp_ms);
   IF_NOT_FIELD_END() goto err;
-  CAST(&out->avg_cpu_pct);
+  CAST(&out->perc_cpu_usage);
   IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_total_kb);
   IF_NOT_FIELD_END() goto err;
@@ -538,14 +540,7 @@ int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd *pkt)
   CAST(&out->mem_available_kb);
   IF_NOT_FIELD_END() goto err;
   CAST(&out->mem_cached_kb);
-  IF_NOT_FIELD_END() goto err;
-  CAST(&out->load_1m);
-  IF_NOT_FIELD_END() goto err;
-  CAST(&out->load_5m);
-  IF_NOT_FIELD_END() goto err;
-  CAST(&out->load_15m);
-  IF_NOT_FIELD_END() goto err;
-  CAST(&out->other);
+  IF_NOT_ROW_END() goto err;
 
   return LIMEADE_SUCCESS;
 
@@ -662,9 +657,7 @@ void limeade_release_proc_update(struct limeade_proc_update *in)
 }
 
 void limeade_release_perf(struct limeade_perf *in)
-{
-  free(in->other);
-}
+{}
 
 void limeade_release_commandeer(struct limeade_commandeer *in)
 {

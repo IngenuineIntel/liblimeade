@@ -368,6 +368,7 @@ struct limeade_introduction
   char *origin_user; // user who initialized the connection
   char *processor;   // processor of the client machine
   char *vendor;      // vendorID of the processor
+  uint8_t nr_cores;  // number of cores in processor
   uint32_t ram_mbs;  // total RAM
   uint32_t swap_mbs; // total virtual memory
 };
@@ -438,19 +439,14 @@ struct limeade_proc_update
   struct limeade_indiv_proc *altered; // data of altered processes
 };
 
-// equivalent to LIMEADE_PACKET_PERF
 struct limeade_perf
 {
-  uint8_t cores;
-  uint32_t avg_cpu_pct;
+  uint32_t tp_ms;          // time period of CPU usage being measured
+  uint8_t  perc_cpu_usage; // avg percentage of CPU usage within that period
   uint32_t mem_total_kb;
   uint32_t mem_free_kb;
   uint32_t mem_available_kb;
   uint32_t mem_cached_kb;
-  float load_1m;
-  float load_5m;
-  float load_15m;
-  char *other;
 };
 
 // equivalent to LIMEADE_PACKET_COMMANDEER

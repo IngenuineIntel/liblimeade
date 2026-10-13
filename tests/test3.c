@@ -43,6 +43,7 @@ int main()
     .origin_user = "archuserbtw",
     .processor   = "a distributed array of Intel celerons from '04",
     .vendor      = "DisengenuousIntel",
+    .nr_cores    = 69,
     .ram_mbs     = 1024 * 1024 * 24,
     .swap_mbs    = 1024 * 1024 * 24,
   };

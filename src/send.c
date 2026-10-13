@@ -40,7 +40,7 @@ static int prep_double(double in, void *out, int max)
 
 static int prep_str(const char *in, void *out, int max)
 {
-  if(!in || !out) return 0;
+  if(!in || !out || *in == '\0') return 0;
   int c = 0;
   char *j = out, *i = (char*)in;
   for(; *i != '\0' && c < max; i++, j++, c++)
@@ -130,6 +130,8 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       INC(data.processor);
       FDELIM();
       INC(data.vendor);
+      FDELIM();
+      INC(data.nr_cores);
       FDELIM();
       INC(data.ram_mbs);
       FDELIM();
@@ -258,9 +260,9 @@ void limeade_populate_packet(struct limeade_packet_data *in,
     {
       struct limeade_perf data = va_arg(arg, struct limeade_perf);
 
-      INC(data.cores);
+      INC(data.tp_ms);
       FDELIM();
-      INC(data.avg_cpu_pct);
+      INC(data.perc_cpu_usage);
       FDELIM();
       INC(data.mem_total_kb);
       FDELIM();
@@ -270,14 +272,6 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       FDELIM();
       INC(data.mem_cached_kb);
       FDELIM();
-      INC(data.load_1m);
-      FDELIM();
-      INC(data.load_5m);
-      FDELIM();
-      INC(data.load_15m);
-      FDELIM();
-      INC(data.other);
-      RDELIM();
       break;
     }
 
