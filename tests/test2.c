@@ -170,6 +170,8 @@ int main(void)
   limeade_release(&recvd);
   limeade_destruct(client);
   limeade_destruct(host);
+  free(client);
+  free(host);
 
   for(int i = 0; i < nr; i++)
     free(altered[i].command);
