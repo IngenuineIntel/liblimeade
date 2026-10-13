@@ -23,11 +23,6 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-#if __has_include(<libssh2.h>)
-#  include <libssh2.h>
-#  define LIMEADE_HAS_LIBSSH2 1
-#endif
-
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif

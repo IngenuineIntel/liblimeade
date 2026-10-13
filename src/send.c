@@ -271,7 +271,7 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       INC(data.mem_available_kb);
       FDELIM();
       INC(data.mem_cached_kb);
-      FDELIM();
+      RDELIM();
       break;
     }
 
