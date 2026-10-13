@@ -10,7 +10,7 @@
 #include<liblimeade/liblimeade.h>
 
 #define E(m, e) /*if(e != LIMEADE_SUCCESS)*/ limeade_perror((m), (e));
-#define COMPR_LVL(ctx) printf("%i\n", ctx.compr_lvl);
+#define COMPR_LVL(ctx) printf("%i\n", ctx->compr_lvl);
 static int proc_update_matches(const struct limeade_proc_update *a,
                                const struct limeade_proc_update *b)
 {
@@ -38,13 +38,15 @@ static int proc_update_matches(const struct limeade_proc_update *a,
 int main(void)
 {
   const int nr = 512;
-  struct limeade_context client, host;
+  struct limeade_context *client, *host;
   struct limeade_recvd recvd = {0};
   struct limeade_proc_update pkt1 = {0}, pkt2 = {0};
   struct limeade_indiv_proc *altered;
   pid_t *died;
   int e;
 
+  client = malloc(sizeof(*client));
+  host   = malloc(sizeof(*host));
   altered = malloc(sizeof(*altered) * nr);
   died = malloc(sizeof(*died) * 8);
 
@@ -94,32 +96,32 @@ int main(void)
     return 1;
   }
 
-  e = limeade_init(&host, LIMEADE_MODE_HOST_ETH|LIMEADE_MODE_NO_COMPRESSION,
+  e = limeade_init(host, LIMEADE_MODE_HOST_ETH|LIMEADE_MODE_NO_COMPRESSION,
                    LIMEADE_PORT);
   E("host init", e);
 
-  e = limeade_init(&client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_LOW_COMPRESSION,
+  e = limeade_init(client, LIMEADE_MODE_CLIENT_ETH|LIMEADE_MODE_LOW_COMPRESSION,
                    "127.0.0.1", LIMEADE_PORT);
   E("client init", e);
   COMPR_LVL(client);
 
-  e = limeade_connect(&host);
+  e = limeade_connect(host);
   E("host connect", e);
 
-  e = limeade_connect(&client);
+  e = limeade_connect(client);
   E("client connect", e);
   COMPR_LVL(client);
 
-  e = limeade_send(&client, LIMEADE_PACKET_PROC_UPDATE, pkt1);
+  e = limeade_send(client, LIMEADE_PACKET_PROC_UPDATE, pkt1);
   E("client send", e);
 
-  e = limeade_recv_wait_noreply(&host, &recvd, 3000);
+  e = limeade_recv_wait_noreply(host, &recvd, 3000);
   E("host receive", e);
   if(e != LIMEADE_SUCCESS)
   {
     fprintf(stderr, "receive returned no packet; aborting test\n");
-    limeade_destruct(&client);
-    limeade_destruct(&host);
+    limeade_destruct(client);
+    limeade_destruct(host);
     for(int i = 0; i < nr; i++)
       free(altered[i].command);
     free(altered);
@@ -141,8 +143,8 @@ int main(void)
   {
     fprintf(stderr, "parse failed: %d\n", e);
     limeade_release(&recvd);
-    limeade_destruct(&client);
-    limeade_destruct(&host);
+    limeade_destruct(client);
+    limeade_destruct(host);
     for(int i = 0; i < nr; i++)
       free(altered[i].command);
     free(altered);
@@ -155,8 +157,8 @@ int main(void)
     fprintf(stderr, "post-parse validation failed\n");
     limeade_release(&pkt2);
     limeade_release(&recvd);
-    limeade_destruct(&client);
-    limeade_destruct(&host);
+    limeade_destruct(client);
+    limeade_destruct(host);
     for(int i = 0; i < nr; i++)
       free(altered[i].command);
     free(altered);
@@ -166,8 +168,8 @@ int main(void)
 
   limeade_release(&pkt2);
   limeade_release(&recvd);
-  limeade_destruct(&client);
-  limeade_destruct(&host);
+  limeade_destruct(client);
+  limeade_destruct(host);
 
   for(int i = 0; i < nr; i++)
     free(altered[i].command);
