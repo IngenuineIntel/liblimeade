@@ -403,24 +403,37 @@ struct limeade_indiv_proc
 {
   pid_t pid;
   pid_t ppid;
-  uid_t uid;
-  uint16_t threads;
-  union             // representations of CPU usage
-  {
-    uint32_t cpu_ticks;
-  };
-  union             // representations of memory usage
-  {
-    uint32_t vm_rss_kb;
-    uint32_t mem_kb;
-    uint32_t ram_kb;
-  };
-  char *command;
+
+  uid_t ruid;
+  uid_t euid;
+  uid_t suid;
+  uid_t fsuid;
+
+  gid_t rgid;
+  gid_t egid;
+  gid_t sgid;
+  gid_t fsgid;
+
+  uint32_t threads;
+
+  // note: the interval over which these are calculated is not specified in the
+  // packet data, as, generally, it would be assumed that the interval is equal
+  // to the rate at which proc packets are sent
+  int8_t cpu_total; // total CPU usage over last interval
+  int8_t cpu_user;  // CPU usage in user mode
+  int8_t cpu_sys;   // CPU usage in system mode
+
+  uint32_t ram_kb;  // amount of memory used in RAM
+  uint32_t swap_kb; // amount of memory used in virtual RAM
+  char state;    // representation of state (as seen in /proc/[PID]/stat)
+  char *command; // full command of the process
 };
 
 // equivalent to LIMEADE_PACKET_PROC_GENERIC
 struct limeade_proc_generic
 {
+  uint32_t ts_s;
+  uint16_t ts_ms;
   uint16_t total;
   struct limeade_indiv_proc *procs;
 };

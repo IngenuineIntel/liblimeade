@@ -10,9 +10,9 @@ test2:
 	valgrind --leak-check=full ./test2.out
 
 test3_graph:
-	python3 -m venv env
-	env/bin/pip install pandas matplotlib
-	env/bin/python3 test3.py
+	python3 -m venv .env
+	./.env/bin/pip install pandas matplotlib
+	./.env/bin/python3 test3.py
 
 test3:
 	gcc test3.c -lz -llimeade -o test3.out

@@ -24,6 +24,15 @@ LIMEADE_GEN_PREP_FN(prep_i32,   int32_t,  LIMEADE_SINT_INDICATOR)
 LIMEADE_GEN_PREP_FN(prep_i64,   int64_t,  LIMEADE_SINT_INDICATOR)
 LIMEADE_GEN_PREP_FN(prep_float, float,    LIMEADE_FLT_INDICATOR)
 
+static int prep_char(char in, void *out, int max)
+{
+  if(!out) return 0;
+  if(max < 2 || in == LIMEADE_FIELD_DELIM || in == LIMEADE_ROW_DELIM)
+    return -1;
+  *(char*)out = in;
+  return 1;
+}
+
 static int prep_double(double in, void *out, int max)
 {
   if(!out) return 0;
@@ -33,6 +42,7 @@ static int prep_double(double in, void *out, int max)
     *(uint8_t*)out = '\x00';
     return 1;
   }
+  // NOTE: I bet this sizeof(in) - 1 is a bug
   *(uint8_t*)out = LIMEADE_FLT_INDICATOR | (sizeof(in) - 1);
   *((double*)((uint8_t*)out + 1)) = in;
   return sizeof(in) + 1;
@@ -64,7 +74,8 @@ static int prep_str(const char *in, void *out, int max)
   int64_t: prep_i64,       \
   float: prep_float,       \
   double: prep_double,     \
-  char*: prep_str          \
+  char*: prep_str,         \
+  char: prep_char          \
 )(in, out, max)
 
 void limeade_populate_packet(struct limeade_packet_data *in,
@@ -198,17 +209,40 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         FDELIM();
         INC(j->ppid);
         FDELIM();
-        INC(j->uid);
+        INC(j->ruid);
+        FDELIM();
+        INC(j->euid);
+        FDELIM();
+        INC(j->suid);
+        FDELIM();
+        INC(j->fsuid);
+        FDELIM();
+        INC(j->rgid);
+        FDELIM();
+        INC(j->egid);
+        FDELIM();
+        INC(j->sgid);
+        FDELIM();
+        INC(j->fsgid);
         FDELIM();
         INC(j->threads);
         FDELIM();
-        INC(j->cpu_ticks);
+        INC(j->cpu_total);
+        FDELIM();
+        INC(j->cpu_user);
+        FDELIM();
+        INC(j->cpu_sys);
         FDELIM();
         INC(j->ram_kb);
+        FDELIM();
+        INC(j->swap_kb);
+        FDELIM();
+        INC(j->state);
         FDELIM();
         INC(j->command);
         RDELIM();
       }
+
       break;
     }
 
@@ -242,13 +276,35 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         FDELIM();
         INC(j->ppid);
         FDELIM();
-        INC(j->uid);
+        INC(j->ruid);
+        FDELIM();
+        INC(j->euid);
+        FDELIM();
+        INC(j->suid);
+        FDELIM();
+        INC(j->fsuid);
+        FDELIM();
+        INC(j->rgid);
+        FDELIM();
+        INC(j->egid);
+        FDELIM();
+        INC(j->sgid);
+        FDELIM();
+        INC(j->fsgid);
         FDELIM();
         INC(j->threads);
         FDELIM();
-        INC(j->cpu_ticks);
+        INC(j->cpu_total);
+        FDELIM();
+        INC(j->cpu_user);
+        FDELIM();
+        INC(j->cpu_sys);
         FDELIM();
         INC(j->ram_kb);
+        FDELIM();
+        INC(j->swap_kb);
+        FDELIM();
+        INC(j->state);
         FDELIM();
         INC(j->command);
         RDELIM();

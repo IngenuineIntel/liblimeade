@@ -209,6 +209,12 @@ static int limeade_cast_str(void *src, char **dst, int rem)
   return l;
 }
 
+static int limeade_cast_char(void *src, char *dst, int rem)
+{
+  *dst = *(char*)src;
+  return 1;
+}
+
 #define ENFORCE_PKT_TYPE(pkt, TYPE)\
   if(((struct limeade_packet_flags*)pkt->flags)->type != TYPE)\
     return LIMEADE_ERROR_GARBAGE;
@@ -234,7 +240,8 @@ LIMEADE_CAST_FUNC(limeade_cast_dbl, double, LIMEADE_TYPECHECK_FLT)
   int64_t*:  limeade_cast_i64, \
   float*:    limeade_cast_flt, \
   double*:   limeade_cast_dbl, \
-  char**:    limeade_cast_str  \
+  char**:    limeade_cast_str, \
+  char*:     limeade_cast_char \
 )(src, dst, rem)
 
 #define CAST_INIT()                                        \
@@ -433,17 +440,38 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
     N_FLD_END() goto err;
     CAST(j->ppid);
     N_FLD_END() goto err;
-    CAST(j->uid);
+    CAST(j->ruid);
+    N_FLD_END() goto err;
+    CAST(j->euid);
+    N_FLD_END() goto err;
+    CAST(j->suid);
+    N_FLD_END() goto err;
+    CAST(j->fsuid);
+    N_FLD_END() goto err;
+    CAST(j->rgid);
+    N_FLD_END() goto err;
+    CAST(j->egid);
+    N_FLD_END() goto err;
+    CAST(j->sgid);
+    N_FLD_END() goto err;
+    CAST(j->fsgid);
     N_FLD_END() goto err;
     CAST(j->threads);
     N_FLD_END() goto err;
-    CAST(j->cpu_ticks);
+    CAST(j->cpu_total);
     N_FLD_END() goto err;
-    CAST(j->vm_rss_kb);
+    CAST(j->cpu_user);
+    N_FLD_END() goto err;
+    CAST(j->cpu_sys);
+    N_FLD_END() goto err;
+    CAST(j->ram_kb);
+    N_FLD_END() goto err;
+    CAST(j->swap_kb);
+    N_FLD_END() goto err;
+    CAST(j->state);
     N_FLD_END() goto err;
     CAST(j->command);
-    N_ROW_END()
-      goto err;
+    N_ROW_END() goto err;
   }
 
   return LIMEADE_SUCCESS;
@@ -495,17 +523,40 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
   for(int i = 0; i < out->total_altered; i++)
   {
     j = &out->altered[i];
+
     CAST(j->pid);
     N_FLD_END() goto err;
     CAST(j->ppid);
     N_FLD_END() goto err;
-    CAST(j->uid);
+    CAST(j->ruid);
+    N_FLD_END() goto err;
+    CAST(j->euid);
+    N_FLD_END() goto err;
+    CAST(j->suid);
+    N_FLD_END() goto err;
+    CAST(j->fsuid);
+    N_FLD_END() goto err;
+    CAST(j->rgid);
+    N_FLD_END() goto err;
+    CAST(j->egid);
+    N_FLD_END() goto err;
+    CAST(j->sgid);
+    N_FLD_END() goto err;
+    CAST(j->fsgid);
     N_FLD_END() goto err;
     CAST(j->threads);
     N_FLD_END() goto err;
-    CAST(j->cpu_ticks);
+    CAST(j->cpu_total);
     N_FLD_END() goto err;
-    CAST(j->vm_rss_kb);
+    CAST(j->cpu_user);
+    N_FLD_END() goto err;
+    CAST(j->cpu_sys);
+    N_FLD_END() goto err;
+    CAST(j->ram_kb);
+    N_FLD_END() goto err;
+    CAST(j->swap_kb);
+    N_FLD_END() goto err;
+    CAST(j->state);
     N_FLD_END() goto err;
     CAST(j->command);
     N_ROW_END() goto err;
