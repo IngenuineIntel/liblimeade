@@ -26,9 +26,16 @@ static int proc_update_matches(const struct limeade_proc_update *a,
     const struct limeade_indiv_proc *x = &a->altered[i];
     const struct limeade_indiv_proc *y = &b->altered[i];
 
-    if(x->pid != y->pid || x->ppid != y->ppid || x->uid != y->uid ||
-       x->threads != y->threads || x->cpu_ticks != y->cpu_ticks ||
-       x->ram_kb  != y->ram_kb  || strcmp(x->command, y->command) != 0)
+    if(x->pid != y->pid || x->ppid != y->ppid ||
+       x->ruid != y->ruid || x->euid != y->euid ||
+       x->suid != y->suid || x->fsuid != y->fsuid ||
+       x->rgid != y->rgid || x->egid != y->egid ||
+       x->sgid != y->sgid || x->fsgid != y->fsgid ||
+       x->threads != y->threads ||
+       x->cpu_total != y->cpu_total || x->cpu_user != y->cpu_user ||
+       x->cpu_sys != y->cpu_sys || x->ram_kb != y->ram_kb ||
+       x->swap_kb != y->swap_kb || x->state != y->state ||
+       strcmp(x->command, y->command) != 0)
       return 0;
   }
 
@@ -61,15 +68,27 @@ int main(void)
 
   for(int i = 0; i < nr; i++)
   {
+    static const char states[] = "RSDTtZXI";
     char name[256];
     snprintf(name, sizeof(name), "limeade-test3-%03d-%s-%s-%s",
              i, "0123456789abcdef", "fedcba9876543210", "abcdefghijklmnop");
     altered[i].pid       = 1000 + i;
     altered[i].ppid      = 2000 + i;
-    altered[i].uid       = 3000 + i;
+    altered[i].ruid      = 3000 + i;
+    altered[i].euid      = 4000 + i;
+    altered[i].suid      = 5000 + i;
+    altered[i].fsuid     = 6000 + i;
+    altered[i].rgid      = 7000 + i;
+    altered[i].egid      = 8000 + i;
+    altered[i].sgid      = 9000 + i;
+    altered[i].fsgid     = 10000 + i;
     altered[i].threads   = 1 + (i % 4);
-    altered[i].cpu_ticks = 1234 + i;
+    altered[i].cpu_total = i % 101;
+    altered[i].cpu_user  = (i * 3) % 101;
+    altered[i].cpu_sys   = (i * 7) % 101;
     altered[i].ram_kb    = 4096 + i;
+    altered[i].swap_kb   = 1024 + i;
+    altered[i].state     = states[i % (sizeof(states) - 1)];
     altered[i].command   = strdup(name);
     if(!altered[i].command)
     {

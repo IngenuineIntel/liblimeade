@@ -144,13 +144,13 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
   d.wait_t.tv_sec  = wait_ms / 1000;
   d.wait_t.tv_nsec = wait_ms % 1000 * 1000000;
   wait_inc.tv_sec  = 0;
-  wait_inc.tv_nsec = 100000000; // 1KHz
+  wait_inc.tv_nsec = 1000000; // 1KHz
 
   int _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
     return _;
 
-  sem_init(&d.sem, 0, 1);
+  sem_init(&d.sem, 0, 0);
   pthread_mutex_init(&d.mtx, NULL);
 
   if(pthread_create(&d.tid, NULL, limeade_recv_waiter, &d) != 0)
@@ -170,6 +170,8 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
 
     nanosleep(&wait_inc, &rem);
   } while(pthread_mutex_trylock(&d.mtx) == EBUSY);
+
+  pthread_mutex_unlock(&d.mtx);
 
   pthread_join(d.tid, NULL);
   sem_destroy(&d.sem);
@@ -424,15 +426,20 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
+  CAST(out->ts_s);
+  N_FLD_END()
+    return LIMEADE_ERROR_BAD_DATA;
+  CAST(out->ts_ms);
+  N_FLD_END()
+    return LIMEADE_ERROR_BAD_DATA;
   CAST(out->total);
-
   N_ROW_END()
     return LIMEADE_ERROR_BAD_DATA;
 
   out->procs = malloc(sizeof(*j) * out->total);
   if(!out->procs)
     return LIMEADE_ERROR_MEMORY;
-  
+
   for(int i = 0; i < out->total; i++)
   {
     j = &out->procs[i];
@@ -477,6 +484,7 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
   return LIMEADE_SUCCESS;
 
 err:
+  // note: shouldn't this increment backwards? Is a NULL check safe enough?
   for(int i = 0; i < out->total && &out->procs[i]; i++)
     free(out->procs[i].command);
   free(out->procs);
@@ -497,11 +505,14 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
 
   CAST_INIT();
 
+  CAST(out->ts_s);
+  N_FLD_END() goto err;
+  CAST(out->ts_ms);
+  N_FLD_END() goto err;
   CAST(out->total_died);
   N_FLD_END() goto err;
   CAST(out->total_altered);
-  N_ROW_END()
-    goto err;
+  N_ROW_END() goto err;
 
   t_sz = out->total_died    * sizeof(pid_t)
        + out->total_altered * sizeof(*out->altered);

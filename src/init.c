@@ -328,8 +328,12 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
       r = limeade_init_host_eth_step_1(ctx, va_arg(arg, int));
       break;
     case LIMEADE_MODE_CLIENT_ETH:
-      r = limeade_init_client_eth_step_1(ctx, va_arg(arg, const char *), va_arg(arg, const int));
+    {
+      const char *dest = va_arg(arg, const char *);
+      const int port = va_arg(arg, int);
+      r = limeade_init_client_eth_step_1(ctx, dest, port);
       break;
+    }
     default:
       return LIMEADE_ERROR_GARBAGE;
   }

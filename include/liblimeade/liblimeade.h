@@ -441,6 +441,8 @@ struct limeade_proc_generic
 // equivalent to LIMEADE_PACKET_PROC_UPDATe
 struct limeade_proc_update
 {
+  uint32_t ts_s;
+  uint16_t ts_ms;
   uint16_t total_died;                 // total dead processes
   uint16_t total_altered;              // total altered processes
   pid_t *died;                         // list of dead processes

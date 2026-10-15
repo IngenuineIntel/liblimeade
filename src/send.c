@@ -201,6 +201,13 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       struct limeade_proc_generic data = va_arg(arg, struct limeade_proc_generic);
       struct limeade_indiv_proc *j;
 
+      INC(data.ts_s);
+      FDELIM();
+      INC(data.ts_ms);
+      FDELIM();
+      INC(data.total);
+      RDELIM();
+
       for(int i = 0; i < data.total; i++)
       {
         j = &data.procs[i];
@@ -252,6 +259,11 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       struct limeade_indiv_proc *j;
       int i;
 
+ 
+      INC(data.ts_s);
+      FDELIM();
+      INC(data.ts_ms);
+      FDELIM();
       INC(data.total_died);
       FDELIM();
       INC(data.total_altered);
