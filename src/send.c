@@ -393,7 +393,9 @@ err:
 
 int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
 {
-  if(compr_lvl <= 0)
+  if(pkt->pkt_sz >= 65507 && !compr_lvl)
+    compr_lvl = 1;
+  else if(compr_lvl <= 0)
     return LIMEADE_SUCCESS;
 
   unsigned int len = pkt->pkt_sz - sizeof(struct limeade_packet_flags) - sizeof(LIMEADE_MAGIC);
@@ -402,11 +404,26 @@ int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
   if(!compressed)
     return LIMEADE_ERROR_MEMORY;
 
+recompress:
+
   if(compress2(compressed, &compressed_len, pkt->data, len, compr_lvl) != Z_OK)
   {
     free(compressed);
     return LIMEADE_ERROR_COMPRESSION;
   }
+
+  // 65536 - (UDP & IP headers) == max UDP packet size
+  if(compressed_len >= 65507)
+  {
+    compr_lvl += 2;
+    if(compr_lvl > 9)
+    {
+      free(compressed);
+      return LIMEADE_ERROR_TOO_MUCH_DATA;
+    }
+    goto recompress;
+  }
+
 
   // in case compression would be inefficient
   if(compressed_len >= len)
@@ -432,6 +449,7 @@ int limeade_deflate_packet(struct limeade_packet_data *pkt, int compr_lvl)
   pkt->pkt   = new_pkt;
   pkt->flags = new_pkt    + sizeof(LIMEADE_MAGIC);
   pkt->data  = pkt->flags + sizeof(struct limeade_packet_flags);
+  ((struct limeade_packet_flags*)pkt->flags)->compr_lvl = compr_lvl;
 
   return LIMEADE_SUCCESS;
 }

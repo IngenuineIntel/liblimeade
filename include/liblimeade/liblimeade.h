@@ -37,6 +37,8 @@ enum limeade_error
   // errors while sending
   LIMEADE_ERROR_GARBAGE, // user supplied useless data to the library
   LIMEADE_ERROR_COMPRESSION, // errors when compressing
+  LIMEADE_ERROR_TOO_MUCH_DATA, // increased compression couldn't make the
+                               // packet small enough to send
 
   // errors with particular libraries/intefaces
   LIMEADE_ERROR_LIBSSH,    // error with libssh
@@ -71,6 +73,7 @@ static const char *LIMEADE_ERROR_REPRS[] = {
 
   "Garbage data supplied",
   "Compression failure",
+  "Too much data",
 
   "libssh failure",
   "SSH failure",

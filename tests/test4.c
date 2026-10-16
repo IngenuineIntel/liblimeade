@@ -10,10 +10,10 @@
 #define OUT_CSV "test4.csv"
 
 #define STOPWATCH(a) clock_gettime(CLOCK_MONOTONIC, &a[i])
-#define TEST(e)                                                                \
+#define TEST(m, e)                                                             \
   if (e != LIMEADE_OK)                                                         \
   {                                                                            \
-    printf("err: %s\n", LIMEADE_ERROR_REPRS[e]);                               \
+    printf("%s: %s\n", m, LIMEADE_ERROR_REPRS[e]);                             \
     goto end;                                                                  \
   }
 
@@ -115,12 +115,12 @@ int main(void)
 
   e = limeade_init(host, LIMEADE_MODE_HOST_ETH | LIMEADE_MODE_NO_COMPRESSION,
                    LIMEADE_PORT);
-  TEST(e)
+  TEST("host init", e)
 
   host_initialized = 1;
 
   e = limeade_connect(host);
-  TEST(e)
+  TEST("host connect", e)
 
   for (int i = 0; i < NR_SAMPLES; i++)
   {
@@ -135,32 +135,32 @@ int main(void)
                      LIMEADE_MODE_CLIENT_ETH | LIMEADE_MODE_LOW_COMPRESSION,
                      "127.0.0.1", LIMEADE_PORT);
     STOPWATCH(init_stop);
-    TEST(e)
+    TEST("init", e)
     client_initialized = 1;
     nanosleep(&rqtp, &rmtp);
 
     STOPWATCH(conn_start);
     e = limeade_connect(client);
     STOPWATCH(conn_stop);
-    TEST(e)
+    TEST("connect", e)
     nanosleep(&rqtp, &rmtp);
 
     STOPWATCH(send_start);
     e = limeade_send(client, LIMEADE_PACKET_PROC_GENERIC, pkt1);
     STOPWATCH(send_stop);
-    TEST(e)
+    TEST("send", e)
     nanosleep(&rqtp, &rmtp);
 
     STOPWATCH(recv_start);
     e = limeade_recv_wait_noreply(host, &recvd, 5000);
     STOPWATCH(recv_stop);
-    TEST(e)
+    TEST("recv", e)
     nanosleep(&rqtp, &rmtp);
 
     STOPWATCH(parse_start);
     e = limeade_parse_proc_generic(&parsed, &recvd);
     STOPWATCH(parse_stop);
-    TEST(e)
+    TEST("parse", e)
     nanosleep(&rqtp, &rmtp);
 
     if (!proc_generic_matches(&pkt1, &parsed))
