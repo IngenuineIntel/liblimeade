@@ -54,7 +54,6 @@ enum limeade_error
   LIMEADE_ERROR_BAD_DATA,        // faliure to parse data
   LIMEADE_ERROR_BAD_COMPRESSION, // failure to decompress
 
-
   // miscellaneous
   LIMEADE_ERROR_REJECTED,        // no acknowledgement from ricipient
   LIMEADE_ERROR_INVALID_CONTEXT, // bad limeade_context* passed
@@ -150,7 +149,7 @@ enum limeade_compression_mode
   LIMEADE_MODE_HIGH_COMPRESSION = 64,
 };
 
-#define LIMEADE_NR_PKTS 8 // number of packets stored at a time
+#define LIMEADE_NR_PKTS 4 // number of packets stored at a time
 #define LIMEADE_MAX_PKT_SZ (1 << 17) // maximum size of packet
 
 // TODO really good documentation
