@@ -13,7 +13,7 @@
 #define TEST(e)                                                                \
   if (e != LIMEADE_OK)                                                         \
   {                                                                            \
-    printf("err: %s\n", LIMEADE_ERROR_REPRS[e]);                                 \
+    printf("err: %s\n", LIMEADE_ERROR_REPRS[e]);                               \
     goto end;                                                                  \
   }
 
@@ -83,8 +83,6 @@ int main(void)
 
   for (int i = 0; i < NR_PROCS; i++)
   {
-    nanosleep(&rqtp, &rmtp);
-
     static const char states[] = "RSDTtZXI";
     char name[256];
 
@@ -126,7 +124,7 @@ int main(void)
 
   for (int i = 0; i < NR_SAMPLES; i++)
   {
-    printf("%i\n", i);
+    //printf("%i\n", i);
     struct limeade_recvd recvd = {0};
     struct limeade_proc_generic parsed = {0};
 

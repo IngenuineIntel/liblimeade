@@ -32,6 +32,7 @@ int main()
   struct timespec conn_start[NR_SAMPLES], conn_stop[NR_SAMPLES];
   struct timespec send_start[NR_SAMPLES], send_stop[NR_SAMPLES];
   struct timespec recv_start[NR_SAMPLES], recv_stop[NR_SAMPLES];
+  struct timespec parse_start[NR_SAMPLES], parse_stop[NR_SAMPLES];
   struct timespec dstr_start[NR_SAMPLES], dstr_stop[NR_SAMPLES];
   struct limeade_context *ctx  = malloc(sizeof(struct limeade_context));
   struct limeade_context *host = malloc(sizeof(struct limeade_context));
@@ -65,6 +66,8 @@ int main()
   
   for(int i = 0; i < NR_SAMPLES; i++)
   {
+    struct limeade_intro parsed = {0};
+
     memset(ctx, 0, sizeof(*ctx));
     memset(&r, 0, sizeof(r));
 
@@ -97,23 +100,30 @@ int main()
     STOPWATCH(recv_stop);
     TEST(e);
 
+    STOPWATCH(parse_start);
+    e = limeade_parse_intro(&parsed, &r);
+    STOPWATCH(parse_stop);
+    TEST(e);
+
     //printf("releasing...");
     STOPWATCH(dstr_start);
     limeade_release(ctx);
+    limeade_release(&parsed);
     limeade_release(&r);
     STOPWATCH(dstr_stop);
   }
 
   FILE *fd = fopen(OUT_CSV, "w");
-  fprintf(fd, "limeade_init,limeade_connect,limeade_send,limeade_recv,limeade_release,\n");
+  fprintf(fd, "limeade_init,limeade_connect,limeade_send,limeade_recv,limeade_parse,limeade_release,\n");
 
   for(int i = 0; i < NR_SAMPLES; i++)
   {
-    fprintf(fd, "%lu,%lu,%lu,%lu,%lu,\n", 
+    fprintf(fd, "%lu,%lu,%lu,%lu,%lu,%lu,\n", 
             ts_diff(init_start[i], init_stop[i]),
             ts_diff(conn_start[i], conn_stop[i]),
             ts_diff(send_start[i], send_stop[i]),
             ts_diff(recv_start[i], recv_stop[i]),
+            ts_diff(parse_start[i], parse_stop[i]),
             ts_diff(dstr_start[i], dstr_stop[i]));
   }
   fclose(fd);
