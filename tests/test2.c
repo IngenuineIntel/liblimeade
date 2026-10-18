@@ -31,8 +31,7 @@ static int proc_update_matches(const struct limeade_proc_update *a,
        x->suid != y->suid || x->fsuid != y->fsuid ||
        x->rgid != y->rgid || x->egid != y->egid ||
        x->sgid != y->sgid || x->fsgid != y->fsgid ||
-       x->threads != y->threads ||
-       x->cpu_total != y->cpu_total || x->cpu_user != y->cpu_user ||
+       x->threads != y->threads || x->cpu_user != y->cpu_user ||
        x->cpu_sys != y->cpu_sys || x->ram_kb != y->ram_kb ||
        x->swap_kb != y->swap_kb || x->state != y->state ||
        strcmp(x->command, y->command) != 0)
@@ -83,7 +82,6 @@ int main(void)
     altered[i].sgid      = 9000 + i;
     altered[i].fsgid     = 10000 + i;
     altered[i].threads   = 1 + (i % 4);
-    altered[i].cpu_total = i % 101;
     altered[i].cpu_user  = (i * 3) % 101;
     altered[i].cpu_sys   = (i * 7) % 101;
     altered[i].ram_kb    = 4096 + i;

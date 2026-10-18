@@ -421,7 +421,6 @@ struct limeade_indiv_proc
   // note: the interval over which these are calculated is not specified in the
   // packet data, as, generally, it would be assumed that the interval is equal
   // to the rate at which proc packets are sent
-  int8_t cpu_total; // total CPU usage over last interval
   int8_t cpu_user;  // CPU usage in user mode
   int8_t cpu_sys;   // CPU usage in system mode
 

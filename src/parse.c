@@ -465,8 +465,6 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
     N_FLD_END() goto err;
     CAST(j->threads);
     N_FLD_END() goto err;
-    CAST(j->cpu_total);
-    N_FLD_END() goto err;
     CAST(j->cpu_user);
     N_FLD_END() goto err;
     CAST(j->cpu_sys);
@@ -556,8 +554,6 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
     CAST(j->fsgid);
     N_FLD_END() goto err;
     CAST(j->threads);
-    N_FLD_END() goto err;
-    CAST(j->cpu_total);
     N_FLD_END() goto err;
     CAST(j->cpu_user);
     N_FLD_END() goto err;

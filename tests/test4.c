@@ -38,7 +38,7 @@ static int proc_generic_matches(const struct limeade_proc_generic *a,
         x->euid != y->euid || x->suid != y->suid || x->fsuid != y->fsuid ||
         x->rgid != y->rgid || x->egid != y->egid || x->sgid != y->sgid ||
         x->fsgid != y->fsgid || x->threads != y->threads ||
-        x->cpu_total != y->cpu_total || x->cpu_user != y->cpu_user ||
+        x->cpu_user != y->cpu_user ||
         x->cpu_sys != y->cpu_sys || x->ram_kb != y->ram_kb ||
         x->swap_kb != y->swap_kb || x->state != y->state ||
         strcmp(x->command, y->command) != 0)
@@ -99,7 +99,6 @@ int main(void)
     pkt1.procs[i].sgid = 9000 + i;
     pkt1.procs[i].fsgid = 10000 + i;
     pkt1.procs[i].threads = 1 + (i % 4);
-    pkt1.procs[i].cpu_total = i % 101;
     pkt1.procs[i].cpu_user = (i * 3) % 101;
     pkt1.procs[i].cpu_sys = (i * 7) % 101;
     pkt1.procs[i].ram_kb = 4096 + i;

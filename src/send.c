@@ -234,8 +234,6 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         FDELIM();
         INC(j->threads);
         FDELIM();
-        INC(j->cpu_total);
-        FDELIM();
         INC(j->cpu_user);
         FDELIM();
         INC(j->cpu_sys);
@@ -305,8 +303,6 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         INC(j->fsgid);
         FDELIM();
         INC(j->threads);
-        FDELIM();
-        INC(j->cpu_total);
         FDELIM();
         INC(j->cpu_user);
         FDELIM();
