@@ -475,6 +475,8 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
     N_FLD_END() goto err;
     CAST(j->state);
     N_FLD_END() goto err;
+    CAST(j->name);
+    N_FLD_END() goto err;
     CAST(j->command);
     N_ROW_END() goto err;
   }
@@ -564,6 +566,8 @@ int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_re
     CAST(j->swap_kb);
     N_FLD_END() goto err;
     CAST(j->state);
+    N_FLD_END() goto err;
+    CAST(j->name);
     N_FLD_END() goto err;
     CAST(j->command);
     N_ROW_END() goto err;
@@ -708,7 +712,10 @@ void limeade_release_proc_generic(struct limeade_proc_generic *in)
   if(!in) return;
 
   for(int i = 0; i < in->total; i++)
+  {
+    free(in->procs[i].name);
     free(in->procs[i].command);
+  }
   free(in->procs);
 }
 
@@ -717,7 +724,10 @@ void limeade_release_proc_update(struct limeade_proc_update *in)
   if(!in) return;
 
   for(int i = 0; i < in->total_altered; i++)
+  {
+    free(in->altered[i].name);
     free(in->altered[i].command);
+  }
   free(in->died);
 }
 

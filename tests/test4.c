@@ -41,6 +41,7 @@ static int proc_generic_matches(const struct limeade_proc_generic *a,
         x->cpu_user != y->cpu_user ||
         x->cpu_sys != y->cpu_sys || x->ram_kb != y->ram_kb ||
         x->swap_kb != y->swap_kb || x->state != y->state ||
+        strcmp(x->name, y->name) != 0 ||
         strcmp(x->command, y->command) != 0)
       return 0;
   }
@@ -104,6 +105,7 @@ int main(void)
     pkt1.procs[i].ram_kb = 4096 + i;
     pkt1.procs[i].swap_kb = 1024 + i;
     pkt1.procs[i].state = states[i % (sizeof(states) - 1)];
+    pkt1.procs[i].name = strdup(name);
     pkt1.procs[i].command = strdup(name);
     if (!pkt1.procs[i].command)
     {
@@ -215,7 +217,10 @@ end:
     limeade_destruct(host);
   if (pkt1.procs)
     for (int i = 0; i < NR_PROCS; i++)
+    {
+      free(pkt1.procs[i].name);
       free(pkt1.procs[i].command);
+    }
   free(pkt1.procs);
   free(client);
   free(host);

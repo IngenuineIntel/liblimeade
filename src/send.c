@@ -244,6 +244,8 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         FDELIM();
         INC(j->state);
         FDELIM();
+        INC(j->name);
+        FDELIM();
         INC(j->command);
         RDELIM();
       }
@@ -313,6 +315,8 @@ void limeade_populate_packet(struct limeade_packet_data *in,
         INC(j->swap_kb);
         FDELIM();
         INC(j->state);
+        FDELIM();
+        INC(j->name);
         FDELIM();
         INC(j->command);
         RDELIM();

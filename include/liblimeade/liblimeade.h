@@ -427,7 +427,8 @@ struct limeade_indiv_proc
   uint32_t ram_kb;  // amount of memory used in RAM
   uint32_t swap_kb; // amount of memory used in virtual RAM
   char state;    // representation of state (as seen in /proc/[PID]/stat)
-  char *command; // full command of the process
+  char *name;    // pretty name of the process
+  char *command; // full command line of the process
 };
 
 // equivalent to LIMEADE_PACKET_PROC_GENERIC

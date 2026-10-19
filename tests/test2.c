@@ -34,6 +34,7 @@ static int proc_update_matches(const struct limeade_proc_update *a,
        x->threads != y->threads || x->cpu_user != y->cpu_user ||
        x->cpu_sys != y->cpu_sys || x->ram_kb != y->ram_kb ||
        x->swap_kb != y->swap_kb || x->state != y->state ||
+       strcmp(x->name, y->name) != 0 ||
        strcmp(x->command, y->command) != 0)
       return 0;
   }
@@ -87,6 +88,7 @@ int main(void)
     altered[i].ram_kb    = 4096 + i;
     altered[i].swap_kb   = 1024 + i;
     altered[i].state     = states[i % (sizeof(states) - 1)];
+    altered[i].name      = strdup(name);
     altered[i].command   = strdup(name);
     if(!altered[i].command)
     {
@@ -191,7 +193,10 @@ int main(void)
   free(host);
 
   for(int i = 0; i < nr; i++)
+  {
+    free(altered[i].name);
     free(altered[i].command);
+  }
   free(altered);
   free(died);
 
