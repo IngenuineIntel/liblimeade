@@ -168,7 +168,12 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
     if(e != LIMEADE_ERROR_NO_DATA)
       goto premature;
 
-    nanosleep(&wait_inc, &rem);
+    e = nanosleep(&wait_inc, &rem);
+    if(e < 0 && errno == EINTR)
+    {
+      e = LIMEADE_ERROR_INTERRUPT;
+      goto premature;
+    }
   } while(pthread_mutex_trylock(&d.mtx) == EBUSY);
 
   pthread_mutex_unlock(&d.mtx);

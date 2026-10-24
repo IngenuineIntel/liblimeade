@@ -60,7 +60,7 @@ enum limeade_error
   LIMEADE_ERROR_MEMORY,          // failure to allocate memory
   LIMEADE_ERROR_NOT_SUPPORTED,   // feature not supported
   LIMEADE_ERROR_TH_RECV_DIED,    // receiving thread died
-  LIMEADE_ERROR_TH_CSM_DIED,     // CSM thread died
+  LIMEADE_ERROR_INTERRUPT,       // signal interrupt while waiting 
   LIMEADE_ERROR_OTHER,           // unspecified & probably assumed impossible
   
   LIMEADE_MAXIMUM_ERROR
@@ -418,15 +418,16 @@ struct limeade_indiv_proc
 
   uint32_t threads;
 
+  uint32_t ram_kb;
+  uint32_t swap_kb;
+  char state;
+
   // note: the interval over which these are calculated is not specified in the
   // packet data, as, generally, it would be assumed that the interval is equal
   // to the rate at which proc packets are sent
   int8_t cpu_user;  // CPU usage in user mode
   int8_t cpu_sys;   // CPU usage in system mode
 
-  uint32_t ram_kb;  // amount of memory used in RAM
-  uint32_t swap_kb; // amount of memory used in virtual RAM
-  char state;    // representation of state (as seen in /proc/[PID]/stat)
   char *name;    // pretty name of the process
   char *command; // full command line of the process
 };
