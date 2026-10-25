@@ -343,30 +343,6 @@ void limeade_populate_packet(struct limeade_packet_data *in,
       break;
     }
 
-    case LIMEADE_PACKET_COMMANDEER:
-    {
-      struct limeade_commandeer data = va_arg(arg, struct limeade_commandeer);
-
-      INC(data.command);
-      FDELIM();
-      INC(data.flags);
-      FDELIM();
-      INC(data.id);
-      RDELIM();
-      break;
-    }
-
-    case LIMEADE_PACKET_EXITED:
-    {
-      struct limeade_exited data = va_arg(arg, struct limeade_exited);
-
-      INC(data.id);
-      FDELIM();
-      INC(data.exitcode);
-      RDELIM();
-      break;
-    }
-
     case LIMEADE_PACKET_CLOSE:
     {
       struct limeade_close data = va_arg(arg, struct limeade_close);

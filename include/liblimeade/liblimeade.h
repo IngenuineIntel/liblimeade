@@ -289,8 +289,6 @@ enum limeade_packet
   LIMEADE_PACKET_PROC_GENERIC, // process table data
   LIMEADE_PACKET_PROC_UPDATE,  // process table data (dynamic)
   LIMEADE_PACKET_PERF,         // resource usage/performance data
-  LIMEADE_PACKET_COMMANDEER,   // request command execution on the client
-  LIMEADE_PACKET_EXITED,       // indication of the command's completion
   LIMEADE_PACKET_CLOSE,        // connection deinitialization
 
   LIMEADE_PACKET_MAX
@@ -462,31 +460,6 @@ struct limeade_perf
   uint32_t mem_cached_kb;
 };
 
-// equivalent to LIMEADE_PACKET_COMMANDEER
-struct limeade_commandeer
-{
-  char *command;  // command to execute
-  uint16_t flags; // (see below)
-  uint32_t id;    // ID to reference with
-};
-
-// flags options for struct limeade_commandeer
-enum limeade_commandeer_flags
-{
-  LIMEADE_COMMANDEER_WO_JAIL   = 1, // otherwise, executed in jail
-  LIMEADE_COMMANDEER_HIGH_PRIV = 2, // otherwise, executed with normal privledges
-  LIMEADE_COMMANDEER_TTY       = 4, // otherwise, executed without TTY environment
-};
-// for example, LIMEADE_COMMANDEER_WO_JAIL|LIMEADE_COMMANDEER_HIGH_PRIV would
-// be a value `flags` value
-
-// equivalent to LIMEADE_PACKET_EXITED
-struct limeade_exited
-{
-  uint32_t id;  // ID supplied in COMMANDEER
-  int exitcode; // exit code of the process
-};
-
 // equivalent to LIMEADE_PACKET_CLOSE
 struct limeade_close
 {
@@ -539,24 +512,31 @@ struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data);
 // for the packet's body, there is a function for each packet type, and the
 // type should be checked before parsing:
 //
-//struct limeade_recv pkt = limeade_recv(ctx);
+//if(limeade_recv(ctx, &pkt) != LIMEADE_OK)
+//{
+//  --SNIP--
+//}
 //
 //switch(pkt.type)
 //{
 //  case LIMEADE_PACKET_KNOCK:
+//  {
 //    struct limeade_knock data;
 //    if(limeade_parse_knock(&data, pkt) != LIMEADE_OK)
 //    {
 //      --SNIP--
 //    }
 //  --SNIP--
+//  }
 //  case LIMEADE_PACKET_RECOGNIZE:
+//  {
 //    struct limeade_recognize data;
 //    if(limeade_parse_recognize(&data, pkt) != LIMEADE_OK)
 //    {
 //      --SNIP--
 //    }
 //  --SNIP--
+//  }
 //}
 //
 // note that if the wrong function is called for parsing, it will detect it
@@ -571,8 +551,6 @@ int limeade_parse_events(struct limeade_events *out, struct limeade_recvd *pkt);
 int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_recvd *pkt);
 int limeade_parse_proc_update(struct limeade_proc_update *out, struct limeade_recvd *pkt);
 int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd *pkt);
-int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recvd *pkt);
-int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd *pkt);
 int limeade_parse_close(struct limeade_close *out, struct limeade_recvd *pkt);
 
 // the following functions are for releasing the parsed data created by the
@@ -587,8 +565,6 @@ void limeade_release_events(struct limeade_events *in);
 void limeade_release_proc_generic(struct limeade_proc_generic *in);
 void limeade_release_proc_update(struct limeade_proc_update *in);
 void limeade_release_perf(struct limeade_perf *in);
-void limeade_release_commandeer(struct limeade_commandeer *in);
-void limeade_release_exited(struct limeade_exited *in);
 void limeade_release_close(struct limeade_close *in);
 
 void limeade_release_recvd(struct limeade_recvd *in);
@@ -603,8 +579,6 @@ void limeade_release_recvd(struct limeade_recvd *in);
   struct limeade_proc_generic*: limeade_release_proc_generic,\
   struct limeade_proc_update*:  limeade_release_proc_update,\
   struct limeade_proc_perf*:    limeade_release_perf,\
-  struct limeade_commandeer*:   limeade_release_commandeer,\
-  struct limeade_exited*:       limeade_release_exited,\
   struct limeade_close*:        limeade_release_close,\
   struct limeade_recvd*:        limeade_release_recvd,\
   struct limeade_context*:      limeade_destruct\

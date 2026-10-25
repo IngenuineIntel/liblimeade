@@ -28,9 +28,6 @@ void limeade_diag_indiv_proc(struct limeade_indiv_proc x);
 void limeade_diag_proc_generic(struct limeade_proc_generic x);
 void limeade_diag_proc_update(struct limeade_proc_update x);
 void limeade_diag_perf(struct limeade_perf x);
-void limeade_diag_commandeer(struct limeade_commandeer x);
-void limeade_diag_commandeer_flags(enum limeade_commandeer_flags x);
-void limeade_diag_exited(struct limeade_exited x);
 void limeade_diag_close(struct limeade_close x);
 
 // if a user supplies any sort of enum to limeade_diag, I'd rather give them
@@ -58,8 +55,6 @@ void limeade_diag_enum(int x);
   struct limeade_proc_generic:          limeade_diag_proc_generic,         \
   struct limeade_proc_update:           limeade_diag_proc_update,          \
   struct limeade_perf:                  limeade_diag_perf,                 \
-  struct limeade_commandeer:            limeade_diag_commandeer,           \
-  struct limeade_exited:                limeade_diag_exited,               \
   struct limeade_close:                 limeade_diag_close,                \
   int:                                  limeade_diag_enum,                 \
 )(x)

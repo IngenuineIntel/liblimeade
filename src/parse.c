@@ -619,46 +619,6 @@ err:
   return LIMEADE_ERROR_BAD_DATA;
 }
 
-int limeade_parse_commandeer(struct limeade_commandeer *out, struct limeade_recvd *pkt)
-{
-  ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_COMMANDEER);
-
-  if(limeade_decompress_packet(pkt))
-    return LIMEADE_ERROR_COMPRESSION;
-
-  CAST_INIT();
-  CAST(out->command);
-  N_FLD_END() goto err;
-  CAST(out->flags);
-  N_FLD_END() goto err;
-  CAST(out->id);
-  N_ROW_END() goto err;
-
-  return LIMEADE_SUCCESS;
-
-err:
-  return LIMEADE_ERROR_BAD_DATA;
-}
-
-int limeade_parse_exited(struct limeade_exited *out, struct limeade_recvd *pkt)
-{
-  ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_EXITED);
-
-  if(limeade_decompress_packet(pkt))
-    return LIMEADE_ERROR_COMPRESSION;
-
-  CAST_INIT();
-  CAST(out->id);
-  N_FLD_END() goto err;
-  CAST(out->exitcode);
-  N_ROW_END() goto err;
-
-  return LIMEADE_SUCCESS;
-
-err:
-  return LIMEADE_ERROR_BAD_DATA;
-}
-
 int limeade_parse_close(struct limeade_close *out, struct limeade_recvd *pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_CLOSE);
@@ -737,15 +697,6 @@ void limeade_release_proc_update(struct limeade_proc_update *in)
 }
 
 void limeade_release_perf(struct limeade_perf *in)
-{}
-
-void limeade_release_commandeer(struct limeade_commandeer *in)
-{
-  if(!in) return;
-  free(in->command);
-}
-
-void limeade_release_exited(struct limeade_exited *in)
 {}
 
 void limeade_release_close(struct limeade_close *in)
