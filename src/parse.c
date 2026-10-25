@@ -273,45 +273,6 @@ if(last_delim != LIMEADE_FIELD_DELIM)
 #define N_ROW_END()\
 if(last_delim != LIMEADE_ROW_DELIM)
 
-int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd *pkt)
-{
-  ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_KNOCK);
-
-  if(limeade_decompress_packet(pkt))
-    return LIMEADE_ERROR_COMPRESSION;
-
-  CAST_INIT();
-  CAST(out->prev_connected);
-  N_FLD_END() goto err;
-  CAST(out->prev_session);
-  N_ROW_END() goto err;
-
-  return LIMEADE_SUCCESS;
-
-err:
-  return LIMEADE_ERROR_BAD_DATA;
-}
-
-int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd *pkt)
-{
-
-  ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_RECOGNIZE);
-
-  if(limeade_decompress_packet(pkt))
-    return LIMEADE_ERROR_COMPRESSION;
-
-  CAST_INIT();
-  CAST(out->accepted);
-  N_FLD_END() goto err;
-  CAST(out->new_session);
-  N_ROW_END() goto err;
-
-  return LIMEADE_SUCCESS;
-
-err:
-  return LIMEADE_ERROR_BAD_DATA;
-}
-
 int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd *pkt)
 {
   ENFORCE_PKT_TYPE(pkt, LIMEADE_PACKET_INTRO);
@@ -635,12 +596,6 @@ int limeade_parse_close(struct limeade_close *out, struct limeade_recvd *pkt)
 err:
   return LIMEADE_ERROR_BAD_DATA;
 }
-
-void limeade_release_knock(struct limeade_knock *in)
-{}
-
-void limeade_release_recognize(struct limeade_recognize *in)
-{}
 
 void limeade_release_intro(struct limeade_intro *in)
 {

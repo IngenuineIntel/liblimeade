@@ -224,7 +224,6 @@ struct limeade_context
   pthread_mutex_t mtx_pub_attrs;
   char *dest;
   int port;
-  uint64_t sessionid;
   uint32_t ack_wait_time_ms;
 
   pthread_mutex_t mtx_mode_specific;
@@ -281,8 +280,6 @@ void limeade_destruct(struct limeade_context *ctx);
 // for each kind of packet, there is a numeric representation here
 enum limeade_packet
 {
-  LIMEADE_PACKET_KNOCK,        // connection initialization (equivalent of SYN)
-  LIMEADE_PACKET_RECOGNIZE,    // confirms connection
   LIMEADE_PACKET_INTRODUCTION, // data about the client machine
   LIMEADE_PACKET_ACKNOWLEDGE,  // acknowledgement of packet received
   LIMEADE_PACKET_EVENTS,       // event data
@@ -314,10 +311,6 @@ struct limeade_packet_data
 #define LIMEADE_MAGIC_RAW "\xFF\xFFLIME^0^\xFF\xFF"
 static const char LIMEADE_MAGIC[] = LIMEADE_MAGIC_RAW;
 
-// every client is given a session ID with which to distinguish itself
-// as a type:
-typedef uint64_t LIMEADE_SESSION;
-
 // packet data, while variadic, is consistenly visualized into rows
 // & columns, Likewise, there are specific characters used for delimiting
 // fields & rows:
@@ -337,21 +330,6 @@ struct limeade_packet_flags
   {
     uint8_t reserved[7];
   };
-  LIMEADE_SESSION session;
-};
-
-// equivalent to LIMEADE_PACKET_KNOCK
-struct limeade_knock
-{
-  uint8_t prev_connected;       // if this client has connected before
-  LIMEADE_SESSION prev_session; // session used previously (can be 0)
-};
-
-// equivalent to LIMEADE_PACKET_RECOGNIZE
-struct limeade_recognize
-{
-  uint8_t accepted; // if the client is accepted (generally not no)
-  LIMEADE_SESSION new_session; // new session the server assigns
 };
 
 // equivalent to LIMEADE_PACKET_INTRODUCTION
@@ -510,39 +488,9 @@ int limeade_recv_wait_noreply(struct limeade_context *ctx, struct limeade_recvd 
 struct limeade_packet_flags limeade_parse_flags(struct limeade_recvd data);
 
 // for the packet's body, there is a function for each packet type, and the
-// type should be checked before parsing:
-//
-//if(limeade_recv(ctx, &pkt) != LIMEADE_OK)
-//{
-//  --SNIP--
-//}
-//
-//switch(pkt.type)
-//{
-//  case LIMEADE_PACKET_KNOCK:
-//  {
-//    struct limeade_knock data;
-//    if(limeade_parse_knock(&data, pkt) != LIMEADE_OK)
-//    {
-//      --SNIP--
-//    }
-//  --SNIP--
-//  }
-//  case LIMEADE_PACKET_RECOGNIZE:
-//  {
-//    struct limeade_recognize data;
-//    if(limeade_parse_recognize(&data, pkt) != LIMEADE_OK)
-//    {
-//      --SNIP--
-//    }
-//  --SNIP--
-//  }
-//}
-//
+// type should be checked before parsing
 // note that if the wrong function is called for parsing, it will detect it
 // and return a LIMEADE_ERROR_GARBAGE
-int limeade_parse_knock(struct limeade_knock *out, struct limeade_recvd *pkt);
-int limeade_parse_recognize(struct limeade_recognize *out, struct limeade_recvd *pkt);
 int limeade_parse_intro(struct limeade_intro *out, struct limeade_recvd *pkt);
 #define limeade_parse_introduction limeade_parse_intro
 int limeade_parse_ack(struct limeade_ack *out, struct limeade_recvd *pkt);
@@ -555,8 +503,6 @@ int limeade_parse_close(struct limeade_close *out, struct limeade_recvd *pkt);
 
 // the following functions are for releasing the parsed data created by the
 // above functions. They are not meant to be called directly: see below
-void limeade_release_knock(struct limeade_knock *in);
-void limeade_release_recognize(struct limeade_recognize *in);
 void limeade_release_intro(struct limeade_intro *in);
 #define limeade_release_introduction limeade_release_intro
 void limeade_release_ack(struct limeade_ack *in);
@@ -571,8 +517,6 @@ void limeade_release_recvd(struct limeade_recvd *in);
 
 // for convenience:
 #define limeade_release(in) _Generic((in), \
-  struct limeade_knock*:        limeade_release_knock,\
-  struct limeade_recognize*:    limeade_release_recognize,\
   struct limeade_intro*:        limeade_release_intro,\
   struct limeade_ack*:          limeade_release_ack,\
   struct limeade_events*:       limeade_release_events,\

@@ -104,28 +104,6 @@ void limeade_populate_packet(struct limeade_packet_data *in,
 
   switch(in->type)
   {
-    case LIMEADE_PACKET_KNOCK:
-    {
-      struct limeade_knock data = va_arg(arg, struct limeade_knock);
-
-      INC(data.prev_connected);
-      FDELIM();
-      INC(data.prev_session);
-      RDELIM();
-      break;
-    }
-
-    case LIMEADE_PACKET_RECOGNIZE:
-    {
-      struct limeade_recognize data = va_arg(arg, struct limeade_recognize);
-
-      INC(data.accepted);
-      FDELIM();
-      INC(data.new_session);
-      RDELIM();
-      break;
-    }
-
     case LIMEADE_PACKET_INTRODUCTION:
     {
       struct limeade_introduction data = va_arg(arg, struct limeade_introduction);

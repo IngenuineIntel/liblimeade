@@ -14,10 +14,7 @@ void limeade_diag_recv_data(struct limeade_recv_data x);
 void limeade_diag_context(struct limeade_context x);
 void limeade_diag_packet(enum limeade_packet x);
 void limeade_diag_packet_data(struct limeade_packet_data x);
-void limeade_diag_session(LIMEADE_SESSION x);
 void limeade_diag_packet_flags(struct limeade_packet_flags x);
-void limeade_diag_knock(struct limeade_knock x);
-void limeade_diag_recognize(struct limeade_recognize x);
 void limeade_diag_introduction(struct limeade_intro x);
 #define limeade_diag_intro limeade_diag_introduction
 void limeade_diag_acknowledge(struct limeade_ack x);
@@ -36,6 +33,10 @@ void limeade_diag_enum(int x);
 
 #endif /* _LIBLIMEADE_DIAG_C */
 
+#ifdef limeade_diag
+#undef limeade_diag
+#endif
+
 #ifdef ENABLE_LIBLIMEADE_DIAGNOSTICS
 
 #define limeade_diag(x) _Generic((x),\
@@ -43,10 +44,7 @@ void limeade_diag_enum(int x);
   struct limeade_recv_data:             limeade_diag_recv_data,            \
   struct limeade_context:               limeade_diag_context,              \
   struct limeade_packet_data:           limeade_diag_packet_data,          \
-  LIMEADE_SESSION:                      limeade_diag_session,              \
   struct limeade_packet_flags:          limeade_diag_packet_flags,         \
-  struct limeade_knock:                 limeade_diag_knock,                \
-  struct limeade_recognize:             limeade_diag_recognize,            \
   struct limeade_intro:                 limeade_diag_intro,                \
   struct limeade_acknowledge:           limeade_diag_acknowledge,          \
   struct limeade_indiv_event:           limeade_diag_indiv_event,          \
