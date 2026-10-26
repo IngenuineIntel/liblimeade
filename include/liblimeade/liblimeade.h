@@ -430,8 +430,9 @@ struct limeade_proc_update
 
 struct limeade_perf
 {
-  uint32_t tp_ms;          // time period of CPU usage being measured
-  uint8_t  perc_cpu_usage; // avg percentage of CPU usage within that period
+  uint8_t perc_cpu_user; // percent of CPU usage in user mode
+  uint8_t perc_cpu_sys;  // percent of CPU usage in system mode
+
   uint32_t mem_total_kb;
   uint32_t mem_free_kb;
   uint32_t mem_available_kb;

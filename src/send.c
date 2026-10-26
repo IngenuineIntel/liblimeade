@@ -306,9 +306,9 @@ void limeade_populate_packet(struct limeade_packet_data *in,
     {
       struct limeade_perf data = va_arg(arg, struct limeade_perf);
 
-      INC(data.tp_ms);
+      INC(data.perc_cpu_user);
       FDELIM();
-      INC(data.perc_cpu_usage);
+      INC(data.perc_cpu_sys);
       FDELIM();
       INC(data.mem_total_kb);
       FDELIM();

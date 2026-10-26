@@ -561,9 +561,9 @@ int limeade_parse_perf(struct limeade_perf *out, struct limeade_recvd *pkt)
     return LIMEADE_ERROR_COMPRESSION;
 
   CAST_INIT();
-  CAST(out->tp_ms);
+  CAST(out->perc_cpu_user);
   N_FLD_END() goto err;
-  CAST(out->perc_cpu_usage);
+  CAST(out->perc_cpu_sys);
   N_FLD_END() goto err;
   CAST(out->mem_total_kb);
   N_FLD_END() goto err;
