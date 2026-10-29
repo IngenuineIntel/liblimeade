@@ -299,7 +299,11 @@ enum limeade_packet
 // a wrapper for a buffer of data to be sent out
 struct limeade_packet_data
 {
-  uint8_t type;    // type of packet
+  union
+  {
+    uint8_t type;    // type of packet
+    uint8_t packet_type; // this is only here for Rust's FFI compat
+  };
   uint8_t compr;   // current compression level
   uint32_t pkt_sz; // size of packet in memory
   void *pkt;   // pointer to beginning of packet
