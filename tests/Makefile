@@ -1,6 +1,27 @@
 #!/usr/bin/make
 # quick-in-dirty test runners
 
+POC_CC ?= clang
+POC_CFLAGS := -std=gnu23 -g -O1 -fno-omit-frame-pointer -fsanitize=address \
+			  -Wall -Wextra -Wpedantic -Wno-gnu-pointer-arith \
+			  -Wno-gnu-binary-literal -I../include
+POC_LIBS := -lz -pthread
+MEMORY_SAFETY_BINS := pocs/poc_parser_cleanup.asan \
+					  pocs/poc_truncated_numeric.asan \
+					  pocs/poc_zero_died.asan \
+					  pocs/poc_string_boundary.asan \
+					  pocs/poc_populate_failure.asan \
+					  pocs/poc_ack_size.ubsan
+
+pocs/%.asan: pocs/%.c $(wildcard ../src/*.c) pocs/poc_parser_packet.h pocs/poc_sender_context.h
+	$(POC_CC) $(POC_CFLAGS) $< ../src/*.c $(POC_LIBS) -o $@
+
+pocs/poc_ack_size.ubsan: pocs/poc_ack_size.c $(wildcard ../src/*.c)
+	$(POC_CC) $(POC_CFLAGS) -fsanitize=address,undefined $< ../src/*.c $(POC_LIBS) -o $@
+
+memory_safety: $(MEMORY_SAFETY_BINS)
+	sh pocs/check_memory_safety.sh
+
 test1:
 	gcc test1.c -lz -llimeade -o test1.out
 	valgrind --leak-check=full ./test1.out
@@ -31,5 +52,7 @@ test4:
 
 clean:
 	-@rm test*.out *.csv *.txt *.png *.svg
+	-@rm test*.out *.csv *.txt *.png *.svg
+	-@rm -f pocs/*.asan
 
-all: test1 test2 test3 test4
+all: test1 test2 test3 test4 memory_safety

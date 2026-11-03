@@ -254,7 +254,8 @@ struct limeade_context
  *        would be a valid flags argument
  * ...:
  *   if LIMEADE_MODE_CLIENT_*SSH:
- *     const char *dest // like "user@machine"
+ *     const char *dest     // like "127.0.0.1"
+ *     const char *key_path // like "/home/user/.ssh/id_ed22519"
  *   if LIMEADE_MODE_CLIENT_ETH:
  *     const char *dest, // host IP address
  *     int port          // port (generally LIMEADE_PORT)

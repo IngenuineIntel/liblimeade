@@ -136,11 +136,11 @@ static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
   limeade_destruct_th_recv_step_2(ctx);\
   limeade_destruct_th_recv_step_1(ctx);
 
-static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const char *dest)
+static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const char *dest, const char *key_path)
 {
   /* manages pipe/dup/execve for LIMEADE_MODE_CLIENT_SSH */
 
-  if(!dest)
+  if(!dest || !key_path)
     return LIMEADE_ERROR_GARBAGE;
 
   ctx->dest = strdup(dest);
@@ -170,7 +170,9 @@ static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const cha
       close(to_ssh[1]);
 
       // ssh -s user@host limeade
-      execlp("ssh", "ssh", "-s", dest, LIMEADE_SUBSYSTEM, NULL);
+      execlp("ssh", "ssh", "-i", key_path,
+             "-oBatchMode=yes", "-oIdentitiesOnly=yes", "-s", "-l",
+             "limeade", dest, LIMEADE_SUBSYSTEM, NULL);
 
       exit(-1);
 
@@ -321,9 +323,13 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
       ctx->sfd = STDOUT_FILENO;
       break;
     case LIMEADE_MODE_CLIENT_SSH:
-      r = limeade_init_client_ssh_step_1(ctx, va_arg(arg, const char *));
+    {
+      const char *dest = va_arg(arg, const char *);
+      const char *key_path = va_arg(arg, const char *);
+      r = limeade_init_client_ssh_step_1(ctx, dest, key_path);
       // allow_compr = 0;
       break;
+    }
     case LIMEADE_MODE_HOST_ETH:
       r = limeade_init_host_eth_step_1(ctx, va_arg(arg, int));
       break;
