@@ -29,7 +29,7 @@
 static int name(type in, void *out, int max)\
 {\
   if(!out) return 0;\
-  if(sizeof(in) + 1 > max) return -1;\
+  if(sizeof(in) + 1 > (uint64_t)max) return -1;\
   if(in == 0)\
   {\
     *(uint8_t*)out = '\x00';\

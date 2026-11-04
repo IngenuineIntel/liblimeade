@@ -62,3 +62,4 @@ env/
 
 # compiled tests
 tests/bin
+tests/pocs/poc*.*san
