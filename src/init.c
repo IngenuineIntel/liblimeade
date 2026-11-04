@@ -350,6 +350,9 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   CHECK(r)
     goto err_1;
 
+  // TODO I feel like this should be explicitly user-supplied
+  ctx->ack_wait_time_ms = 750;
+
   if(allow_compr)
   {
     switch(ctx->compr_mode)

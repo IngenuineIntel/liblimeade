@@ -2,14 +2,15 @@
 //
 // AGPL here
 
+#include<errno.h>
 #include<signal.h>
 
 #include<liblimeade/liblimeade-internal.h>
 
 int limeade_statecheck(struct limeade_context *ctx)
 {
-  if(ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH)
-    if(kill(ctx->ssh_pid, 0) != 0)
+  if(ctx->mode == LIMEADE_MODE_CLIENT_SSH)
+    if(kill(ctx->ssh_pid, 0) != 0 && errno != ESRCH)
       return LIMEADE_ERROR_SSH_CHILD;
   if(pthread_kill(ctx->recv.tid, 0) != 0)
     return LIMEADE_ERROR_TH_RECV_DIED;

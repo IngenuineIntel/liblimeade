@@ -87,9 +87,6 @@ int limeade_prelim_confirm(const void *buffer, const int sz)
   /* Does preliminary checks on the packet in the buffer to confirm it's not
    * complete garbage. */
 
-  // note: `return -1` is replaced with `goto f` because the assembly will look
-  // nicer
-
   struct limeade_packet_flags *f = (struct limeade_packet_flags*)(buffer + MAGSZ);
 
   if(sz <= MAGSZ + sizeof(*f) + 2)

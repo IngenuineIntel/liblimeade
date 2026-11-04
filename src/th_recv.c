@@ -21,7 +21,7 @@ void *limeade_th_recv_host_eth(void *arg)
   struct sockaddr_in tmp_sockaddr;
   socklen_t tmp_socklen;
   void *buffer;
-  int amt_recv, poll_ms, poll_ret;
+  int amt_recv, poll_ms, poll_ret, pipe_ended;
 
   ctx = arg;
   r   = &ctx->recv;
@@ -41,10 +41,18 @@ void *limeade_th_recv_host_eth(void *arg)
   {
 
     poll_ret = poll(&recv_poll, 1, poll_ms);
-    if(poll_ret < 0 && errno == EINTR)
+    if(poll_ret <= 0)
       continue;
-    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
-      continue;
+
+    if(recv_poll.revents & POLLHUP)
+      pipe_ended = 1;
+
+    if(!(recv_poll.revents & POLLIN))
+    {
+      if(pipe_ended)
+        break;
+      else continue;
+    }
 
     pthread_mutex_lock(&ctx->mtx_rfd);
     pthread_mutex_lock(&ctx->mtx_mode_specific);
@@ -71,7 +79,7 @@ void *limeade_th_recv_client_eth(void *arg)
   struct limeade_recv_data *r;
   struct pollfd recv_poll;
   void *buffer;
-  int amt_recv, poll_ms, poll_ret;
+  int amt_recv, poll_ms, poll_ret, pipe_ended;
 
   ctx = arg;
   r   = &ctx->recv;
@@ -91,10 +99,18 @@ void *limeade_th_recv_client_eth(void *arg)
   {
 
     poll_ret = poll(&recv_poll, 1, poll_ms);
-    if(poll_ret < 0 && errno == EINTR)
+    if(poll_ret <= 0)
       continue;
-    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
-      continue;
+
+    if(recv_poll.revents & POLLHUP)
+      pipe_ended = 1;
+
+    if(!(recv_poll.revents & POLLIN))
+    {
+      if(pipe_ended)
+        break;
+      else continue;
+    }
 
     pthread_mutex_lock(&ctx->mtx_rfd);
 
@@ -120,7 +136,7 @@ void *limeade_th_recv_client_ssh(void *arg)
   struct limeade_recv_data *r;
   struct pollfd recv_poll;
   void *buffer;
-  int amt_recv, poll_ms, poll_ret;
+  int amt_recv, poll_ms, poll_ret, pipe_ended;
 
   ctx = arg;
   r   = &ctx->recv;
@@ -140,10 +156,19 @@ void *limeade_th_recv_client_ssh(void *arg)
     recv_poll.fd = ctx->rfd;
 
     poll_ret = poll(&recv_poll, 1, poll_ms);
-    if(poll_ret < 0 && errno == EINTR)
+
+    if(poll_ret <= 0)
       continue;
-    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
-      continue;
+
+    if(recv_poll.revents & POLLHUP)
+      pipe_ended = 1;
+
+    if(!(recv_poll.revents & POLLIN))
+    {
+      if(pipe_ended)
+        break;
+      else continue;
+    }
 
     pthread_mutex_lock(&ctx->mtx_rfd);
 
