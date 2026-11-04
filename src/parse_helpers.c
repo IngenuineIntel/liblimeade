@@ -38,7 +38,8 @@ int limeade_decompress_packet(struct limeade_recvd *pkt)
   if(!new)
     return LIMEADE_ERROR_MEMORY;
 
-  if(uncompress(new, &new_l, pkt->data, f->packet_size) != Z_OK)
+  if(uncompress(new, &new_l, pkt->data,
+                f->packet_size - sizeof(*f) - sizeof(LIMEADE_MAGIC)) != Z_OK)
   {
     free(new);
     return LIMEADE_ERROR_COMPRESSION;

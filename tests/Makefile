@@ -19,12 +19,15 @@ pocs/%.asan: pocs/%.c $(wildcard ../src/*.c) pocs/poc_parser_packet.h pocs/poc_s
 pocs/poc_ack_size.ubsan: pocs/poc_ack_size.c $(wildcard ../src/*.c)
 	$(POC_CC) $(POC_CFLAGS) -fsanitize=address,undefined $< ../src/*.c $(POC_LIBS) -o $@
 
-test1:
-	gcc test1.c -lz -llimeade -o test1.out
+liblimeade:
+	$(MAKE) -C .. so
+
+test1: liblimeade
+	gcc test1.c -L.. -Wl,-rpath,'$$ORIGIN/..' -l:liblimeade-0.1.so -lz -o test1.out
 	valgrind --leak-check=full ./test1.out
 
-test2:
-	gcc test2.c -lz -llimeade -o test2.out
+test2: liblimeade
+	gcc test2.c -L.. -Wl,-rpath,'$$ORIGIN/..' -l:liblimeade-0.1.so -lz -o test2.out
 	valgrind --leak-check=full ./test2.out
 
 test3_graph:
@@ -50,9 +53,16 @@ test4:
 test5: $(MEMORY_SAFETY_BINS)
 	sh pocs/check_memory_safety.sh
 
+test6:
+	$(POC_CC) $(POC_CFLAGS) test_ssh_framing.c ../src/th_recv_helpers.c $(POC_LIBS) -o test_ssh_framing.out
+	./test_ssh_framing.out
+	rm -f test_ssh_framing.out
+
 clean:
 	-@rm test*.out *.csv *.txt *.png *.svg
 	-@rm test*.out *.csv *.txt *.png *.svg
 	-@rm -f pocs/*.asan
 
-all: test1 test2 test3 test4 test5
+.PHONY: liblimeade test_ssh_framing
+
+all: test1 test2 test3 test4 test5 test6

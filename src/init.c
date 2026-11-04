@@ -136,7 +136,8 @@ static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
   limeade_destruct_th_recv_step_2(ctx);\
   limeade_destruct_th_recv_step_1(ctx);
 
-static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const char *dest, const char *key_path)
+static int limeade_init_client_ssh_step_1(struct limeade_context *ctx,
+                                         const char *dest, const char *key_path)
 {
   /* manages pipe/dup/execve for LIMEADE_MODE_CLIENT_SSH */
 
@@ -170,9 +171,11 @@ static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const cha
       close(to_ssh[1]);
 
       // ssh -s user@host limeade
-      execlp("ssh", "ssh", "-i", key_path,
-             "-oBatchMode=yes", "-oIdentitiesOnly=yes", "-s", "-l",
-             "limeade", dest, LIMEADE_SUBSYSTEM, NULL);
+          execlp("ssh", "ssh", "-i", key_path, "-oBatchMode=yes",
+                  "-oIdentitiesOnly=yes",
+                      "-oUpdateHostKeys=no",
+                  "-oUserKnownHostsFile=/etc/limeade/.ssh/known_hosts",
+                  "-s", "-l", "limeade", dest, LIMEADE_SUBSYSTEM, NULL);
 
       exit(-1);
 
@@ -350,7 +353,6 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   CHECK(r)
     goto err_1;
 
-  // TODO I feel like this should be explicitly user-supplied
   ctx->ack_wait_time_ms = 750;
 
   if(allow_compr)

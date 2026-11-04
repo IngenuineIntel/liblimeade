@@ -202,6 +202,7 @@ struct limeade_recv_data
 
   struct limeade_indiv_recv ack; // acknowledgement packets go here
 
+  sem_t ack_ready; // signals that ack contains a newly received packet
   sem_t sem_kys; // kill switch for recv thread
 };
 

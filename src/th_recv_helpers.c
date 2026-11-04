@@ -23,6 +23,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
   if(((struct limeade_packet_flags*)(pkt + MAGSZ))->type == LIMEADE_PACKET_ACKNOWLEDGE)
   {
     memcpy(r->ack.data, pkt, sz);
+    r->ack.sz = sz;
 
     if(addr)
     {
@@ -87,9 +88,12 @@ int limeade_prelim_confirm(const void *buffer, const int sz)
   /* Does preliminary checks on the packet in the buffer to confirm it's not
    * complete garbage. */
 
+  // note: `return -1` is replaced with `goto f` because the assembly will look
+  // nicer
+
   struct limeade_packet_flags *f = (struct limeade_packet_flags*)(buffer + MAGSZ);
 
-  if(sz <= MAGSZ + sizeof(*f) + 2)
+  if(sz < 0 || (size_t)sz <= MAGSZ + sizeof(*f) + 2)
     goto f;
   
   if(memcmp(buffer, LIMEADE_MAGIC, MAGSZ) != 0)
@@ -104,6 +108,29 @@ int limeade_prelim_confirm(const void *buffer, const int sz)
   return 0;
 f:
   return -1;
+}
+
+int limeade_ssh_frame_size(const void *buffer, size_t available, size_t *frame_size)
+{
+  struct limeade_packet_flags flags;
+  size_t header_size = MAGSZ + sizeof(flags);
+
+  if(available < MAGSZ)
+    return memcmp(buffer, LIMEADE_MAGIC, available) == 0 ? 0 : -1;
+
+  if(memcmp(buffer, LIMEADE_MAGIC, MAGSZ) != 0)
+    return -1;
+
+  if(available < header_size)
+    return 0;
+
+  memcpy(&flags, buffer + MAGSZ, sizeof(flags));
+  if(flags.type >= LIMEADE_PACKET_MAX
+  || flags.packet_size < header_size + 1)
+    return -1;
+
+  *frame_size = flags.packet_size;
+  return available < *frame_size ? 0 : 1;
 }
 
 #undef MAGSZ

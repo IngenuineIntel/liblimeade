@@ -19,6 +19,7 @@
 #ifndef _LIBLIMEADE_INTERNAL_H_
 #define _LIBLIMEADE_INTERNAL_H_
 
+#include <stddef.h>
 #include<liblimeade/liblimeade.h>
 
 // function generator for writing data into packets before sending
@@ -139,6 +140,10 @@ inline int limeade_ssh_recv(const struct limeade_context *ctx,
  * does preliminary checks on a packet to make sure it is valid
  */
 int limeade_prelim_confirm(const void *buffer, const int sz);
+
+/* Returns 1 for a complete frame, 0 when more stream bytes are needed,
+ * and -1 when the current prefix cannot begin a valid frame. */
+int limeade_ssh_frame_size(const void *buffer, size_t available, size_t *frame_size);
 
 // signal hook for th_recv
 void limeade_recv_stop_signal(int signal);

@@ -545,6 +545,8 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   clock_gettime(CLOCK_REALTIME, &recvwait);
   recvwait.tv_sec  += ctx->ack_wait_time_ms / 1000;
   recvwait.tv_nsec += ctx->ack_wait_time_ms % 1000 * 1000000;
+  recvwait.tv_sec  += recvwait.tv_nsec / 1000000000;
+  recvwait.tv_nsec %= 1000000000;
   
   pthread_mutex_unlock(&ctx->mtx_pub_attrs);
 
@@ -557,17 +559,37 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   }
 
   {
-    char ack_pkt[r->ack.sz];
+    char *ack_pkt;
+    unsigned int ack_size = r->ack.sz;
+
+    if(ack_size < sizeof(LIMEADE_MAGIC) + sizeof(*ack_f)
+    || ack_size > LIMEADE_MAX_PKT_SZ)
+    {
+      pthread_mutex_unlock(&r->ack.mtx);
+      _ = LIMEADE_ERROR_GARBAGE;
+      goto err;
+    }
+
+    ack_pkt = malloc(ack_size);
+    if(!ack_pkt)
+    {
+      pthread_mutex_unlock(&r->ack.mtx);
+      _ = LIMEADE_ERROR_MEMORY;
+      goto err;
+    }
+
     recv_ack.pkt    = ack_pkt;
     recv_ack.flags  = ack_f = recv_ack.pkt + sizeof(LIMEADE_MAGIC);
     recv_ack.data   = recv_ack.flags + sizeof(*ack_f);
-    recv_ack.pkt_sz = r->ack.sz;
+    recv_ack.pkt_sz = ack_size;
+
+    memcpy(ack_pkt, r->ack.data, ack_size);
     recv_ack.type   = ack_f->type;
     recv_ack.compr  = ack_f->compr_lvl;
-
-    memcpy(ack_pkt, r->ack.data, r->ack.sz);
+    pthread_mutex_unlock(&r->ack.mtx);
 
     _ = limeade_parse_ack(&a, &recv_ack);
+    free(recv_ack.pkt);
   }
 
   if(_ != LIMEADE_SUCCESS)
