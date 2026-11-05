@@ -47,7 +47,6 @@ int main(void)
     limeade_destruct(&host);
     return 1;
   }
-  client.ack_wait_time_ms = 5000;
   if(pthread_create(&receiver, NULL, receive_one, &task) != 0)
   {
     limeade_destruct(&client);
@@ -56,7 +55,7 @@ int main(void)
   }
 
   struct limeade_close close_data = {.explanation = "local reproducer"};
-  (void)limeade_send_await(&client, LIMEADE_PACKET_CLOSE, close_data);
+  (void)limeade_send_await(&client, 5000, LIMEADE_PACKET_CLOSE, close_data);
   pthread_join(receiver, NULL);
   printf("host receive result: %d\n", task.result);
 

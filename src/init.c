@@ -202,10 +202,18 @@ static inline int limeade_init_client_ssh_step_2(struct limeade_context *ctx)
 {
   // there's not really anything to do here except confirm that the process
   // hasn't died for some reason
+  struct sigaction sa;
+  sa.sa_handler = SIG_IGN;
+  sa.sa_flags   = 0;
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGPIPE, &sa, NULL);
+
   register int r = kill(ctx->ssh_pid, 0);
 
   if(r != 0 && errno != EPERM)
     return LIMEADE_ERROR_OTHER;
+
+
   return LIMEADE_SUCCESS;
 }
 
@@ -352,8 +360,6 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   r = limeade_init_mutexes(ctx);
   CHECK(r)
     goto err_1;
-
-  ctx->ack_wait_time_ms = 750;
 
   if(allow_compr)
   {

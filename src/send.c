@@ -413,8 +413,19 @@ int limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *p
   pthread_mutex_lock(&ctx->mtx_sfd);
 
   if(ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH)
-    write(ctx->sfd, pkt->pkt, pkt->pkt_sz);
+  {
+    if(write(ctx->sfd, pkt->pkt, pkt->pkt_sz) < 0)
+    {
+      switch(errno)
+      {
+        case EPIPE:
+          return LIMEADE_ERROR_SSH_CHILD;
+        default:
+          return LIMEADE_ERROR_OTHER;
+      }
+    }
 
+  }
   else if(ctx->mode == LIMEADE_MODE_CLIENT_ETH)
   {
     pthread_mutex_lock(&ctx->mtx_mode_specific);
