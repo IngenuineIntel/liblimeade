@@ -496,7 +496,7 @@ err:
   return _;
 }
 
-int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ...)
+int limeade_send_await(struct limeade_context *ctx, uint64_t wait_time_ms, enum limeade_packet type, ...)
 {
   register int _;
   struct limeade_recv_data *r;
@@ -543,10 +543,8 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   pthread_mutex_lock(&ctx->mtx_pub_attrs);
 
   clock_gettime(CLOCK_REALTIME, &recvwait);
-  recvwait.tv_sec  += ctx->ack_wait_time_ms / 1000;
-  recvwait.tv_nsec += ctx->ack_wait_time_ms % 1000 * 1000000;
-  recvwait.tv_sec  += recvwait.tv_nsec / 1000000000;
-  recvwait.tv_nsec %= 1000000000;
+  recvwait.tv_sec  += wait_time_ms / 1000;
+  recvwait.tv_nsec += wait_time_ms % 1000 * 1000000;
   
   pthread_mutex_unlock(&ctx->mtx_pub_attrs);
 
@@ -559,22 +557,14 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   }
 
   {
-    char *ack_pkt;
     unsigned int ack_size = r->ack.sz;
+    char ack_pkt[ack_size];
 
     if(ack_size < sizeof(LIMEADE_MAGIC) + sizeof(*ack_f)
     || ack_size > LIMEADE_MAX_PKT_SZ)
     {
       pthread_mutex_unlock(&r->ack.mtx);
       _ = LIMEADE_ERROR_GARBAGE;
-      goto err;
-    }
-
-    ack_pkt = malloc(ack_size);
-    if(!ack_pkt)
-    {
-      pthread_mutex_unlock(&r->ack.mtx);
-      _ = LIMEADE_ERROR_MEMORY;
       goto err;
     }
 
@@ -589,7 +579,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
     pthread_mutex_unlock(&r->ack.mtx);
 
     _ = limeade_parse_ack(&a, &recv_ack);
-    free(recv_ack.pkt);
+    // if we ever want to do something with this data, we can do so here
   }
 
   if(_ != LIMEADE_SUCCESS)

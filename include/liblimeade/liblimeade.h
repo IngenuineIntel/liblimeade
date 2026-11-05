@@ -225,7 +225,6 @@ struct limeade_context
   pthread_mutex_t mtx_pub_attrs;
   char *dest;
   int port;
-  uint32_t ack_wait_time_ms;
 
   pthread_mutex_t mtx_mode_specific;
   union
@@ -474,7 +473,7 @@ int limeade_send(struct limeade_context *ctx, enum limeade_packet type, ...);
  *
  * 0 on success, -1 on error, and the error is push to the error buffer
  */
-int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ...);
+int limeade_send_await(struct limeade_context *ctx, uint64_t wait_time_ms, enum limeade_packet type, ...);
 
 // struct limeade_recv
 // received data before parsing
