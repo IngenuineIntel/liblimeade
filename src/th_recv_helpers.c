@@ -110,28 +110,5 @@ f:
   return -1;
 }
 
-int limeade_ssh_frame_size(const void *buffer, size_t available, size_t *frame_size)
-{
-  struct limeade_packet_flags flags;
-  size_t header_size = MAGSZ + sizeof(flags);
-
-  if(available < MAGSZ)
-    return memcmp(buffer, LIMEADE_MAGIC, available) == 0 ? 0 : -1;
-
-  if(memcmp(buffer, LIMEADE_MAGIC, MAGSZ) != 0)
-    return -1;
-
-  if(available < header_size)
-    return 0;
-
-  memcpy(&flags, buffer + MAGSZ, sizeof(flags));
-  if(flags.type >= LIMEADE_PACKET_MAX
-  || flags.packet_size < header_size + 1)
-    return -1;
-
-  *frame_size = flags.packet_size;
-  return available < *frame_size ? 0 : 1;
-}
-
 #undef MAGSZ
 

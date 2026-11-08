@@ -162,42 +162,11 @@ void *limeade_th_recv_client_ssh(void *arg)
       break;
     }
 
-    buffered += (size_t)amt_recv;
-    while(buffered > 0)
-    {
-      size_t frame_size = 0;
-      int frame = limeade_ssh_frame_size(buffer, buffered, &frame_size);
-
-      if(frame == 0)
-        break;
-
-      if(frame < 0)
-      {
-        size_t next_magic = 1;
-        while(next_magic < buffered)
-        {
-          size_t remaining = buffered - next_magic;
-          size_t compare_size = remaining < sizeof(LIMEADE_MAGIC)
-                              ? remaining : sizeof(LIMEADE_MAGIC);
-          if(memcmp(buffer + next_magic, LIMEADE_MAGIC, compare_size) == 0)
-            break;
-          next_magic++;
-        }
-
-        memmove(buffer, buffer + next_magic, buffered - next_magic);
-        buffered -= next_magic;
-        continue;
-      }
-
-      limeade_th_recv_wr_pkt(r, buffer, frame_size, NULL, 0);
-      memmove(buffer, buffer + frame_size, buffered - frame_size);
-      buffered -= frame_size;
-    }
-
-    if(buffered == buffer_capacity)
+    if(limeade_prelim_confirm(buffer, amt_recv) != 0)
       continue;
-  }
 
+    limeade_th_recv_wr_pkt(r, buffer, amt_recv, NULL, 0);
+  }
   free(buffer);
   return NULL;
 }

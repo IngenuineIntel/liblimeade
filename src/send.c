@@ -412,50 +412,33 @@ int limeade_send_base(struct limeade_context *ctx, struct limeade_packet_data *p
 {
   pthread_mutex_lock(&ctx->mtx_sfd);
 
-  if(ctx->mode == LIMEADE_MODE_HOST_SSH || ctx->mode == LIMEADE_MODE_CLIENT_SSH)
+  switch(ctx->mode)
   {
-    if(write(ctx->sfd, pkt->pkt, pkt->pkt_sz) < 0)
-    {
-      switch(errno)
+    case LIMEADE_MODE_HOST_SSH:
+    case LIMEADE_MODE_CLIENT_SSH:
+      if(write(ctx->sfd, pkt->pkt, pkt->pkt_sz) < 0)
       {
-        case EPIPE:
+        if(errno == EPIPE)
           return LIMEADE_ERROR_SSH_CHILD;
-        default:
-          return LIMEADE_ERROR_OTHER;
+        return LIMEADE_ERROR_OTHER;
       }
-    }
-
+      break;
+    case LIMEADE_MODE_CLIENT_ETH:
+      pthread_mutex_lock(&ctx->mtx_mode_specific);
+      sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
+            (struct sockaddr*)&ctx->saddr, sizeof(ctx->saddr));
+      pthread_mutex_unlock(&ctx->mtx_mode_specific);
+      break;
+    case LIMEADE_MODE_HOST_ETH:
+      pthread_mutex_lock(&ctx->mtx_mode_specific);
+      sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
+             (struct sockaddr*)&ctx->cliaddr, ctx->cliaddr_len);
+      pthread_mutex_unlock(&ctx->mtx_mode_specific);
+      break;
+    default:
+      return LIMEADE_ERROR_INVALID_CONTEXT;
   }
-  else if(ctx->mode == LIMEADE_MODE_CLIENT_ETH)
-  {
-    pthread_mutex_lock(&ctx->mtx_mode_specific);
-
-    sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
-          (struct sockaddr*)&ctx->saddr, sizeof(ctx->saddr));
-
-    pthread_mutex_unlock(&ctx->mtx_mode_specific);
-
-  } else if (ctx->mode == LIMEADE_MODE_HOST_ETH)
-  {
-    pthread_mutex_lock(&ctx->mtx_mode_specific);
-
-    sendto(ctx->sfd, pkt->pkt, pkt->pkt_sz, 0,
-           (struct sockaddr*)&ctx->cliaddr, ctx->cliaddr_len);
-
-    pthread_mutex_unlock(&ctx->mtx_mode_specific);
-
-  } else if(ctx->mode == LIMEADE_MODE_CLIENT_LIBSSH)
-  {
-    pthread_mutex_unlock(&ctx->mtx_sfd);
-    return LIMEADE_ERROR_NOT_SUPPORTED;
-
-  } else
-  {
-    pthread_mutex_unlock(&ctx->mtx_sfd);
-    return LIMEADE_ERROR_INVALID_CONTEXT;
-  }
-
-  pthread_mutex_unlock(&ctx->mtx_sfd);  
+  pthread_mutex_unlock(&ctx->mtx_sfd);
   return LIMEADE_SUCCESS;
 }
 

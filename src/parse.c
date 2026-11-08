@@ -402,7 +402,7 @@ int limeade_parse_proc_generic(struct limeade_proc_generic *out, struct limeade_
   N_ROW_END()
     return LIMEADE_ERROR_BAD_DATA;
 
-  out->procs = malloc(sizeof(*j) * out->total);
+  out->procs = calloc(1, sizeof(*j) * out->total);
   if(!out->procs)
     return LIMEADE_ERROR_MEMORY;
 
