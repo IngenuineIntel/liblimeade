@@ -59,6 +59,7 @@ static inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   pthread_mutex_init(&r->mtx_idx, NULL);
   sem_init(&r->sem_kys, 0, 1);
   sem_wait(&r->sem_kys);
+  sem_init(&r->ack_ready, 0, 0);
 
   for(int i = 0; i < LIMEADE_NR_PKTS; i++)
   {
@@ -130,6 +131,7 @@ static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
   pthread_kill(r->tid, SIGUSR1);
   pthread_join(r->tid, NULL);
   sem_destroy(&r->sem_kys);
+  sem_destroy(&r->ack_ready);
 }
 
 #define limeade_destruct_th_recv(ctx)\

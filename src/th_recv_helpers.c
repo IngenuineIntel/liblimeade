@@ -22,6 +22,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 
   if(((struct limeade_packet_flags*)(pkt + MAGSZ))->type == LIMEADE_PACKET_ACKNOWLEDGE)
   {
+    pthread_mutex_lock(&r->ack.mtx);
     memcpy(r->ack.data, pkt, sz);
     r->ack.sz = sz;
 
@@ -32,7 +33,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
     }
 
     pthread_mutex_unlock(&r->ack.mtx);
-    pthread_mutex_lock(&r->ack.mtx);
+    sem_post(&r->ack_ready);
   } else
   {
     pthread_mutex_lock(&r->mtx_idx);

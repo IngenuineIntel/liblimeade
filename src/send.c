@@ -544,15 +544,20 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   retry:
 
-  if(pthread_mutex_timedlock(&r->ack.mtx, &recvwait) != 0)
+  do
+  {
+    _ = sem_timedwait(&r->ack_ready, &recvwait);
+  } while(_ != 0 && errno == EINTR);
+
+  if(_ != 0)
   {
     _ = LIMEADE_ERROR_REJECTED;
     goto err;
   }
 
   {
+    pthread_mutex_lock(&r->ack.mtx);
     unsigned int ack_size = r->ack.sz;
-    char ack_pkt[ack_size];
 
     if(ack_size < sizeof(LIMEADE_MAGIC) + sizeof(*ack_f)
     || ack_size > LIMEADE_MAX_PKT_SZ)
@@ -562,6 +567,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
       goto err;
     }
 
+    char ack_pkt[ack_size];
     recv_ack.pkt    = ack_pkt;
     recv_ack.flags  = ack_f = recv_ack.pkt + sizeof(LIMEADE_MAGIC);
     recv_ack.data   = recv_ack.flags + sizeof(*ack_f);

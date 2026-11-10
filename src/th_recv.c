@@ -27,8 +27,6 @@ void *limeade_th_recv_host_eth(void *arg)
   ctx = arg;
   r   = &ctx->recv;
 
-  pthread_mutex_lock(&r->ack.mtx);
-
   poll_ms = 1000/(r->hz);
 
   buffer = malloc(LIMEADE_MAX_PKT_SZ);
@@ -77,8 +75,6 @@ void *limeade_th_recv_client_eth(void *arg)
   ctx = arg;
   r   = &ctx->recv;
   
-  pthread_mutex_lock(&r->ack.mtx);
-
   poll_ms = 1000/(r->hz);
 
   buffer = malloc(LIMEADE_MAX_PKT_SZ);
@@ -128,8 +124,6 @@ void *limeade_th_recv_client_ssh(void *arg)
   ctx = arg;
   r   = &ctx->recv;
 
-  pthread_mutex_lock(&r->ack.mtx);
-
   poll_ms = 1000/(r->hz);
 
   buffer = malloc(buffer_capacity);
@@ -162,10 +156,34 @@ void *limeade_th_recv_client_ssh(void *arg)
       break;
     }
 
-    if(limeade_prelim_confirm(buffer, amt_recv) != 0)
-      continue;
+    buffered += (size_t)amt_recv;
 
-    limeade_th_recv_wr_pkt(r, buffer, amt_recv, NULL, 0);
+    while(buffered >= MAGSZ + sizeof(struct limeade_packet_flags))
+    {
+      struct limeade_packet_flags *flags =
+        (struct limeade_packet_flags*)(buffer + MAGSZ);
+      size_t frame_size = flags->packet_size;
+
+      if(memcmp(buffer, LIMEADE_MAGIC, MAGSZ) != 0
+      || frame_size < MAGSZ + sizeof(*flags) + 3
+      || frame_size > LIMEADE_MAX_PKT_SZ)
+      {
+        memmove(buffer, buffer + 1, --buffered);
+        continue;
+      }
+
+      if(buffered < frame_size)
+        break;
+
+      if(limeade_prelim_confirm(buffer, (int)frame_size) == 0)
+        limeade_th_recv_wr_pkt(r, buffer, (unsigned int)frame_size, NULL, 0);
+
+      buffered -= frame_size;
+      memmove(buffer, buffer + frame_size, buffered);
+    }
+
+    if(buffered == buffer_capacity)
+      buffered = 0;
   }
   free(buffer);
   return NULL;
