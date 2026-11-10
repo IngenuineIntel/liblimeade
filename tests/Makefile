@@ -1,6 +1,8 @@
 #!/usr/bin/make
 # quick-in-dirty test runners
 
+LIB_DIR ?= ..
+
 test1:
 	gcc test1.c -L.. -Wl,-rpath,'$$ORIGIN/..' -l:liblimeade-0.1.so -lz -o test1.out
 	valgrind --leak-check=full ./test1.out
@@ -29,7 +31,13 @@ test4:
 	#-@cat test4.csv
 	$(MAKE) test4_graph
 
+test5:
+	gcc -I../include test_ack_concurrency.c -L$(LIB_DIR) \
+	  -Wl,-rpath,$(abspath $(LIB_DIR)) -l:liblimeade-0.1.so -lz -pthread \
+	  -o test_ack_concurrency.out
+	./test_ack_concurrency.out
+
 clean:
 	-@rm test*.out *.csv *.txt *.png *.svg
 
-all: test1 test2 test3 test4
+all: test1 test2 test3 test4 test5

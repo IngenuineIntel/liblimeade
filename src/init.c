@@ -69,6 +69,7 @@ static inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   }
 
   pthread_mutex_init(&r->ack.mtx, NULL);
+  pthread_mutex_init(&r->mtx_ack_wait, NULL);
 
   r->hz             = LIMEADE_TH_RECV_DFLT_HZ;
   r->nr_pkts_unread = 0;
@@ -122,6 +123,8 @@ static void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
   pthread_mutex_destroy(&r->mtx_nr_read);
   pthread_mutex_destroy(&r->mtx_lost);
   pthread_mutex_destroy(&r->mtx_idx);
+  pthread_mutex_destroy(&r->mtx_ack_wait);
+  pthread_mutex_destroy(&r->ack.mtx);
 }
 
 static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
@@ -288,7 +291,6 @@ static inline int limeade_init_host_eth_step_1(struct limeade_context *ctx,
   ctx->dest = NULL;
   ctx->port          = port;
 
-  ctx->saddr_len             = sizeof(ctx->saddr);
   ctx->saddr.sin_addr.s_addr = htonl(INADDR_ANY);
   ctx->saddr.sin_family      = AF_INET;
 

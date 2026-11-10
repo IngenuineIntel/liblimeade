@@ -498,6 +498,7 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   struct limeade_packet_flags flags, *f, *ack_f;
   struct limeade_ack a;
   struct timespec sendts, recvwait;
+  int ack_locked = 0;
   va_list arg;
   va_start(arg, type);
 
@@ -507,7 +508,10 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   _ = limeade_statecheck(ctx);
   if(_ != LIMEADE_SUCCESS)
+  {
+    va_end(arg);
     return _;
+  }
 
   pkt.type = flags.type = type;
 
@@ -529,6 +533,9 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
   f->packet_size = pkt.pkt_sz;
   f->ts_s        = sendts.tv_sec;
   f->ts_ms       = sendts.tv_nsec / 1000000;
+
+  pthread_mutex_lock(&r->mtx_ack_wait);
+  ack_locked = 1;
 
   _ = limeade_send_base(ctx, &pkt);
   if(_ != LIMEADE_SUCCESS)
@@ -594,7 +601,10 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
 
   err:
 
+  if(ack_locked)
+    pthread_mutex_unlock(&r->mtx_ack_wait);
   free(pkt.pkt);
+  va_end(arg);
   return _;
 }
 

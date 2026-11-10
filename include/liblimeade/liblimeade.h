@@ -202,6 +202,7 @@ struct limeade_recv_data
 
   struct limeade_indiv_recv ack; // acknowledgement packets go here
 
+  pthread_mutex_t mtx_ack_wait; // serializes send-and-wait transactions
   sem_t ack_ready; // signals that ack contains a newly received packet
   sem_t sem_kys; // kill switch for recv thread
 };
@@ -233,11 +234,12 @@ struct limeade_context
     pid_t ssh_pid; // LIMEADE_MODE_CLIENT_SSH
 
     struct sockaddr_in saddr; // LIMEADE_MODE_CLIENT_ETH
-    socklen_t saddr_len;
 
-    // must be populated before calls to send packets
-    struct sockaddr_in cliaddr; // LIMEADE_MODE_HOST_ETH
-    socklen_t cliaddr_len;
+    struct
+    {
+      struct sockaddr_in cliaddr; // LIMEADE_MODE_HOST_ETH
+      socklen_t cliaddr_len;
+    };
   };
 
   struct limeade_recv_data recv;
