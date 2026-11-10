@@ -586,8 +586,6 @@ int limeade_send_await(struct limeade_context *ctx, enum limeade_packet type, ..
     pthread_mutex_unlock(&r->ack.mtx);
 
     _ = limeade_parse_ack(&a, &recv_ack);
-    // if we are to do anything with the acknowledgemnet packet, we
-    // shall do so here
   }
 
   if(_ != LIMEADE_SUCCESS)
