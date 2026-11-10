@@ -22,7 +22,9 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
 
   if(((struct limeade_packet_flags*)(pkt + MAGSZ))->type == LIMEADE_PACKET_ACKNOWLEDGE)
   {
+    pthread_mutex_lock(&r->ack.mtx);
     memcpy(r->ack.data, pkt, sz);
+    r->ack.sz = sz;
 
     if(addr)
     {
@@ -31,7 +33,7 @@ void limeade_th_recv_wr_pkt(struct limeade_recv_data *r, void *pkt,
     }
 
     pthread_mutex_unlock(&r->ack.mtx);
-    pthread_mutex_lock(&r->ack.mtx);
+    sem_post(&r->ack_ready);
   } else
   {
     pthread_mutex_lock(&r->mtx_idx);
@@ -87,9 +89,12 @@ int limeade_prelim_confirm(const void *buffer, const int sz)
   /* Does preliminary checks on the packet in the buffer to confirm it's not
    * complete garbage. */
 
+  // note: `return -1` is replaced with `goto f` because the assembly will look
+  // nicer
+
   struct limeade_packet_flags *f = (struct limeade_packet_flags*)(buffer + MAGSZ);
 
-  if(sz <= MAGSZ + sizeof(*f) + 2)
+  if(sz < 0 || (size_t)sz <= MAGSZ + sizeof(*f) + 2)
     goto f;
   
   if(memcmp(buffer, LIMEADE_MAGIC, MAGSZ) != 0)

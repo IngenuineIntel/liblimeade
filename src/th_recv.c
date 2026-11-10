@@ -7,6 +7,7 @@
 #include<pthread.h>
 #include<stdlib.h>
 #include<stdint.h>
+#include<string.h>
 #include<unistd.h>
 
 #include<liblimeade/liblimeade-internal.h>
@@ -21,12 +22,10 @@ void *limeade_th_recv_host_eth(void *arg)
   struct sockaddr_in tmp_sockaddr;
   socklen_t tmp_socklen;
   void *buffer;
-  int amt_recv, poll_ms, poll_ret, pipe_ended;
+  int amt_recv, poll_ms, poll_ret;
 
   ctx = arg;
   r   = &ctx->recv;
-
-  pthread_mutex_lock(&r->ack.mtx);
 
   poll_ms = 1000/(r->hz);
 
@@ -41,18 +40,10 @@ void *limeade_th_recv_host_eth(void *arg)
   {
 
     poll_ret = poll(&recv_poll, 1, poll_ms);
-    if(poll_ret <= 0)
+    if(poll_ret < 0 && errno == EINTR)
       continue;
-
-    if(recv_poll.revents & POLLHUP)
-      pipe_ended = 1;
-
-    if(!(recv_poll.revents & POLLIN))
-    {
-      if(pipe_ended)
-        break;
-      else continue;
-    }
+    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
+      continue;
 
     pthread_mutex_lock(&ctx->mtx_rfd);
     pthread_mutex_lock(&ctx->mtx_mode_specific);
@@ -79,13 +70,11 @@ void *limeade_th_recv_client_eth(void *arg)
   struct limeade_recv_data *r;
   struct pollfd recv_poll;
   void *buffer;
-  int amt_recv, poll_ms, poll_ret, pipe_ended;
+  int amt_recv, poll_ms, poll_ret;
 
   ctx = arg;
   r   = &ctx->recv;
   
-  pthread_mutex_lock(&r->ack.mtx);
-
   poll_ms = 1000/(r->hz);
 
   buffer = malloc(LIMEADE_MAX_PKT_SZ);
@@ -99,18 +88,10 @@ void *limeade_th_recv_client_eth(void *arg)
   {
 
     poll_ret = poll(&recv_poll, 1, poll_ms);
-    if(poll_ret <= 0)
+    if(poll_ret < 0 && errno == EINTR)
       continue;
-
-    if(recv_poll.revents & POLLHUP)
-      pipe_ended = 1;
-
-    if(!(recv_poll.revents & POLLIN))
-    {
-      if(pipe_ended)
-        break;
-      else continue;
-    }
+    if(poll_ret <= 0 || !(recv_poll.revents & POLLIN))
+      continue;
 
     pthread_mutex_lock(&ctx->mtx_rfd);
 
@@ -135,17 +116,17 @@ void *limeade_th_recv_client_ssh(void *arg)
   struct limeade_context *ctx;
   struct limeade_recv_data *r;
   struct pollfd recv_poll;
-  void *buffer;
-  int amt_recv, poll_ms, poll_ret, pipe_ended;
+  unsigned char *buffer;
+  size_t buffered = 0;
+  const size_t buffer_capacity = LIMEADE_MAX_PKT_SZ * 2u;
+  int amt_recv, poll_ms, poll_ret;
 
   ctx = arg;
   r   = &ctx->recv;
 
-  pthread_mutex_lock(&r->ack.mtx);
-
   poll_ms = 1000/(r->hz);
 
-  buffer = malloc(LIMEADE_MAX_PKT_SZ);
+  buffer = malloc(buffer_capacity);
   if(!buffer)
     return NULL;
 
@@ -156,32 +137,54 @@ void *limeade_th_recv_client_ssh(void *arg)
     recv_poll.fd = ctx->rfd;
 
     poll_ret = poll(&recv_poll, 1, poll_ms);
-
-    if(poll_ret <= 0)
+    if(poll_ret < 0 && errno == EINTR)
       continue;
-
-    if(recv_poll.revents & POLLHUP)
-      pipe_ended = 1;
-
-    if(!(recv_poll.revents & POLLIN))
-    {
-      if(pipe_ended)
-        break;
-      else continue;
-    }
+    if(poll_ret <= 0
+    || !(recv_poll.revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL)))
+      continue;
 
     pthread_mutex_lock(&ctx->mtx_rfd);
 
-    amt_recv = read(recv_poll.fd, buffer, LIMEADE_MAX_PKT_SZ);
+    amt_recv = read(recv_poll.fd, buffer + buffered, buffer_capacity - buffered);
 
     pthread_mutex_unlock(&ctx->mtx_rfd);
-    
-    if(limeade_prelim_confirm(buffer, amt_recv) != 0)
-      continue;
 
-    limeade_th_recv_wr_pkt(r, buffer, amt_recv, NULL, 0);
+    if(amt_recv <= 0)
+    {
+      if(amt_recv < 0 && errno == EINTR)
+        continue;
+      break;
+    }
+
+    buffered += (size_t)amt_recv;
+
+    while(buffered >= MAGSZ + sizeof(struct limeade_packet_flags))
+    {
+      struct limeade_packet_flags *flags =
+        (struct limeade_packet_flags*)(buffer + MAGSZ);
+      size_t frame_size = flags->packet_size;
+
+      if(memcmp(buffer, LIMEADE_MAGIC, MAGSZ) != 0
+      || frame_size < MAGSZ + sizeof(*flags) + 3
+      || frame_size > LIMEADE_MAX_PKT_SZ)
+      {
+        memmove(buffer, buffer + 1, --buffered);
+        continue;
+      }
+
+      if(buffered < frame_size)
+        break;
+
+      if(limeade_prelim_confirm(buffer, (int)frame_size) == 0)
+        limeade_th_recv_wr_pkt(r, buffer, (unsigned int)frame_size, NULL, 0);
+
+      buffered -= frame_size;
+      memmove(buffer, buffer + frame_size, buffered);
+    }
+
+    if(buffered == buffer_capacity)
+      buffered = 0;
   }
-
   free(buffer);
   return NULL;
 }

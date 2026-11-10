@@ -59,6 +59,7 @@ static inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   pthread_mutex_init(&r->mtx_idx, NULL);
   sem_init(&r->sem_kys, 0, 1);
   sem_wait(&r->sem_kys);
+  sem_init(&r->ack_ready, 0, 0);
 
   for(int i = 0; i < LIMEADE_NR_PKTS; i++)
   {
@@ -68,6 +69,7 @@ static inline int limeade_init_th_recv_step_1(struct limeade_context *ctx)
   }
 
   pthread_mutex_init(&r->ack.mtx, NULL);
+  pthread_mutex_init(&r->mtx_ack_wait, NULL);
 
   r->hz             = LIMEADE_TH_RECV_DFLT_HZ;
   r->nr_pkts_unread = 0;
@@ -121,6 +123,8 @@ static void limeade_destruct_th_recv_step_1(struct limeade_context *ctx)
   pthread_mutex_destroy(&r->mtx_nr_read);
   pthread_mutex_destroy(&r->mtx_lost);
   pthread_mutex_destroy(&r->mtx_idx);
+  pthread_mutex_destroy(&r->mtx_ack_wait);
+  pthread_mutex_destroy(&r->ack.mtx);
 }
 
 static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
@@ -130,13 +134,15 @@ static void limeade_destruct_th_recv_step_2(struct limeade_context *ctx)
   pthread_kill(r->tid, SIGUSR1);
   pthread_join(r->tid, NULL);
   sem_destroy(&r->sem_kys);
+  sem_destroy(&r->ack_ready);
 }
 
 #define limeade_destruct_th_recv(ctx)\
   limeade_destruct_th_recv_step_2(ctx);\
   limeade_destruct_th_recv_step_1(ctx);
 
-static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const char *dest, const char *key_path)
+static int limeade_init_client_ssh_step_1(struct limeade_context *ctx,
+                                         const char *dest, const char *key_path)
 {
   /* manages pipe/dup/execve for LIMEADE_MODE_CLIENT_SSH */
 
@@ -170,9 +176,11 @@ static int limeade_init_client_ssh_step_1(struct limeade_context *ctx, const cha
       close(to_ssh[1]);
 
       // ssh -s user@host limeade
-      execlp("ssh", "ssh", "-i", key_path,
-             "-oBatchMode=yes", "-oIdentitiesOnly=yes", "-s", "-l",
-             "limeade", dest, LIMEADE_SUBSYSTEM, NULL);
+          execlp("ssh", "ssh", "-i", key_path, "-oBatchMode=yes",
+                  "-oIdentitiesOnly=yes",
+                      "-oUpdateHostKeys=no",
+                  "-oUserKnownHostsFile=/etc/limeade/.ssh/known_hosts",
+                  "-s", "-l", "limeade", dest, LIMEADE_SUBSYSTEM, NULL);
 
       exit(-1);
 
@@ -199,10 +207,18 @@ static inline int limeade_init_client_ssh_step_2(struct limeade_context *ctx)
 {
   // there's not really anything to do here except confirm that the process
   // hasn't died for some reason
+  struct sigaction sa;
+  sa.sa_handler = SIG_IGN;
+  sa.sa_flags   = 0;
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGPIPE, &sa, NULL);
+
   register int r = kill(ctx->ssh_pid, 0);
 
   if(r != 0 && errno != EPERM)
     return LIMEADE_ERROR_OTHER;
+
+
   return LIMEADE_SUCCESS;
 }
 
@@ -275,7 +291,6 @@ static inline int limeade_init_host_eth_step_1(struct limeade_context *ctx,
   ctx->dest = NULL;
   ctx->port          = port;
 
-  ctx->saddr_len             = sizeof(ctx->saddr);
   ctx->saddr.sin_addr.s_addr = htonl(INADDR_ANY);
   ctx->saddr.sin_family      = AF_INET;
 
@@ -349,9 +364,6 @@ int limeade_init(struct limeade_context *ctx, int flags, ...)
   r = limeade_init_mutexes(ctx);
   CHECK(r)
     goto err_1;
-
-  // TODO I feel like this should be explicitly user-supplied
-  ctx->ack_wait_time_ms = 750;
 
   if(allow_compr)
   {

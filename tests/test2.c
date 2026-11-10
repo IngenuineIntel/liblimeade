@@ -137,16 +137,8 @@ int main(void)
   e = limeade_recv_wait_noreply(host, &recvd, 3000);
   E("host receive", e);
   if(e != LIMEADE_SUCCESS)
-  {
-    fprintf(stderr, "receive returned no packet; aborting test\n");
-    limeade_destruct(client);
-    limeade_destruct(host);
-    for(int i = 0; i < nr; i++)
-      free(altered[i].command);
-    free(altered);
-    free(died);
-    return 1;
-  }
+    goto end;
+
 
   printf("sz = %i\n", recvd.pkt_sz);
   //write(STDOUT_FILENO, recvd.pkt, recvd.pkt_sz);
@@ -159,31 +151,13 @@ int main(void)
 
   E("host parse", e);
   if(e != LIMEADE_SUCCESS)
-  {
-    fprintf(stderr, "parse failed: %d\n", e);
-    limeade_release(&recvd);
-    limeade_destruct(client);
-    limeade_destruct(host);
-    for(int i = 0; i < nr; i++)
-      free(altered[i].command);
-    free(altered);
-    free(died);
-    return 1;
-  }
+    goto end;
 
-  if(!proc_update_matches(&pkt1, &pkt2))
-  {
-    fprintf(stderr, "post-parse validation failed\n");
-    limeade_release(&pkt2);
-    limeade_release(&recvd);
-    limeade_destruct(client);
-    limeade_destruct(host);
-    for(int i = 0; i < nr; i++)
-      free(altered[i].command);
-    free(altered);
-    free(died);
-    return 1;
-  }
+  if(!(e = proc_update_matches(&pkt1, &pkt2)))
+    goto end;
+
+  e = 0;
+end:
 
   limeade_release(&pkt2);
   limeade_release(&recvd);
@@ -200,6 +174,6 @@ int main(void)
   free(altered);
   free(died);
 
-  return 0;
+  return e;
 }
 
